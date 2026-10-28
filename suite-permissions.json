@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "2026-10-24.1",
+  "suite": "Celluloid Science Apps",
+  "principles": {
+    "denyByDefault": true,
+    "adminHasAllPermissions": true,
+    "qaHasAllPermissionsWhereQaRoleExists": true,
+    "signatureUsesAuthenticatedUserRole": true,
+    "independentReviewRequiresDifferentUser": true,
+    "backendEnforcementRequiredForSecurity": true
+  },
+  "apps": {
+    "LIMSMan": {
+      "enforcement": "server",
+      "roleSource": "user.role plus user.isAdmin",
+      "roles": {
+        "Analyst": [
+          "workspace.view",
+          "sample.create",
+          "sample.edit",
+          "inventory.edit",
+          "sample.sign.analyst",
+          "audit.view",
+          "data.export"
+        ],
+        "QC": [
+          "workspace.view",
+          "sample.sign.reviewer",
+          "audit.view",
+          "data.export"
+        ],
+        "QA": [
+          "*"
+        ],
+        "Admin": [
+          "*"
+        ]
+      }
+    },
+    "EEL": {
+      "enforcement": "server",
+      "roleSource": "organization membership role",
+      "roles": {
+        "scientist": [
+          "workspace.view",
+          "document.create",
+          "document.edit",
+          "document.author_sign",
+          "document.submit",
+          "attachment.manage",
+          "template.use",
+          "audit.view",
+          "data.export"
+        ],
+        "reviewer": [
+          "workspace.view",
+          "document.review",
+          "document.approve",
+          "audit.view",
+          "data.export"
+        ],
+        "read_only": [
+          "workspace.view",
+          "audit.view",
+          "data.export"
+        ],
+        "admin": [
+          "*"
+        ],
+        "owner": [
+          "*"
+        ]
+      }
+    },
+    "DuckMan": {
+      "enforcement": "server",
+      "roleSource": "user.role",
+      "roles": {
+        "editor": [
+          "workspace.view",
+          "document.create",
+          "document.edit",
+          "document.revise",
+          "workflow.start",
+          "controlled_copy.issue",
+          "authoring_task.complete",
+          "audit.view",
+          "data.export"
+        ],
+        "reviewer": [
+          "workspace.view",
+          "document.review",
+          "document.approve",
+          "document.reject",
+          "approval.withdraw",
+          "document.make_effective",
+          "periodic_review.manage",
+          "review_task.complete",
+          "audit.view",
+          "data.export"
+        ],
+        "read_only": [
+          "workspace.view",
+          "document.download",
+          "audit.view",
+          "data.export"
+        ],
+        "admin": [
+          "*"
+        ]
+      }
+    },
+    "MethPipe": {
+      "enforcement": "server_workspace",
+      "roleSource": "authenticated account suite_role",
+      "roles": {
+        "Analyst": [
+          "workspace.view",
+          "method.edit",
+          "plan.edit",
+          "experiment.execute",
+          "result.edit",
+          "result.sign.analyst",
+          "audit.view",
+          "data.export"
+        ],
+        "Reviewer": [
+          "workspace.view",
+          "result.review",
+          "result.sign.reviewer",
+          "audit.view",
+          "data.export"
+        ],
+        "QA": [
+          "*"
+        ],
+        "Admin": [
+          "*"
+        ],
+        "ReadOnly": [
+          "workspace.view",
+          "audit.view",
+          "data.export"
+        ]
+      }
+    },
+    "GoFlo": {
+      "enforcement": "server_review_workflows",
+      "roleSource": "authenticated account suite_role",
+      "roles": {
+        "Analyst": [
+          "workspace.view",
+          "analysis.edit",
+          "gating.edit",
+          "batch.run",
+          "report.create",
+          "data.export"
+        ],
+        "Reviewer": [
+          "workspace.view",
+          "analysis.review",
+          "report.review",
+          "data.export"
+        ],
+        "QA": [
+          "*"
+        ],
+        "Admin": [
+          "*"
+        ],
+        "ReadOnly": [
+          "workspace.view",
+          "data.export"
+        ]
+      }
+    },
+    "ManTrain": {
+      "enforcement": "server_workspace",
+      "roleSource": "authenticated account suite_role",
+      "roles": {
+        "Learner": [
+          "workspace.view",
+          "training.view_assigned",
+          "training.complete"
+        ],
+        "Trainer": [
+          "workspace.view",
+          "training.view",
+          "training.assign",
+          "training.signoff",
+          "qualification.manage",
+          "report.view",
+          "audit.view"
+        ],
+        "QA": [
+          "*"
+        ],
+        "Admin": [
+          "*"
+        ],
+        "ReadOnly": [
+          "workspace.view",
+          "report.view",
+          "audit.view"
+        ]
+      }
+    }
+  }
+}
