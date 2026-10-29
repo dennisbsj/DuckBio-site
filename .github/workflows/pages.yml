@@ -1,0 +1,56 @@
+name: Publish DuckBio site on GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - pricing.html
+      - assets/app-icons/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout site
+        uses: actions/checkout@v4
+      - name: Assemble public site only
+        run: |
+          set -euo pipefail
+          mkdir -p _site/assets/app-icons
+          cp index.html pricing.html _site/
+          cp assets/app-icons/*.svg _site/assets/app-icons/
+          touch _site/.nojekyll
+          test -s _site/index.html
+          test -s _site/pricing.html
+          test -s _site/assets/app-icons/eel.svg
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Deploy site
+        id: deployment
+        uses: actions/deploy-pages@v4

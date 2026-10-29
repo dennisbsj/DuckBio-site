@@ -1,52 +1,67 @@
 # DuckBio — software for scientific workflows
 
-This repository is the **new DuckBio website and shared application-suite source**. DuckBio is a software-only business offering six applications: **GoFlo, EEL, MethPipe, ManTrain, LIMSMan and DuckMan**.
+DuckBio offers six focused scientific software applications: **GoFlo, EEL, MethPipe, ManTrain, LIMSMan and DuckMan**.
 
-## Status — migration in progress
+## GitHub Pages marketing website
 
-**This repository is not yet a production website. Do not deploy it in place of the existing site or point live domains at it.**
+The public **website preview** is hosted at:
 
-The existing `dennisbsj/celluloid-consulting-site` repository remains the active website/deployment source until a separately verified cutover. Its historical content must not be deleted before backups and release verification.
+**https://dennisbsj.github.io/DuckBio-site/**
 
-The first migration step preserves the canonical authorization policy and shared app UI **byte-for-byte**. This keeps all six installed application copies compatible. Existing legacy names in these files (including `Celluloid Science Apps`, the `cc-suite-theme` local-storage key and their JS global/event names) are compatibility contracts, **not the new DuckBio marketing brand**. Do not rename these contracts during the repository migration. Rebranding them requires separate testing across all six apps.
+This repository contains the GitHub Pages website source and shared application-suite assets:
 
-## Canonical shared files
+- `index.html`: public homepage, navigation and app overview.
+- `pricing.html`: proposed 2027 pricing, discounts, launch promotion and interactive estimate calculator.
+- `assets/app-icons/`: existing app icons used on the public pages.
+- `.github/workflows/pages.yml`: GitHub Pages publication workflow.
+
+The website uses relative links (`pricing.html`, `index.html` and `assets/...`) so it works under the GitHub Pages project path `/DuckBio-site/`.
+
+### Publishing
+
+The GitHub Actions workflow publishes updates from `main` and also supports manual runs (`workflow_dispatch`). It uploads **only** the public HTML pages and SVG application icons. It does **not** upload the shared permission policy, suite UI runtime, sync scripts, databases or application source code.
+
+If the site does not update after a merge, check **Actions → Publish DuckBio site on GitHub Pages** and **Settings → Pages**. The Pages build source must be set to **GitHub Actions** for the workflow to publish.
+
+A successful GitHub commit alone is not proof that the public site has updated; confirm the deployment run and the actual served pages. The GitHub Pages site is a marketing preview, not an app deployment, Stripe checkout or a replacement for the six application hosting environments.
+
+### Commercial status
+
+Prices are the **tentative 2027 subscription proposal**:
+
+- DKK 200 per user per app per month, excluding VAT.
+- Multi-app discounts rising to 25% for all six apps (DKK 900/user/month).
+- Organisation discounts for 5–19 and 20–49 users; 50+ by quote.
+- Early-adopter campaign for subscriptions started from 1 January through 31 March 2027, with 20% off for the first 12 months.
+
+No live purchasing or account provisioning is claimed on the GitHub Pages preview.
+
+## Canonical shared files — preserve compatibility
 
 - `suite-permissions.json`: shared roles and permission policy.
 - `suite-ui.js`: shared login/header/theme helper.
-- `scripts/sync-suite-permissions.py`: verifies/updates six app-local copies.
-- `scripts/sync-suite-ui.py`: verifies/updates six app-local copies.
-- `assets/app-icons/`: selected pre-existing product icons.
+- `scripts/sync-suite-permissions.py` and `scripts/sync-suite-ui.py`: verification/synchronisation scripts.
 
-The six apps each retain a local release copy of these shared files and **do not load their runtime code remotely from this website**.
+The six apps retain independent local release copies of these shared files. Existing names and storage/event keys inside them are compatibility contracts and **must not be renamed merely for website rebranding**.
 
-When the site and all six repositories are checked out as sibling directories:
+When this repository and all six app repositories are checked out as siblings:
 
 ```sh
 python scripts/sync-suite-permissions.py --check
 python scripts/sync-suite-ui.py --check
 ```
 
-Only after deliberately modifying an approved canonical file should the corresponding `--write` command be used; review diffs, run app tests and deploy each app separately.
+Only use `--write` after intentionally changing an approved canonical file and checking application compatibility. GitHub Pages publication does not synchronize or deploy apps.
 
-## Website direction (not implemented yet)
+## Design principles
 
-- Software products and subscription licensing only; **no consulting services**.
-- Keep the light navy/blue/aqua/coral look from preferred concept #1.
-- No photography or illustrations of people.
-- Home; All apps; six product details; Platform; Pricing; Solutions; About; Support/Contact.
-- Public marketing site and authenticated customer platform are separate products.
-- Avoid claiming unified login, billing, inbox, messaging, compliance certification or other features are live until implemented and verified.
-- Use real product UI screenshots and product icons rather than fake application screenshots.
-- Proposed tagline: **Serious science. Smarter software.**
+- Software products and subscription licensing, not consulting services.
+- Light navy, blue, aqua and coral; no photography of people.
+- Use real product icons and verified screenshots, not fake product UI.
+- Public marketing pages and the future authenticated customer platform are separate products.
+- Never advertise unified login, billing, messaging or certification as live until verified.
+- Tagline: **Serious science. Smarter software.**
 
-## Safety gates before old repository can be retired
+## Further work
 
-1. Preserve an independent archive/backup of the original website repository and public assets.
-2. Move required website content/assets, rebuild and review the DuckBio site.
-3. Verify shared policy and UI are still identical in all six apps.
-4. Update remaining source links, sync instructions, deployment scripts and domain references in controlled PRs, not as a bulk blind replace.
-5. Migrate hosting, DNS, HTTPS, licensing/contacts and any redirects; verify the production source and rollback.
-6. Only then archive the old repository. Consider permanent deletion separately.
-
-**No production deployment, DNS change, app migration or old-repository deletion is authorized by this README.**
+Complete the remaining app detail, platform, solutions, about and support pages; validate the release and payment flows separately; and retain tested rollback arrangements for any future domain, hosting or application migrations.
