@@ -36,7 +36,7 @@ jobs:
           test -s _site/pricing.html
           test -s _site/assets/app-icons/eel.svg
       - name: Upload site artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: _site
 
@@ -49,8 +49,6 @@ jobs:
     steps:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - name: Deploy site
         id: deployment
         uses: actions/deploy-pages@v4
