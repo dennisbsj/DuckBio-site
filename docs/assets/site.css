@@ -198,18 +198,38 @@ a.pr-app:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
 .pr-app-arrow{color:var(--blue);font-size:12px;font-weight:800;margin-left:3px}
 html[data-theme="dark"] a.pr-app:hover{background:#27566a;color:#eaf8fd}
 
-/* Marketing Apps landing page shows the ACTUAL separate prototype HTML page in an iframe. */
+/* Apps catalogue page: concise hero, pricing note and six product cards. */
 .apps-landing-hero{padding:70px 0 61px}
 .apps-landing-hero h1{max-width:900px}
 .apps-hero-detail{display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;font-size:13px;color:var(--muted);margin-top:28px}
 .apps-hero-detail span{border-radius:99px;border:1px solid var(--line);padding:9px 15px;background:var(--white);font-weight:750}
 .apps-hero-detail a{color:var(--blue);font-weight:850}
-.platform-frame{width:100%;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);background:#102f43;overflow:hidden}
-.platform-frame iframe{display:block;width:100%;height:790px;border:0;background:#edf7fa}
-.apps-preview-disclaimer{max-width:920px;color:var(--muted);font-size:12px;line-height:1.6;margin:17px auto 0;text-align:center}
-.apps-preview-disclaimer a{color:var(--blue);text-decoration:underline;text-underline-offset:3px}
 html[data-theme="dark"] .apps-hero-detail span{background:#163b4d}
-html[data-theme="dark"] .platform-frame{border-color:#4b7384}
-@media(max-width:950px){.platform-frame iframe{height:920px}}
-@media(max-width:700px){.apps-landing-hero{padding:54px 0 45px}.platform-frame iframe{height:1040px}}
-@media(max-width:420px){.platform-frame iframe{height:1140px}}
+@media(max-width:700px){.apps-landing-hero{padding:54px 0 45px}}
+
+/* Separate platform preview page: resembles a screenshot but the embedded launcher is clickable. */
+.workspace-page-hero{padding:58px 0 50px}
+.workspace-page-hero h1{margin-bottom:14px}
+.workspace-page-hero .lead{max-width:770px;margin-bottom:12px}
+.workspace-page-caveat{max-width:810px;font-size:12px;color:var(--muted);line-height:1.6;margin:0}
+.workspace-preview-section{padding:50px 0 65px}
+.workspace-screenshot{border:1px solid #cedee7;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(9,44,62,.18);background:#112f42}
+.workspace-screenshot-chrome{min-height:50px;padding:10px 20px;display:flex;gap:17px;align-items:center;background:#e8f2f5;color:#587380;border-bottom:1px solid #d7e8ed;font-size:12px}
+.workspace-dots{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.workspace-dots i{display:block;border-radius:50%;width:9px;height:9px;background:#c1d2da}
+.workspace-dots i:first-child{background:#ffac98}
+.workspace-dots i:nth-child(2){background:#f5d884}
+.workspace-dots i:nth-child(3){background:#83d8c8}
+.workspace-address{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:750}
+.workspace-preview-status{margin-left:auto;flex:0 0 auto;letter-spacing:.065em;font-weight:850;font-size:10px;color:#176f86}
+.workspace-screenshot iframe{width:100%;height:860px;display:block;border:0;background:#eaf5f9}
+.workspace-below{display:flex;justify-content:space-between;align-items:center;gap:16px;margin:20px 0 10px}
+.workspace-below p{font-size:13px;color:var(--muted);margin:0}
+.workspace-below .text-link{white-space:nowrap}
+.workspace-note{font-size:12px;color:var(--muted);line-height:1.7;margin:0}
+html[data-theme="dark"] .workspace-screenshot{border-color:#47697a;box-shadow:0 25px 60px rgba(0,0,0,.27)}
+html[data-theme="dark"] .workspace-screenshot-chrome{background:#15364a;border-bottom-color:#456879;color:#c0d6df}
+html[data-theme="dark"] .workspace-preview-status{color:#80d8e8}
+@media(max-width:900px){.workspace-screenshot iframe{height:900px}}
+@media(max-width:760px){.workspace-page-hero{padding:46px 0 39px}.workspace-preview-section{padding:29px 0 50px}.workspace-screenshot iframe{height:1060px}.workspace-screenshot-chrome{padding:10px 12px;gap:10px}.workspace-below{align-items:start;flex-direction:column}}
+@media(max-width:430px){.workspace-preview-status{font-size:8px}.workspace-address{font-size:11px}.workspace-screenshot iframe{height:1150px}}
