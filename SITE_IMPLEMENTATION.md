@@ -102,3 +102,11 @@ The order applies to the homepage hero app preview and six product cards, the pr
 ## DuckPipe customer-facing rename (2026-10-29)
 
 The method-validation app is now named **DuckPipe** (previously MethDuck) across the DuckBio marketing website. The canonical product page is `docs/duckpipe.html`, and the previous `docs/methpipe.html` URL remains as a fast redirect. All application navigation and footer lists, the homepage preview and cards, the pricing-page app chooser and FAQ, and the interactive launcher use DuckPipe. Its position in the canonical order is third: **LabDuck → CytoDuck → DuckPipe / DuckNote → DuckMan → DuckTrain**. The pipe-themed approved artwork and its existing technical CSS sprite class `logo-methduck` and launcher sprite slot `s4` remain unchanged, as does the `methpipe` pricing key. The actual app repository `dennisbsj/MethPipe` and application code have **not** been changed or renamed.
+
+## Transparent DB mark (no fill) for light/dark themes (2026-10-29)
+
+DuckBio's customer-approved combined DB-and-duck company symbol now uses **transparent negative space** instead of a solid white duck/background. The same icon contours were traced to two lightweight, resolution-independent SVGs: `docs/assets/duckbio-brand-nofill.svg` (navy D, cyan B) for light backgrounds and `docs/assets/duckbio-brand-nofill-dark.svg` (pale D, cyan B) for dark backgrounds. Both have no white duck fill and no background box.
+
+Every standard page uses the light symbol in the header's light theme, the pale symbol in the dark theme, and the pale symbol in the always-dark footer. The dark-header variant is toggled by CSS and follows DuckBio's own stored light/dark preference, not only the operating-system setting. The interactive launcher has a permanently dark top bar and uses the pale symbol there. Favicons expose both SVGs with `prefers-color-scheme` media attributes. Versioned stylesheet links prevent old white-background logo styling from being served from cache.
+
+The previous `docs/assets/duckbio-brand-approved.png` is retained only for rollback; it is no longer used on public HTML pages. The six application logos, pricing data, application repositories, and deployment branch `main` were not modified.
