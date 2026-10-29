@@ -89,3 +89,12 @@ A new set of 50 exploratory DuckBio brand concepts was created for user review, 
 The user-approved compact **DB monogram with a white duck and cyan duckbill** replaces the earlier abstract-duck mark in the marketing site's header, footer and standalone launcher. The approved symbol is cropped from the selected image, optimised as a 256×256 PNG at `docs/assets/duckbio-brand-approved.png`, and also used as the PNG favicon on all website pages (including redirects). The adjacent DuckBio wordmark remains readable text that adapts to the site's light and dark themes. A rounded white backing maintains the correct appearance against the dark footer and navigation.
 
 The superseded `duckbio-mark.svg` and `duckbio-mark-light.svg` remain in the repository for rollback but no longer appear in public page markup. The original full-size user-approved design remains in the conversation source artwork; the smaller image is the website delivery asset. All standard pages reference a refreshed stylesheet version for browser cache invalidation. **No app source code, app branding, repository names, production deployments, authentication or payments have been modified.**
+
+## Canonical application display order (2026-10-29)
+
+Use this single customer-facing order **everywhere** in the DuckBio marketing website and its interactive preview:
+
+1. **Top row:** LabDuck → CytoDuck → MethDuck
+2. **Bottom row:** DuckNote → DuckMan → DuckTrain
+
+The order applies to the homepage hero app preview and six product cards, the pricing-page app chooser (three columns on desktop), the All Apps interactive launcher (three columns on desktop), the Apps dropdown in every full website header, and the Products list in every full website footer. On narrower screens, preserve the same reading/tab order even when responsive CSS changes the number of columns. Keep icon sprite position mappings (LabDuck=s1, CytoDuck=s5, MethDuck=s4, DuckNote=s2, DuckMan=s6, DuckTrain=s3), application links, prices, copy and existing code identifiers unchanged. The static marketing site alone was edited; no live app repository is touched.
