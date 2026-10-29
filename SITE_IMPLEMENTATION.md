@@ -83,3 +83,9 @@ The customer-visible laboratory management product is now **LabDuck**, replacing
 The earlier typographical error `Eeletronic lab notebook` was corrected to `Electronic lab notebook` in public-facing website copy.
 
 A new set of 50 exploratory DuckBio brand concepts was created for user review, reflecting LIMS, ELN, document management, cytometry, validation, and training. These concepts are NOT yet installed as the DuckBio corporate logo; final selection and trademark similarity review remain pending.
+
+## Approved DB duck corporate logo and favicon (2026-10-29)
+
+The user-approved compact **DB monogram with a white duck and cyan duckbill** replaces the earlier abstract-duck mark in the marketing site's header, footer and standalone launcher. The approved symbol is cropped from the selected image, optimised as a 256×256 PNG at `docs/assets/duckbio-brand-approved.png`, and also used as the PNG favicon on all website pages (including redirects). The adjacent DuckBio wordmark remains readable text that adapts to the site's light and dark themes. A rounded white backing maintains the correct appearance against the dark footer and navigation.
+
+The superseded `duckbio-mark.svg` and `duckbio-mark-light.svg` remain in the repository for rollback but no longer appear in public page markup. The original full-size user-approved design remains in the conversation source artwork; the smaller image is the website delivery asset. All standard pages reference a refreshed stylesheet version for browser cache invalidation. **No app source code, app branding, repository names, production deployments, authentication or payments have been modified.**
