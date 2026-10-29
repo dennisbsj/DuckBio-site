@@ -60,7 +60,7 @@ Static source checks can verify local links, internal anchors, unique page metad
 
 ## Product display names — October 2026
 
-The public DuckBio storefront now uses **LIMSDuck**, **DuckNote**, **DuckTrain**, **MethDuck**, **DuckFlow**, and **DuckMan**.
+The public DuckBio storefront now uses **LIMSDuck**, **DuckNote**, **DuckTrain**, **MethDuck**, **CytoDuck**, and **DuckMan**.
 
 The underlying repository names and static legacy slugs for the five renamed products are unchanged until a separately approved repository/deployment migration. `GoFlo` is the existing repository spelling; it was not named `GoFlow`. The pricing configuration and image file paths retain stable internal identifiers until integration is designed and tested. The LIMSDuck website icon has been restored to the exact original LIMSMan artwork (retitled only). Four custom SVG website illustrations now represent DuckNote, DuckTrain, MethDuck and DuckFlow in a shared navy/white/teal scientific duck style. Prior website icon files remain available as fallback/archive. The DuckMan icon and corporate DuckBio logo are unchanged, and no live app logo or code was changed.
 
@@ -69,3 +69,9 @@ The underlying repository names and static legacy slugs for the five renamed pro
 The six user-approved icon illustrations were extracted from the supplied six-panel image **without the wordmarks beneath them** and published as a compact 3×2 WebP sprite at `docs/assets/icons/duckbio-approved-sprite.webp`. The HTML image elements use the local transparent SVG `transparent.svg` with six CSS background-position classes to select the corresponding tile. The public product titles remain ordinary text outside the images. All 18 pages use a versioned stylesheet reference to avoid stale browser cache.
 
 The original icon artwork and the previous website-only SVG experiments remain in the repository for reversibility. **No application repositories, live app branding, permissions, production data, main branch or authentication/payment integration were changed.** The image was optimised for small product icons; a higher-resolution master remains available in the user's supplied artwork, not in the website repository.
+
+## DuckFlow → CytoDuck and corporate brand mark (2026-10-29)
+
+The customer-visible cytometry product is now **CytoDuck** across the public website. Its new public URL is `docs/cytoduck.html`. `docs/goflo.html` remains as a redirect for existing links. The underlying `dennisbsj/GoFlo` repository, server, route integration identifiers, and `goflo` key in `docs/assets/pricing.json` are deliberately unchanged. The existing user-approved flow-cytometry artwork is retained and now labelled CytoDuck.
+
+The DuckBio **company** brand icon is a minimal, smooth abstract duck silhouette distinct from the detailed illustrated app mascots; it has no glasses, shirt, laboratory implements or app-style square background. Website-wide headers use `docs/assets/duckbio-mark.svg`, dark footers use `docs/assets/duckbio-mark-light.svg`, and browsers use the main silhouette as the favicon. The existing DuckBio wordmark remains separate text. No application assets or repositories were modified.
