@@ -56,3 +56,91 @@ a.app-card-link:after{content:"→";color:var(--blue);font-weight:850;font-size:
 .contact-draft-fallback textarea{width:100%;min-height:140px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;padding:12px;border:1px solid var(--line);border-radius:8px;resize:vertical}
 @media(max-width:820px){.contact-layout{grid-template-columns:1fr;gap:25px}}
 @media(max-width:540px){.contact-fields{grid-template-columns:1fr}.contact-field.full{grid-column:auto}.contact-form-card{padding:20px}.application-price-bar a{margin-left:0;width:100%}.homepage-app-meta{align-items:flex-start;flex-direction:column}}
+
+
+/* Global, identical header actions and persistent day/night switch. */
+.header .head{min-height:74px;height:auto;padding-block:10px}
+.head-actions{flex:0 0 auto}
+.theme-toggle{display:inline-flex;align-items:center;justify-content:center;flex:0 0 42px;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:#f0f8fb;color:#123c55;cursor:pointer;transition:background .18s,border-color .18s,transform .18s}
+.theme-toggle:hover{background:#dcf1f6;transform:translateY(-1px)}
+.theme-toggle:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+.theme-toggle .theme-icon{font-size:23px;line-height:1}
+@media(max-width:820px){
+ .head{gap:12px}
+ .head-actions{gap:9px}
+ .theme-toggle{width:39px;height:39px;flex-basis:39px}
+ .nav{right:0}
+}
+
+/* Contact form layout: deliberately explicit so all mobile fields remain aligned. */
+#contact.contact-section{scroll-margin-top:90px}
+#contact .contact-layout{display:grid;grid-template-columns:minmax(0,.88fr) minmax(0,1.12fr);gap:clamp(20px,5vw,55px);align-items:start}
+#contact .contact-form-card{display:block;min-width:0;width:100%;padding:clamp(22px,3vw,32px);border:1px solid var(--line);border-radius:18px;background:var(--white);box-shadow:var(--shadow)}
+#contact .contact-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+#contact .contact-field{display:flex;flex-direction:column;min-width:0;gap:8px}
+#contact .contact-field.full{grid-column:1/-1}
+#contact .contact-field label{display:block;font-size:13px;font-weight:800;color:var(--ink)}
+#contact .contact-field input,#contact .contact-field textarea{display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;margin:0;padding:13px 15px;min-height:47px;border:1px solid #b8d1dc;border-radius:10px;background:var(--white);color:var(--ink);font:inherit;font-size:14px;line-height:1.45}
+#contact .contact-field textarea{min-height:156px;resize:vertical}
+#contact .contact-field input:focus,#contact .contact-field textarea:focus{outline:2px solid var(--teal);outline-offset:1px;border-color:var(--teal)}
+#contact .contact-form-card button[type="submit"]{margin-top:21px}
+#contact .contact-footnote{line-height:1.6}
+#contact .contact-copy h2{margin-top:0}
+#contact .contact-steps{background:#e9f6f9}
+@media(max-width:820px){#contact .contact-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:540px){
+ #contact .contact-fields{grid-template-columns:minmax(0,1fr)}
+ #contact .contact-field.full{grid-column:auto}
+ #contact .contact-form-card button[type="submit"]{width:100%}
+ #contact .contact-form-card{padding:21px}
+}
+
+/* Night mode deliberately styles all existing pages, including pricing and forms. */
+html[data-theme="dark"]{color-scheme:dark;--ink:#e1f0f7;--navy:#d2eaf3;--navy2:#93c1d4;--blue:#76c9ed;--teal:#67d5de;--pale:#132c3d;--pale2:#162e40;--muted:#b0c9d3;--line:#385568;--white:#102737;--shadow:0 20px 52px rgba(0,8,20,.31)}
+html[data-theme="dark"] body{background:#0b1d2b;color:var(--ink)}
+html[data-theme="dark"] .header{background:rgba(13,32,47,.96);border-bottom-color:var(--line)}
+html[data-theme="dark"] .header .brand{color:#e8f8ff}
+html[data-theme="dark"] .nav a{color:#c8dfe8}
+html[data-theme="dark"] .nav a:hover,html[data-theme="dark"] .nav a[aria-current="page"]{color:#7cdef0}
+html[data-theme="dark"] .nav.open{background:#112c3c}
+html[data-theme="dark"] .theme-toggle{background:#24485b;border-color:#456679;color:#f4e2a7}
+html[data-theme="dark"] .theme-toggle:hover{background:#325b71}
+html[data-theme="dark"] .small-btn.menu-btn{color:#eaf9ff;border-color:var(--line)}
+html[data-theme="dark"] .soft{background:linear-gradient(135deg,#0e2433,#142f40)}
+html[data-theme="dark"] .page-hero{background:linear-gradient(120deg,#16354a,#102536)}
+html[data-theme="dark"] .page-hero h1,html[data-theme="dark"] .page-hero h2{color:#eefaff}
+html[data-theme="dark"] .card,html[data-theme="dark"] .faq details,html[data-theme="dark"] .tile,html[data-theme="dark"] .media-panel{background:#173548;border-color:var(--line)}
+html[data-theme="dark"] .media-placeholder{background:#193447;border-color:#4a6c7a;color:#c3dae4}
+html[data-theme="dark"] .note,html[data-theme="dark"] .contact-steps{background:#1b3a4c;border-color:var(--line);color:#cbe3ec}
+html[data-theme="dark"] .note p,html[data-theme="dark"] .contact-steps p{color:#cbe3ec}
+html[data-theme="dark"] .app-card h3,html[data-theme="dark"] .card h3,html[data-theme="dark"] .faq summary,html[data-theme="dark"] .section h2,html[data-theme="dark"] .page-hero h1{color:#edfaff}
+html[data-theme="dark"] a.app-card-link{color:#d9f0f5}
+html[data-theme="dark"] a.app-card-link:hover{border-color:#76cbd6;background:#1c4156;color:#e8f9ff}
+html[data-theme="dark"] .app-subtitle{color:#80d5e4}
+html[data-theme="dark"] .btn-outline{color:#e8f8ff;background:#1a3b4d;border-color:#6e9aaa}
+html[data-theme="dark"] .btn-white{background:#d5f1f4;color:#123446}
+html[data-theme="dark"] .btn-secondary{background:#28637b;color:white}
+html[data-theme="dark"] .hero-visual{background:#17384d;color:#effaff}
+html[data-theme="dark"] .hero-app,html[data-theme="dark"] .suite-grid .mini{background:#21475b;color:#e5f5ff}
+html[data-theme="dark"] .preview-top,html[data-theme="dark"] .hero-app strong,html[data-theme="dark"] .suite-grid strong{color:#effaff}
+html[data-theme="dark"] .hero-app small,html[data-theme="dark"] .suite-grid small{color:#b9d4dd}
+html[data-theme="dark"] #contact .contact-form-card{background:#183748}
+html[data-theme="dark"] #contact .contact-steps{background:#1c3d50}
+html[data-theme="dark"] #contact .contact-field input,html[data-theme="dark"] #contact .contact-field textarea{background:#102735;border-color:#507282;color:#eaf7fa}
+html[data-theme="dark"] #contact .contact-field input::placeholder,html[data-theme="dark"] #contact .contact-field textarea::placeholder{color:#96b1bd}
+html[data-theme="dark"] .contact-draft-fallback textarea{background:#0d2736;color:#e8f7fa;border-color:var(--line)}
+html[data-theme="dark"] .footer{background:#081b29}
+html[data-theme="dark"] .pr-hero{background:radial-gradient(circle at 80% 18%,#265767,transparent 42%),linear-gradient(120deg,#102a3a,#18394b)}
+html[data-theme="dark"] .pr-hero h1,html[data-theme="dark"] .pr-hero h1 span,html[data-theme="dark"] .pr-heading h2,html[data-theme="dark"] .pr-plan h3,html[data-theme="dark"] .pr-price,html[data-theme="dark"] .pr-hero-card .pr-amount{color:#e9f9ff}
+html[data-theme="dark"] .pr-hero-card,html[data-theme="dark"] .pr-plan,html[data-theme="dark"] .pr-calc-card,html[data-theme="dark"] .pr-app,html[data-theme="dark"] .pr-faq details,html[data-theme="dark"] .pr-table{background:#18384a;border-color:var(--line)}
+html[data-theme="dark"] .pr-hero-card strong,html[data-theme="dark"] .pr-plan .pr-price,html[data-theme="dark"] .pr-calc-intro h2,html[data-theme="dark"] .pr-faq summary,html[data-theme="dark"] .pr-result .pr-total{color:#eaf9ff}
+html[data-theme="dark"] .pr-table th{background:#21475b;color:#d3eef4}
+html[data-theme="dark"] .pr-table td,html[data-theme="dark"] .pr-table td:last-child{color:#e2f5fa;border-bottom-color:var(--line)}
+html[data-theme="dark"] .pr-app,html[data-theme="dark"] .pr-input-grid label,html[data-theme="dark"] .pr-breakdown b,html[data-theme="dark"] .pr-field label{color:#eaf6fc}
+html[data-theme="dark"] .pr-input-grid input,html[data-theme="dark"] .pr-input-grid select{background:#102b3c;border-color:#52788a;color:#eafaff}
+html[data-theme="dark"] .pr-promo{background:#194c53;border-color:#478e96}
+html[data-theme="dark"] .pr-promo strong{color:#e3faf6}
+html[data-theme="dark"] .pr-offer{background:linear-gradient(125deg,#183f56,#225e6c)}
+html[data-theme="dark"] .pr-apps .pr-app{color:#eaf8fc}
+html[data-theme="dark"] .pr-bullet{color:#c4e0e9}
+html[data-theme="dark"] .pr-calc-card .pr-result-label{color:#bed7e1}
