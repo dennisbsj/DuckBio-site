@@ -19,7 +19,21 @@ main{padding:clamp(25px,4vw,48px)}.kicker{font-size:11px;letter-spacing:.17em;fo
 @media(max-width:760px){.shell{grid-template-columns:1fr}aside{display:none}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.app{padding:17px;min-height:193px}.icon{width:55px;height:55px}.bar{min-height:61px}.tag{font-size:10px;padding:6px 9px}}
 @media(max-width:400px){.grid{gap:12px}.app{padding:13px;min-height:178px}.app strong{font-size:16px}.app small{font-size:11px;min-height:42px}.main-title{flex-direction:column}.notice{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.app{transition:none}}
+/* Respect the preference used by the DuckBio marketing site, including in the embedded preview. */
+html[data-theme="dark"],html[data-theme="dark"] body{background:#102534;color:#dfedf5}
+html[data-theme="dark"] .bar{background:#091e2b}
+html[data-theme="dark"] aside{background:#102c3d}
+html[data-theme="dark"] .app{background:#1c4054;border-color:#40677a}
+html[data-theme="dark"] .app strong,html[data-theme="dark"] .main-title h1{color:#e8f6fa}
+html[data-theme="dark"] .app small,html[data-theme="dark"] .main-title p{color:#b9d3dc}
+html[data-theme="dark"] .app .action{color:#87e3ec}
+html[data-theme="dark"] .notice{background:#17394a;border-color:#416878;color:#cae4ed}
+html[data-theme="dark"] .count{background:#234c60;color:#dbf1f6}
 </style>
+<script>
+try{document.documentElement.dataset.theme=localStorage.getItem("duckbio-theme")==="dark"?"dark":"light"}catch(e){document.documentElement.dataset.theme="light"}
+addEventListener("storage",function(e){if(e.key==="duckbio-theme"){document.documentElement.dataset.theme=e.newValue==="dark"?"dark":"light"}});
+</script>
 </head>
 <body>
 <div class="bar"><div class="brand"><img src="assets/duckbio-mark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><span class="tag"><span class="dot"></span>Interactive prototype</span></div>
