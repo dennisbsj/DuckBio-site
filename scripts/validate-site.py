@@ -13,7 +13,7 @@ EXPECTED_APPS = {"limsman", "eel", "mantrain", "methpipe", "goflo", "duckman"}
 EXPECTED_PAGES = {
     "index.html", "apps.html", "pricing.html", "trial.html", "account.html",
     "about.html", "support.html", "terms.html", "privacy.html", "cookies.html",
-    "subscriptions.html", "refunds.html", "cytoduck.html",
+    "subscriptions.html", "refunds.html", "cytoduck.html", "labduck.html",
 } | {f"{app}.html" for app in EXPECTED_APPS}
 
 
