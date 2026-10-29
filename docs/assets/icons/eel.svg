@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="EEL">
+  <defs>
+    <linearGradient id="eel" x1="7" y1="53" x2="58" y2="12" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#008b78"/>
+      <stop offset=".5" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#effcff"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="12" fill="#00243a"/>
+  <path d="M8 48C15 20 34 10 49 18C61 24 63 38 55 45C47 51 37 47 37 39C37 32 43 28 50 30" fill="none" stroke="url(#eel)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M11 46C15 44 18 40 21 36" fill="none" stroke="#83eff4" stroke-opacity=".55" stroke-width="1.7" stroke-linecap="round"/>
+  <circle cx="51.4" cy="29.2" r="2" fill="#eafcff"/>
+  <circle cx="52" cy="29.1" r=".8" fill="#00243a"/>
+  <circle cx="27" cy="15" r="1.6" fill="#54d8ef" opacity=".72"/>
+  <circle cx="32" cy="11" r="1" fill="#6be7f1" opacity=".52"/>
+</svg>

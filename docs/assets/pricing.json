@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "currency": "DKK",
+  "trialDays": 7,
+  "trialConfigured": false,
+  "subscriptionsLive": false,
+  "products": {
+    "limsman": {
+      "monthly": null,
+      "currency": "DKK",
+      "stripePriceId": null,
+      "earlyAdopterMonthly": null
+    },
+    "eel": {
+      "monthly": null,
+      "currency": "DKK",
+      "stripePriceId": null,
+      "earlyAdopterMonthly": null
+    },
+    "mantrain": {
+      "monthly": null,
+      "currency": "DKK",
+      "stripePriceId": null,
+      "earlyAdopterMonthly": null
+    },
+    "methpipe": {
+      "monthly": null,
+      "currency": "DKK",
+      "stripePriceId": null,
+      "earlyAdopterMonthly": null
+    },
+    "goflo": {
+      "monthly": null,
+      "currency": "DKK",
+      "stripePriceId": null,
+      "earlyAdopterMonthly": null
+    },
+    "duckman": {
+      "monthly": null,
+      "currency": "DKK",
+      "stripePriceId": null,
+      "earlyAdopterMonthly": null
+    }
+  },
+  "policy": "Pricing remains unapproved. Do not display a price or enable Stripe checkout until a server backend and price IDs are configured."
+}

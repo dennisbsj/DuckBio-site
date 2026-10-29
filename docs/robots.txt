@@ -1,0 +1,3 @@
+User-agent: *
+Disallow: /
+# Development site: remove the restriction only after public launch.
