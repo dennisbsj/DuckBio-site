@@ -227,9 +227,21 @@ html[data-theme="dark"] .apps-hero-detail span{background:#163b4d}
 .workspace-below p{font-size:13px;color:var(--muted);margin:0}
 .workspace-below .text-link{white-space:nowrap}
 .workspace-note{font-size:12px;color:var(--muted);line-height:1.7;margin:0}
-html[data-theme="dark"] .workspace-screenshot{border-color:#47697a;box-shadow:0 25px 60px rgba(0,0,0,.27)}
-html[data-theme="dark"] .workspace-screenshot-chrome{background:#15364a;border-bottom-color:#456879;color:#c0d6df}
-html[data-theme="dark"] .workspace-preview-status{color:#80d8e8}
+/* Screenshot window stays LIGHT, even when the surrounding website is dark. */
+html[data-theme="dark"] .workspace-screenshot{background:#f0f7fa;border-color:#b7d4de;box-shadow:0 25px 60px rgba(0,0,0,.27)}
+html[data-theme="dark"] .workspace-screenshot-chrome{background:#e8f2f5;border-bottom-color:#d7e8ed;color:#587380}
+html[data-theme="dark"] .workspace-preview-status{color:#176f86}
 @media(max-width:900px){.workspace-screenshot iframe{height:900px}}
 @media(max-width:760px){.workspace-page-hero{padding:46px 0 39px}.workspace-preview-section{padding:29px 0 50px}.workspace-screenshot iframe{height:1060px}.workspace-screenshot-chrome{padding:10px 12px;gap:10px}.workspace-below{align-items:start;flex-direction:column}}
 @media(max-width:430px){.workspace-preview-status{font-size:8px}.workspace-address{font-size:11px}.workspace-screenshot iframe{height:1150px}}
+
+/* High-visibility interaction instructions above the screenshot-like preview. */
+.interactive-preview-guide{display:flex;align-items:center;flex-wrap:wrap;gap:10px 19px;border:2px solid #42bdb9;background:#e8fbf7;border-radius:14px;margin:0 0 22px;padding:17px 21px;color:#19495b;box-shadow:0 8px 24px rgba(15,116,124,.08)}
+.interactive-preview-guide .interactive-preview-label{display:inline-flex;align-items:center;gap:8px;background:#087b89;color:white;border-radius:50px;padding:8px 13px;font-weight:850;font-size:11px;letter-spacing:.07em;white-space:nowrap}
+.interactive-preview-guide .interactive-preview-label span{color:#77ffcd;font-size:12px}
+.interactive-preview-guide strong{font-size:15px;color:#123a4c}
+.interactive-preview-guide>span:last-child{font-size:13px;color:#406e7d}
+html[data-theme="dark"] .interactive-preview-guide{background:#e8fbf7;border-color:#42bdb9;color:#19495b}
+html[data-theme="dark"] .interactive-preview-guide strong{color:#123a4c}
+html[data-theme="dark"] .interactive-preview-guide>span:last-child{color:#406e7d}
+@media(max-width:760px){.interactive-preview-guide{padding:14px 16px;align-items:flex-start;flex-direction:column}.interactive-preview-guide strong{font-size:14px}}
