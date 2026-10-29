@@ -4,26 +4,21 @@ DuckBio offers six focused scientific software applications: **GoFlo, EEL, MethP
 
 ## GitHub Pages marketing website
 
-The public **website preview** is hosted at:
+**Website:** https://dennisbsj.github.io/DuckBio-site/
 
-**https://dennisbsj.github.io/DuckBio-site/**
+The public-facing static pages are `index.html` and `pricing.html` in the root of the `main` branch. The site uses relative links and the existing app icons in `assets/app-icons/` so links resolve under `/DuckBio-site/`.
 
-This repository contains the GitHub Pages website source and shared application-suite assets:
+### Publishing without a custom workflow
 
-- `index.html`: public homepage, navigation and app overview.
-- `pricing.html`: proposed 2027 pricing, discounts, launch promotion and interactive estimate calculator.
-- `assets/app-icons/`: existing app icons used on the public pages.
-- `.github/workflows/pages.yml`: GitHub Pages publication workflow.
+This site is designed for GitHub Pages **Deploy from a branch** rather than a custom GitHub Actions workflow. Keep the source set to the branch and folder containing the site; for the root-level HTML files, choose **main** and **/(root)** in **Settings → Pages → Build and deployment**.
 
-The website uses relative links (`pricing.html`, `index.html` and `assets/...`) so it works under the GitHub Pages project path `/DuckBio-site/`.
+An empty `.nojekyll` file in the root bypasses Jekyll processing. The custom publishing workflow added during the initial implementation was removed because it conflicted with the existing branch-based publishing setup and was unnecessary for a static HTML site.
 
-### Publishing
+**Important:** GitHub Pages can still use its own build/deployment workflow even when the source is a branch. Private repositories may consume GitHub Actions minutes. Check the Pages deployment status and account quota if publication is blocked; a new Git commit alone does not establish that the public site has updated.
 
-The GitHub Actions workflow publishes updates from `main` and also supports manual runs (`workflow_dispatch`). It uploads **only** the public HTML pages and SVG application icons. It does **not** upload the shared permission policy, suite UI runtime, sync scripts, databases or application source code.
+**Publication security:** GitHub Pages makes the deployed site publicly accessible even when the repository is private. The root directory currently also contains shared application metadata/runtime files that are not intended as marketing assets. Before public commercial launch, isolate the public web files into a dedicated `/docs` publishing folder and change the Pages source folder to `/docs`, or use a separate public-only website repository. Do not upload credentials, databases or private application files.
 
-If the site does not update after a merge, check **Actions → Publish DuckBio site on GitHub Pages** and **Settings → Pages**. The Pages build source must be set to **GitHub Actions** for the workflow to publish.
-
-A successful GitHub commit alone is not proof that the public site has updated; confirm the deployment run and the actual served pages. The GitHub Pages site is a marketing preview, not an app deployment, Stripe checkout or a replacement for the six application hosting environments.
+The Pages website is a marketing preview, not an app deployment, Stripe checkout or a replacement for the six application hosting environments.
 
 ### Commercial status
 
