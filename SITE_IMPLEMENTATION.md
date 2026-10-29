@@ -60,7 +60,7 @@ Static source checks can verify local links, internal anchors, unique page metad
 
 ## Product display names — October 2026
 
-The public DuckBio storefront now uses **LIMSDuck**, **DuckNote**, **DuckTrain**, **MethDuck**, **CytoDuck**, and **DuckMan**.
+The public DuckBio storefront now uses **LabDuck**, **CytoDuck**, **DuckPipe**, **DuckNote**, **DuckMan**, and **DuckTrain**.
 
 The underlying repository names and static legacy slugs for the five renamed products are unchanged until a separately approved repository/deployment migration. `GoFlo` is the existing repository spelling; it was not named `GoFlow`. The pricing configuration and image file paths retain stable internal identifiers until integration is designed and tested. The LIMSDuck website icon has been restored to the exact original LIMSMan artwork (retitled only). Four custom SVG website illustrations now represent DuckNote, DuckTrain, MethDuck and DuckFlow in a shared navy/white/teal scientific duck style. Prior website icon files remain available as fallback/archive. The DuckMan icon and corporate DuckBio logo are unchanged, and no live app logo or code was changed.
 
@@ -94,7 +94,11 @@ The superseded `duckbio-mark.svg` and `duckbio-mark-light.svg` remain in the rep
 
 Use this single customer-facing order **everywhere** in the DuckBio marketing website and its interactive preview:
 
-1. **Top row:** LabDuck → CytoDuck → MethDuck
+1. **Top row:** LabDuck → CytoDuck → DuckPipe
 2. **Bottom row:** DuckNote → DuckMan → DuckTrain
 
-The order applies to the homepage hero app preview and six product cards, the pricing-page app chooser (three columns on desktop), the All Apps interactive launcher (three columns on desktop), the Apps dropdown in every full website header, and the Products list in every full website footer. On narrower screens, preserve the same reading/tab order even when responsive CSS changes the number of columns. Keep icon sprite position mappings (LabDuck=s1, CytoDuck=s5, MethDuck=s4, DuckNote=s2, DuckMan=s6, DuckTrain=s3), application links, prices, copy and existing code identifiers unchanged. The static marketing site alone was edited; no live app repository is touched.
+The order applies to the homepage hero app preview and six product cards, the pricing-page app chooser (three columns on desktop), the All Apps interactive launcher (three columns on desktop), the Apps dropdown in every full website header, and the Products list in every full website footer. On narrower screens, preserve the same reading/tab order even when responsive CSS changes the number of columns. Keep icon sprite position mappings (LabDuck=s1, CytoDuck=s5, DuckPipe=s4, DuckNote=s2, DuckMan=s6, DuckTrain=s3), application links, prices, copy and existing code identifiers unchanged. The static marketing site alone was edited; no live app repository is touched.
+
+## DuckPipe customer-facing rename (2026-10-29)
+
+The method-validation app is now named **DuckPipe** (previously MethDuck) across the DuckBio marketing website. The canonical product page is `docs/duckpipe.html`, and the previous `docs/methpipe.html` URL remains as a fast redirect. All application navigation and footer lists, the homepage preview and cards, the pricing-page app chooser and FAQ, and the interactive launcher use DuckPipe. Its position in the canonical order is third: **LabDuck → CytoDuck → DuckPipe / DuckNote → DuckMan → DuckTrain**. The pipe-themed approved artwork and its existing technical CSS sprite class `logo-methduck` and launcher sprite slot `s4` remain unchanged, as does the `methpipe` pricing key. The actual app repository `dennisbsj/MethPipe` and application code have **not** been changed or renamed.

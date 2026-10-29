@@ -11,9 +11,10 @@ from urllib.parse import unquote, urlsplit
 ROOT = Path(__file__).resolve().parents[1] / "docs"
 EXPECTED_APPS = {"limsman", "eel", "mantrain", "methpipe", "goflo", "duckman"}
 EXPECTED_PAGES = {
-    "index.html", "apps.html", "pricing.html", "trial.html", "account.html",
-    "about.html", "support.html", "terms.html", "privacy.html", "cookies.html",
+    "index.html", "apps.html", "pricing.html", "account.html", "launcher.html",
+    "support.html", "terms.html", "privacy.html", "cookies.html",
     "subscriptions.html", "refunds.html", "cytoduck.html", "labduck.html",
+    "duckpipe.html",
 } | {f"{app}.html" for app in EXPECTED_APPS}
 
 
