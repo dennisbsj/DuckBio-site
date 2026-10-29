@@ -1,36 +1,56 @@
 (()=>{
   "use strict";
+
+  // This static site does not provide a mail server.
+  // Set data-endpoint to a verified HTTPS contact-form service before enabling delivery.
+  // The UI must never report a successful send without a successful server response.
   const form=document.getElementById("duckbio-contact-form");
   if(!form)return;
   const feedback=document.getElementById("contact-form-status");
-  const fallback=document.getElementById("contact-copy-fallback");
-  const fallbackText=document.getElementById("contact-draft-text");
-  const fields=(name)=>String(form.elements.namedItem(name)?.value||"").trim();
+  const sendButton=document.getElementById("contact-send-button");
+
+  function announce(message){feedback.textContent=message;}
+
   form.addEventListener("submit",async(event)=>{
     event.preventDefault();
     if(!form.reportValidity())return;
-    const name=fields("name"),email=fields("email"),organisation=fields("organisation"),message=fields("message");
-    const draft="DuckBio contact enquiry\n\nName: "+name+"\nEmail: "+email+"\nOrganisation: "+(organisation||"Not provided")+"\n\nMessage:\n"+message;
-    fallback.hidden=true;
-    feedback.textContent="";
-    // Static GitHub Pages has no mail server. Do not claim successful submission.
-    const recipient=String(form.dataset.recipient||"").trim();
-    if(recipient){
-      const mailto="mailto:"+encodeURIComponent(recipient)+"?subject="+encodeURIComponent("DuckBio website enquiry")+"&body="+encodeURIComponent(draft);
-      window.location.href=mailto;
-      feedback.textContent="Your email application was opened. Please press Send there to deliver your enquiry.";
+
+    const endpoint=String(form.dataset.endpoint||"").trim();
+    if(!endpoint){
+      announce("Message sending is not configured yet. Your message has NOT been sent.");
       return;
     }
+    let url;
+    try{url=new URL(endpoint,window.location.href);}
+    catch{announce("Contact service configuration is invalid. Nothing was sent.");return;}
+    if(url.protocol!=="https:"){
+      announce("The contact service must use a secure HTTPS address. Nothing was sent.");
+      return;
+    }
+    sendButton.disabled=true;
+    sendButton.setAttribute("aria-busy","true");
+    announce("Sending your message…");
     try{
-      if(!navigator.clipboard?.writeText)throw Error("Clipboard unavailable");
-      await navigator.clipboard.writeText(draft);
-      feedback.textContent="Your message has been copied. It has not been sent to DuckBio.";
-    }catch{
-      fallback.hidden=false;
-      fallbackText.value=draft;
-      fallbackText.focus();
-      fallbackText.select();
-      feedback.textContent="Your message is ready below. Copy it manually. Nothing has been sent.";
+      const response=await fetch(url.href,{
+        method:"POST",
+        headers:{"Accept":"application/json"},
+        body:new FormData(form),
+        mode:"cors",
+        cache:"no-store",
+        credentials:"omit"
+      });
+      if(!response.ok)throw Error("Contact provider returned HTTP "+response.status);
+      const type=response.headers.get("content-type")||"";
+      if(!type.includes("application/json"))throw Error("Contact provider did not confirm acceptance");
+      const result=await response.json();
+      if(result.ok===false||result.success===false||result.error)throw Error("Contact provider rejected message");
+      announce("Message sent successfully. Thank you for contacting DuckBio.");
+      form.reset();
+    }catch(error){
+      announce("The message could not be sent. Please try again later. Your text remains in the form.");
+    }finally{
+      sendButton.disabled=false;
+      sendButton.removeAttribute("aria-busy");
     }
   });
 })();
