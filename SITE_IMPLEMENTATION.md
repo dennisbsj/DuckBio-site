@@ -57,3 +57,9 @@ The user has required **permission before any changes to any of the six app repo
 ## Test status
 
 Static source checks can verify local links, internal anchors, unique page metadata, image alt attributes, no visible legacy branding, and disabled subscriptions. Browser/rendering and real account/commerce integration tests are **not yet complete**; they depend on deployment/approved infrastructure.
+
+## Product display names — October 2026
+
+The public DuckBio storefront now uses **LIMSDuck**, **DuckNote**, **DuckTrain**, **MethDuck**, **DuckFlow**, and **DuckMan**.
+
+The underlying repository names and static legacy slugs for the five renamed products are unchanged until a separately approved repository/deployment migration. `GoFlo` is the existing repository spelling; it was not named `GoFlow`. The pricing configuration and image file paths retain stable internal identifiers until integration is designed and tested. All product icons are pending a separate approved artwork update; no live app logo or code is changed by this website copy refresh.
