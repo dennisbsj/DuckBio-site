@@ -8,7 +8,7 @@ The historical source repository and the shared `suite-ui.js` / `suite-permissio
 
 ## Phase 1 — implemented on development
 
-- Eighteen static HTML pages: home, applications, six individual products, pricing, seven-day trial concept, My Apps concept, about, support, and five legal/information drafts.
+- Nineteen static HTML pages: home, applications, six individual products, pricing, seven-day trial concept, My Apps concept, about, support, and five legal/information drafts.
 - Semantic navigation, CSS-responsive layouts, keyboard-visible focus indicators, mobile menu, product/category filtering, authentic product icons, unique page descriptions and the requested navy/teal/coral palette.
 - Real app features grounded in repository READMEs. Missing screenshots and demo videos explicitly display placeholders, not fabricated UIs.
 - Central, non-live `docs/assets/pricing.json`. All amounts/Stripe IDs are intentionally `null` until prices are approved. The browser presentation reads this config to render verified future prices.
@@ -66,7 +66,7 @@ The underlying repository names and static legacy slugs for the five renamed pro
 
 ## Approved website icon artwork (2026-10-29)
 
-The six user-approved icon illustrations were extracted from the supplied six-panel image **without the wordmarks beneath them** and published as a compact 3×2 WebP sprite at `docs/assets/icons/duckbio-approved-sprite.webp`. The HTML image elements use the local transparent SVG `transparent.svg` with six CSS background-position classes to select the corresponding tile. The public product titles remain ordinary text outside the images. All 18 pages use a versioned stylesheet reference to avoid stale browser cache.
+The six user-approved icon illustrations were extracted from the supplied six-panel image **without the wordmarks beneath them** and published as a compact 3×2 WebP sprite at `docs/assets/icons/duckbio-approved-sprite.webp`. The HTML image elements use the local transparent SVG `transparent.svg` with six CSS background-position classes to select the corresponding tile. The public product titles remain ordinary text outside the images. All 19 pages use a versioned stylesheet reference to avoid stale browser cache.
 
 The original icon artwork and the previous website-only SVG experiments remain in the repository for reversibility. **No application repositories, live app branding, permissions, production data, main branch or authentication/payment integration were changed.** The image was optimised for small product icons; a higher-resolution master remains available in the user's supplied artwork, not in the website repository.
 
