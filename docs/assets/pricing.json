@@ -6,41 +6,42 @@
   "subscriptionsLive": false,
   "products": {
     "limsman": {
-      "monthly": null,
+      "monthly": 200,
       "currency": "DKK",
       "stripePriceId": null,
-      "earlyAdopterMonthly": null
+      "earlyAdopterMonthly": 160
     },
     "eel": {
-      "monthly": null,
+      "monthly": 200,
       "currency": "DKK",
       "stripePriceId": null,
-      "earlyAdopterMonthly": null
+      "earlyAdopterMonthly": 160
     },
     "mantrain": {
-      "monthly": null,
+      "monthly": 200,
       "currency": "DKK",
       "stripePriceId": null,
-      "earlyAdopterMonthly": null
+      "earlyAdopterMonthly": 160
     },
     "methpipe": {
-      "monthly": null,
+      "monthly": 200,
       "currency": "DKK",
       "stripePriceId": null,
-      "earlyAdopterMonthly": null
+      "earlyAdopterMonthly": 160
     },
     "goflo": {
-      "monthly": null,
+      "monthly": 200,
       "currency": "DKK",
       "stripePriceId": null,
-      "earlyAdopterMonthly": null
+      "earlyAdopterMonthly": 160
     },
     "duckman": {
-      "monthly": null,
+      "monthly": 200,
       "currency": "DKK",
       "stripePriceId": null,
-      "earlyAdopterMonthly": null
+      "earlyAdopterMonthly": 160
     }
   },
-  "policy": "Pricing remains unapproved. Do not display a price or enable Stripe checkout until a server backend and price IDs are configured."
+  "policy": "Proposed 2027 pricing only: DKK 200 per user per app per month before multi-app, organisation and eligible early adopter discounts. Early adopter period is 1 January–31 March 2027, with the promotional discount valid for the first 12 months. Checkout and billing are not enabled.",
+  "pricesTentative": true
 }
