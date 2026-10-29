@@ -2,7 +2,7 @@
 
 ## Scope and permissions
 
-This site was authored **from scratch** in `docs/` on `development`. It reuses only the six icons already in `DuckBio-site` before this website task. It does **not** pull new website materials from the former site, modify any app repository, change deployed apps, change DNS, or charge customers.
+This site was authored **from scratch** in `docs/` on `development`. The first website version reused the six icon files already in `DuckBio-site`; in October 2026, five new standalone SVG website icons were added for the public product rebrand. It does **not** pull new website materials from the former site, modify any app repository, change deployed apps, change DNS, or charge customers.
 
 The historical source repository and the shared `suite-ui.js` / `suite-permissions.json` contracts at repository root remain untouched. These compatibility contracts are intentionally separate from public DuckBio branding.
 
@@ -62,4 +62,4 @@ Static source checks can verify local links, internal anchors, unique page metad
 
 The public DuckBio storefront now uses **LIMSDuck**, **DuckNote**, **DuckTrain**, **MethDuck**, **DuckFlow**, and **DuckMan**.
 
-The underlying repository names and static legacy slugs for the five renamed products are unchanged until a separately approved repository/deployment migration. `GoFlo` is the existing repository spelling; it was not named `GoFlow`. The pricing configuration and image file paths retain stable internal identifiers until integration is designed and tested. All product icons are pending a separate approved artwork update; no live app logo or code is changed by this website copy refresh.
+The underlying repository names and static legacy slugs for the five renamed products are unchanged until a separately approved repository/deployment migration. `GoFlo` is the existing repository spelling; it was not named `GoFlow`. The pricing configuration and image file paths retain stable internal identifiers until integration is designed and tested. Five new original SVG icons are now implemented in `docs/assets/icons/` and wired into the customer-facing pages. The prior icon files remain as fallback/archive. The DuckMan icon and corporate DuckBio logo are unchanged, and no live app logo or code was changed.
