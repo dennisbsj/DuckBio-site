@@ -144,3 +144,24 @@ html[data-theme="dark"] .pr-offer{background:linear-gradient(125deg,#183f56,#225
 html[data-theme="dark"] .pr-apps .pr-app{color:#eaf8fc}
 html[data-theme="dark"] .pr-bullet{color:#c4e0e9}
 html[data-theme="dark"] .pr-calc-card .pr-result-label{color:#bed7e1}
+
+/* Additional text contrast for the standalone pricing page in night mode. */
+html[data-theme="dark"] .pr-hero .lead,
+html[data-theme="dark"] .pr-hero .pr-tiny,
+html[data-theme="dark"] .pr-hero .pr-unit,
+html[data-theme="dark"] .pr-plan .pr-desc,
+html[data-theme="dark"] .pr-plan .pr-period,
+html[data-theme="dark"] .pr-plan li,
+html[data-theme="dark"] .pr-after,
+html[data-theme="dark"] .pr-calc-intro p,
+html[data-theme="dark"] .pr-heading p,
+html[data-theme="dark"] .pr-hint,
+html[data-theme="dark"] .pr-faq p,
+html[data-theme="dark"] .pr-breakdown div,
+html[data-theme="dark"] .pr-small,
+html[data-theme="dark"] .pr-field label,
+html[data-theme="dark"] .pr-promo small{color:#bed8e2}
+html[data-theme="dark"] .pr-result .pr-breakdown b{color:#effaff}
+html[data-theme="dark"] .pr-promo input{accent-color:#77d5db}
+html[data-theme="dark"] .pr-calc-card .pr-result .pr-saved,
+html[data-theme="dark"] .pr-calc-card .pr-result .pr-saved b{color:#8ce5de}
