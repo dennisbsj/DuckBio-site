@@ -10,3 +10,14 @@
 
 /* Keep app icon silhouettes consistent, including raster-backed SVG artwork. */
 .hero-app img,.suite-grid img,.product-hero .product-icon,.price-card .app-icon{border-radius:14px}
+
+/* Six user-approved DuckBio illustrations are embedded in one optimised shared sprite.
+   Every existing icon is a transparent image with this sprite as its background.
+   Do not alter the application repositories or compatibility icons. */
+img.suite-sprite{display:block;background-image:url("icons/duckbio-approved-sprite.webp?v=approved-20261029");background-repeat:no-repeat;background-size:300% 200%;object-fit:contain;background-color:transparent;border-radius:14px;}
+img.suite-sprite.logo-limsduck{background-position:0% 0%}
+img.suite-sprite.logo-ducknote{background-position:50% 0%}
+img.suite-sprite.logo-ducktrain{background-position:100% 0%}
+img.suite-sprite.logo-methduck{background-position:0% 100%}
+img.suite-sprite.logo-duckflow{background-position:50% 100%}
+img.suite-sprite.logo-duckman{background-position:100% 100%}
