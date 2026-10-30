@@ -270,7 +270,7 @@ html[data-theme="dark"] .hero-app .hero-app-summary{color:#bdd8e0}
 @media(max-width:700px){.trust-grid{grid-template-columns:1fr}.hero-suitable{font-size:13px}}
 
 /* Distinct CytoDuck foreground-duck illustration; other approved sprite icons stay unchanged. */
-img.suite-sprite.logo-cytoduck{background-image:url("icons/cytoduck-revised.svg?v=cyto-20261030");background-size:100% 100%;background-position:center center;background-repeat:no-repeat}
+img.suite-sprite.logo-cytoduck{background-image:url("icons/cytoduck-original-instrument.svg?v=original-duck-instrument-20261030");background-size:100% 100%;background-position:center center;background-repeat:no-repeat}
 
 
 /* Every app capability has its own checkmark. One row on wide screens; one item per line on narrow screens. */
