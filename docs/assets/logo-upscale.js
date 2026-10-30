@@ -50,15 +50,18 @@
     const original = new Uint8ClampedArray(data);
     /* Conservative 5-tap unsharp mask at output resolution: crisp edges
        without the harsh pixelated look or changes to the approved design. */
-    const strength = 0.24;
-    for (let y = 1; y < w - 1; y++) {
-      for (let x = 1; x < w - 1; x++) {
+    const strength = 0.55;
+    const radius = 4;
+    for (let y = radius; y < w - radius; y++) {
+      for (let x = radius; x < w - radius; x++) {
         const idx = (y * w + x) * 4;
         for (let channel = 0; channel < 3; channel++) {
           const i = idx + channel;
+          const stride = w * 4 * radius;
+          const step = 4 * radius;
           const neighbours = (
-            original[i - 4] + original[i + 4] +
-            original[i - w * 4] + original[i + w * 4]
+            original[i - step] + original[i + step] +
+            original[i - stride] + original[i + stride]
           ) / 4;
           data[i] = Math.max(0, Math.min(255,
             Math.round(original[i] + strength * (original[i] - neighbours))
