@@ -51,6 +51,8 @@
  <path d="M123 111L129 113M123 119L129 121M123 128L130 132" stroke="#6ee9ef" stroke-width="2.2"/>
  
  
+<path d="M122 54L126 53M143 52L155 56" fill="none" stroke="#3a8199" stroke-width="1.6" stroke-linecap="round"/>
+<circle cx="135" cy="54" r="8.1" fill="none" stroke="#2d6f87" stroke-width="1.7"/>
 </g>
 <path d="M14 177H180" stroke="#36cad7" opacity=".25" stroke-width="2"/>
 </g>
