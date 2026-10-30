@@ -33,15 +33,66 @@ html body,html[data-theme="dark"] body{color:#13384c!important;background:#f1f7f
 .settings-menu summary::-webkit-details-marker{display:none}.settings-menu summary:hover,.settings-menu[open] summary{background:#276780}.settings-menu summary:focus-visible{outline:3px solid #27c4d0;outline-offset:3px}
 .settings-panel{position:absolute;right:0;top:calc(100% + 8px);width:240px;background:#fff;color:#12384b;border:1px solid #bdd7e0;border-radius:12px;box-shadow:0 12px 30px #092c3e35;padding:13px;display:grid;gap:3px}
 .settings-panel strong{padding:6px 9px}.settings-panel a{padding:9px;border-radius:7px;color:#0c5672;font-weight:750;font-size:12px}.settings-panel a:hover,.settings-panel a:focus-visible{background:#e9f6f9}.settings-panel p{color:#617c89;font-size:11px;margin:9px 9px 3px;line-height:1.4}
+
+/* Functional preview navigation and safe, in-memory account and permissions dialogs. */
+button{font:inherit}button:focus-visible{outline:3px solid #24b7c7;outline-offset:2px}
+.bar-tools{display:flex;align-items:center;gap:13px}.preview-current-user{font-size:11px;color:#bde8ed}
+.settings-panel button{appearance:none;background:transparent;border:0;text-align:left;padding:9px;color:#0c5672;font-weight:750;font-size:12px;cursor:pointer;border-radius:7px}
+.settings-panel button:hover,.settings-panel button:focus-visible{background:#e9f6f9}
+.side-link{border:0;text-align:left;cursor:pointer;width:100%;display:flex;justify-content:space-between;align-items:center;font-weight:800}
+.side-link[aria-expanded="false"] span{transform:rotate(-90deg)}
+.side-app-list{display:grid;gap:3px;margin:0 0 5px 9px}
+.side-app-list[hidden]{display:none}
+.side-app-list a{padding:7px 12px 7px 20px;border-radius:7px;color:#cce9f3;font-size:12px}
+.side-app-list a:hover,.side-app-list a:focus-visible{background:#25556a}
+.side-separator{border-top:1px solid #436879;margin:13px 10px 5px}
+.side-communication{background:transparent;border:0;color:#d5eaf1;text-align:left;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13px}
+.side-communication:hover,.side-communication:focus-visible{background:#25556a;color:white}
+.launcher-dialog{width:min(90vw,750px);max-height:calc(100vh - 42px);overflow:auto;border:1px solid #a7d5e0;border-radius:17px;padding:25px;color:#183e51;background:#fff;box-shadow:0 30px 95px #071d2a88}
+.launcher-dialog::backdrop{background:rgba(5,23,35,.72)}
+.modal-head{display:flex;justify-content:space-between;align-items:start;gap:14px}
+.modal-head h2{font-size:27px;margin:3px 0 12px;line-height:1.2}
+.modal-eyebrow{font-size:10px;font-weight:850;color:#1b8b9e;letter-spacing:.13em;text-transform:uppercase;margin:0}
+.modal-close{border:0;background:#e6f2f6;color:#24576c;font-size:27px;line-height:1;border-radius:9px;width:36px;height:36px;cursor:pointer}
+.modal-note{color:#607d8c;background:#f0f8fb;border-radius:9px;padding:12px;font-size:12px;margin:3px 0 18px}
+.account-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.account-fields label{display:grid;gap:5px;font-size:12px;font-weight:800;color:#245268}
+.account-fields input,.account-fields textarea{width:100%;font:inherit;color:#153c50;font-size:13px;border:1px solid #b9d2dd;border-radius:8px;padding:11px;background:#fff}
+.account-fields textarea{resize:vertical}
+.account-full{grid-column:1/-1}
+.modal-actions{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:9px}
+.modal-actions #account-status{font-size:11px;color:#177c8f;margin-right:auto}
+.modal-btn{border-radius:9px;padding:10px 15px;cursor:pointer;font-size:12px;font-weight:800;border:1px solid #88b8c5}
+.modal-btn.primary{background:#16617a;color:#fff;border-color:#16617a}
+.modal-btn.secondary{background:#f5fafc;color:#276177}
+.permission-tabs{display:flex;border-bottom:1px solid #bdd8e1;gap:9px;margin-bottom:15px}
+.permission-tabs button{border:0;background:transparent;padding:10px 13px;color:#507286;font-weight:800;cursor:pointer}
+.permission-tabs button[aria-selected="true"]{color:#006d8a;border-bottom:3px solid #11a8b5}
+.perm-pane h3{margin:9px 0 5px;font-size:18px}.perm-caption{color:#6a8696;font-size:12px;margin:0 0 15px}
+.permission-list{padding:0;list-style:none;display:grid;gap:8px}
+.permission-list li{padding:11px 12px;border:1px solid #d8e8ed;border-radius:8px;display:flex;justify-content:space-between;gap:12px}
+.permission-list li span{color:#527386;font-size:12px}
+.matrix-scroll{overflow:auto}.perm-table{border-collapse:collapse;width:100%;min-width:525px;font-size:12px;text-align:center}
+.perm-table caption{text-align:left;font-size:11px;color:#678392;margin-bottom:5px}
+.perm-table th,.perm-table td{border-bottom:1px solid #deebef;padding:9px}
+.perm-table th:first-child{text-align:left}.perm-table thead{background:#eaf6f8}.perm-table td{color:#187a8e;font-weight:900}
+.empty-communication{padding:28px;background:#f0f8fb;border:1px solid #d4e8ed;border-radius:12px}
+.empty-communication p{color:#557789;font-size:13px}
+@media(max-width:760px){.shell{grid-template-columns:1fr}aside{display:flex;padding:15px;gap:6px}.side-app-list{grid-template-columns:repeat(3,minmax(0,1fr));margin:0}.side-separator{margin:4px 10px}.aside-note{display:none}.launch-menu{position:relative}}
+@media(max-width:480px){.side-app-list{grid-template-columns:repeat(2,minmax(0,1fr))}.account-fields{grid-template-columns:1fr}.account-full{grid-column:auto}.launcher-dialog{width:96vw;padding:15px}.preview-current-user{display:none}}
 </style>
 </head>
 <body>
-<div class="bar"><div class="brand"><img src="assets/duckbio-brand-nofill-dark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><details class="settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><a href="account.html" target="_top">Account overview</a><a href="pricing.html" target="_top">Subscriptions & pricing</a><a href="support.html" target="_top">Help & support</a><p>User and team settings will be available when the platform launches.</p></div></details></div>
+<div class="bar"><div class="brand"><img src="assets/duckbio-brand-nofill-dark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><div class="bar-tools"><span class="preview-current-user" id="preview-current-user">Preview user</span><details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button><a href="pricing.html" target="_top">Subscriptions &amp; pricing</a><a href="support.html" target="_top">Help &amp; support</a><p>Preview only — no live account or permissions are changed.</p></div></details></div></div>
 <div class="shell">
 <aside>
-<div class="label">WORKSPACE</div><span class="side-link" aria-current="page">▦ &nbsp; Apps</span>
-
-<p class="aside-note">This page demonstrates the planned launcher. It is not a production customer platform.</p>
+<div class="label">WORKSPACE</div>
+<button type="button" class="side-link" id="workspace-apps-toggle" aria-expanded="true" aria-controls="workspace-app-links">▦ &nbsp; Apps <span aria-hidden="true">▾</span></button>
+<nav class="side-app-list" id="workspace-app-links" aria-label="App links"><a href="labduck.html" target="_top">LabDuck</a><a href="cytoduck.html" target="_top">CytoDuck</a><a href="duckpipe.html" target="_top">DuckPipe</a><a href="eel.html" target="_top">DuckNote</a><a href="duckman.html" target="_top">DuckMan</a><a href="mantrain.html" target="_top">DuckTrain</a></nav>
+<div class="side-separator"></div><div class="label">COMMUNICATION</div>
+<button class="side-communication" type="button" data-communication="Messaging">✉ &nbsp; Messaging</button>
+<button class="side-communication" type="button" data-communication="Mail">✉ &nbsp; Mail</button>
+<p class="aside-note">Interactive preview only. App links open public pages; communication and account administration are not live.</p>
 </aside>
 <main>
 <div class="main-title"><div><span class="kicker">MY APPS</span><h1>Your DuckBio workspace</h1><p>Click or tap a card below to open that app’s product page.</p></div><span class="count">6 apps</span></div>
@@ -55,4 +106,106 @@ html body,html[data-theme="dark"] body{color:#13384c!important;background:#f1f7f
 </div>
 <div class="notice">Preview only. These links open public product pages, not authenticated apps. Access controls, billing and platform accounts will be connected separately when implemented.</div>
 </main></div>
+
+<dialog class="launcher-dialog" id="account-dialog" aria-labelledby="account-heading">
+ <div class="modal-head"><div><p class="modal-eyebrow">Profile preview</p><h2 id="account-heading">Account settings</h2></div><button type="button" class="modal-close" data-close-dialog aria-label="Close account settings">×</button></div>
+ <p class="modal-note">Changes are temporary and only affect this preview. No account details are sent or saved to DuckBio.</p>
+ <form id="preview-account-form" class="account-fields" autocomplete="off">
+ <label>Name<input name="name" maxlength="120" placeholder="Full name"></label>
+ <label>Nickname<input name="nickname" maxlength="80" placeholder="Display name"></label>
+ <label>Email<input name="email" type="email" maxlength="254" placeholder="you@example.com"></label>
+ <label>Phone number<input name="phone" type="tel" maxlength="40" placeholder="+45 ..."></label>
+ <label>Organisation<input name="organisation" maxlength="150" placeholder="Organisation"></label>
+ <label>Title<input name="title" maxlength="100" placeholder="Job title"></label>
+ <label class="account-full">Bio<textarea name="bio" rows="4" maxlength="1200" placeholder="A short introduction"></textarea></label>
+ <div class="modal-actions account-full"><span id="account-status" role="status"></span><button type="button" class="modal-btn secondary" data-close-dialog>Cancel</button><button class="modal-btn primary" type="submit">Save preview</button></div>
+ </form>
+</dialog>
+<dialog class="launcher-dialog permissions-modal" id="permissions-dialog" aria-labelledby="permissions-heading">
+ <div class="modal-head"><div><p class="modal-eyebrow">Access preview</p><h2 id="permissions-heading">Permissions</h2></div><button type="button" class="modal-close" data-close-dialog aria-label="Close permissions">×</button></div>
+ <p class="modal-note">Illustrative permissions only. These are not your real permissions or an active authorisation system.</p>
+ <div role="tablist" class="permission-tabs" aria-label="Permissions views">
+  <button type="button" role="tab" id="perm-my-tab" aria-controls="perm-my" aria-selected="true" tabindex="0" data-perm-tab="my">My permissions</button>
+  <button type="button" role="tab" id="perm-matrix-tab" aria-controls="perm-matrix" aria-selected="false" tabindex="-1" data-perm-tab="matrix">Permission matrix</button>
+ </div>
+ <div role="tabpanel" id="perm-my" aria-labelledby="perm-my-tab" class="perm-pane">
+ <h3>Example app access</h3><p class="perm-caption">The preview shows an illustrative member role, not data from a signed-in account.</p>
+ <ul class="permission-list"><li><strong>LabDuck</strong><span>View, create, edit</span></li><li><strong>CytoDuck</strong><span>View, analyse</span></li><li><strong>DuckPipe</strong><span>View, create</span></li><li><strong>DuckNote</strong><span>View, create, edit</span></li><li><strong>DuckMan</strong><span>View only</span></li><li><strong>DuckTrain</strong><span>View, complete training</span></li></ul>
+ </div>
+ <div role="tabpanel" id="perm-matrix" aria-labelledby="perm-matrix-tab" class="perm-pane" hidden>
+ <h3>Illustrative permission matrix</h3><p class="perm-caption">Example permissions for a member role. Real permissions must come from authenticated backend roles and licensing.</p>
+ <div class="matrix-scroll"><table class="perm-table"><caption>Example member permissions by app</caption><thead><tr><th scope="col">App</th><th scope="col">View</th><th scope="col">Create</th><th scope="col">Edit</th><th scope="col">Approve</th><th scope="col">Admin</th></tr></thead><tbody>
+ <tr><th scope="row">LabDuck</th><td>✓</td><td>✓</td><td>✓</td><td>—</td><td>—</td></tr>
+ <tr><th scope="row">CytoDuck</th><td>✓</td><td>✓</td><td>—</td><td>—</td><td>—</td></tr>
+ <tr><th scope="row">DuckPipe</th><td>✓</td><td>✓</td><td>—</td><td>—</td><td>—</td></tr>
+ <tr><th scope="row">DuckNote</th><td>✓</td><td>✓</td><td>✓</td><td>—</td><td>—</td></tr>
+ <tr><th scope="row">DuckMan</th><td>✓</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+ <tr><th scope="row">DuckTrain</th><td>✓</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+ </tbody></table></div>
+ </div>
+</dialog>
+<dialog class="launcher-dialog" id="communication-dialog" aria-labelledby="communication-heading">
+ <div class="modal-head"><div><p class="modal-eyebrow">Communication preview</p><h2 id="communication-heading">Communication</h2></div><button type="button" class="modal-close" data-close-dialog aria-label="Close communication preview">×</button></div>
+ <div class="empty-communication"><strong id="communication-label">Messaging</strong><p>Messaging and Mail are planned features. No real messages can be sent or received from this preview.</p></div>
+ <div class="modal-actions"><button type="button" class="modal-btn primary" data-close-dialog>Close</button></div>
+</dialog>
+
+<script>
+(()=>{
+"use strict";
+const get=id=>document.getElementById(id);
+const appsToggle=get("workspace-apps-toggle");
+appsToggle.addEventListener("click",()=>{
+ const expanded=appsToggle.getAttribute("aria-expanded")!=="true";
+ appsToggle.setAttribute("aria-expanded",String(expanded));
+ get("workspace-app-links").hidden=!expanded;
+});
+const settings=get("launcher-settings-menu");
+function openDialog(id){
+ const element=get(id);
+ if(!element||typeof element.showModal!=="function")return;
+ settings.open=false;
+ element.showModal();
+ const initial=element.querySelector("input,button");
+ initial?.focus();
+}
+document.querySelectorAll("[data-launcher-dialog]").forEach(btn=>btn.addEventListener("click",()=>openDialog(btn.dataset.launcherDialog)));
+document.querySelectorAll("[data-close-dialog]").forEach(btn=>btn.addEventListener("click",()=>btn.closest("dialog")?.close()));
+document.querySelectorAll("dialog").forEach(dlg=>dlg.addEventListener("click",evt=>{if(evt.target===dlg)dlg.close()}));
+const accountForm=get("preview-account-form");
+accountForm.addEventListener("submit",event=>{
+ event.preventDefault();
+ if(!accountForm.reportValidity())return;
+ const values=new FormData(accountForm),nickname=String(values.get("nickname")||"").trim(),name=String(values.get("name")||"").trim();
+ get("preview-current-user").textContent=nickname||name||"Preview user";
+ get("account-status").textContent="Updated in this preview only.";
+});
+document.querySelectorAll("[data-communication]").forEach(button=>button.addEventListener("click",()=>{
+ const feature=button.dataset.communication;
+ get("communication-heading").textContent=feature;
+ get("communication-label").textContent=feature+" — coming soon";
+ openDialog("communication-dialog");
+}));
+const tabs=[...document.querySelectorAll("[data-perm-tab]")];
+function setTab(value){
+ for(const tab of tabs){
+  const active=tab.dataset.permTab===value;
+  tab.setAttribute("aria-selected",String(active));
+  tab.tabIndex=active?0:-1;
+ }
+ get("perm-my").hidden=value!=="my";
+ get("perm-matrix").hidden=value!=="matrix";
+}
+tabs.forEach((tab,index)=>{
+ tab.addEventListener("click",()=>setTab(tab.dataset.permTab));
+ tab.addEventListener("keydown",event=>{
+  if(event.key!=="ArrowRight"&&event.key!=="ArrowLeft")return;
+  event.preventDefault();
+  const next=tabs[(index+(event.key==="ArrowRight"?1:tabs.length-1))%tabs.length];
+  setTab(next.dataset.permTab);next.focus();
+ });
+});
+setTab("my");
+})();
+</script>
 </body></html>
