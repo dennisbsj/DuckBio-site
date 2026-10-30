@@ -337,27 +337,8 @@ img.suite-sprite.logo-cytoduck{background-image:none;background-color:transparen
 .hero-suitable-list i{flex:0 0 22px;width:22px;height:22px;font-size:12px}
 @media(max-width:540px){.hero .hero-intro{font-size:16px;line-height:1.6}.hero .hero-suitable-heading{font-size:13px}.hero-suitable-list{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:9px;row-gap:12px}.hero-suitable-list li{font-size:11.5px;gap:6px}.hero-suitable-list i{flex-basis:19px;width:19px;height:19px;font-size:11px}}
 
-/* Scientific software illustration based on the unaltered approved LabDuck artwork. */
-.hero-illustration{position:relative;isolation:isolate;width:100%;height:435px;min-height:0;align-self:center;overflow:visible}
-.hero-art-halo{position:absolute;z-index:-1;inset:5% 1% 6% 1%;border-radius:50%;background:radial-gradient(ellipse at 51% 52%,rgba(87,224,225,.24),rgba(85,199,222,.08) 46%,transparent 72%);filter:blur(5px)}
-.hero-art-ring{position:absolute;z-index:-1;inset:5% 5% 7% 4%;border:1px solid rgba(153,247,246,.3);border-radius:50%;transform:rotate(-15deg)}
-.hero-art-ring:after{content:'';position:absolute;inset:13% 8%;border:1px dashed rgba(150,237,238,.23);border-radius:50%;transform:rotate(32deg)}
-.hero-art-screen{position:absolute;left:17%;top:16%;width:80%;height:62%;border:1px solid #91d2e0;border-radius:15px;transform:rotate(3deg);background:linear-gradient(140deg,#153f57,#0b2a40);box-shadow:0 23px 52px rgba(0,19,34,.38),inset 0 0 0 6px rgba(3,28,45,.8);padding:12px}
-.hero-art-screen-header{display:flex;justify-content:space-between;align-items:center;padding:4px 7px 13px;border-bottom:1px solid #386b82;color:#b8eaf3;font-size:12px;font-weight:700;letter-spacing:.03em}
-.hero-art-screen-lights{letter-spacing:4px;color:#7edadd;font-size:9px}
-.hero-art-screen-body{padding:17px 11px 8px}
-.hero-art-topline{display:flex;gap:8px;margin-bottom:9px}
-.hero-art-topline span{height:7px;border-radius:50px;background:#346e86}
-.hero-art-topline span:first-child{width:28%}.hero-art-topline span:nth-child(2){width:18%;background:#63d9dd}.hero-art-topline span:last-child{width:13%}
-.hero-art-plot{display:block;width:100%;height:122px}
-.hero-art-screen-bars{display:flex;gap:8px;align-items:flex-end;height:30px;opacity:.8}
-.hero-art-screen-bars i{flex:1;background:linear-gradient(180deg,#55dedf,#277b9a);height:45%;border-radius:3px 3px 0 0}.hero-art-screen-bars i:nth-child(2){height:70%}.hero-art-screen-bars i:nth-child(3){height:35%}.hero-art-screen-bars i:nth-child(4){height:95%}.hero-art-screen-bars i:nth-child(5){height:65%}.hero-art-screen-bars i:nth-child(6){height:85%}.hero-art-screen-bars i:nth-child(7){height:53%}
-.hero-art-stand{position:absolute;left:45%;bottom:-22%;width:14%;height:22%;background:linear-gradient(90deg,#0f3449,#27617a);clip-path:polygon(27% 0,73% 0,82% 82%,100% 82%,100% 100%,0 100%,0 82%,18% 82%)}
-.hero-art-mascot{position:absolute;z-index:2;left:1%;top:38%;width:39%;max-width:205px;aspect-ratio:1;border:2px solid rgba(161,245,244,.7);border-radius:22px;overflow:hidden;transform:rotate(-7deg);box-shadow:0 18px 42px rgba(0,19,35,.4),0 0 32px rgba(74,230,227,.12);background:#082c45}
-.hero-art-mascot img{display:block;width:100%;height:100%;object-fit:cover}
-.hero-art-science{position:absolute;z-index:3;display:grid;place-items:center;border:1px solid rgba(151,240,240,.35);background:rgba(14,56,77,.84);box-shadow:0 12px 30px rgba(1,24,40,.26);backdrop-filter:blur(4px);border-radius:16px}
-.hero-art-science svg{width:100%;height:100%}
-.hero-art-science--molecule{right:0;top:0;width:86px;height:86px;padding:7px;transform:rotate(9deg)}
-.hero-art-science--flask{right:4%;bottom:0;width:73px;height:83px;padding:6px;transform:rotate(-8deg)}
-@media(max-width:820px){.hero-illustration{height:360px;max-width:570px;margin:15px auto 0}.hero-art-screen{left:22%;width:75%}.hero-art-mascot{left:7%;width:36%}}
-@media(max-width:540px){.hero-illustration{height:270px;margin:0 auto 8px}.hero-art-screen{top:16%;left:21%;width:76%;height:65%;padding:8px;border-radius:12px}.hero-art-screen-header{font-size:10px;padding:2px 4px 8px}.hero-art-screen-body{padding:9px 5px}.hero-art-plot{height:89px}.hero-art-screen-bars{height:19px;gap:5px}.hero-art-mascot{top:41%;left:2%;width:40%;border-radius:16px}.hero-art-science--molecule{width:58px;height:58px;border-radius:12px}.hero-art-science--flask{width:53px;height:62px;border-radius:12px;right:1%}}
+/* Homepage hero visual: image-based artwork; text and links remain actual HTML. */
+.hero-illustration.hero-illustration--image{width:100%;height:auto;max-width:640px;min-height:0;display:flex;align-items:center;justify-content:center;overflow:visible;margin:0 auto}
+.hero-illustration--image img{display:block;width:100%;height:auto;max-width:640px;object-fit:contain;filter:drop-shadow(0 13px 20px rgba(2,32,50,.07))}
+@media(max-width:820px){.hero-illustration.hero-illustration--image{height:auto;max-width:570px;margin:14px auto 0}}
+@media(max-width:540px){.hero-illustration.hero-illustration--image{height:auto;margin:0 auto 8px}}
