@@ -342,3 +342,8 @@ img.suite-sprite.logo-cytoduck{background-image:none;background-color:transparen
 .hero-illustration--image img{display:block;width:100%;height:auto;max-width:640px;object-fit:contain;filter:drop-shadow(0 13px 20px rgba(2,32,50,.07))}
 @media(max-width:820px){.hero-illustration.hero-illustration--image{height:auto;max-width:570px;margin:14px auto 0}}
 @media(max-width:540px){.hero-illustration.hero-illustration--image{height:auto;margin:0 auto 8px}}
+
+/* Homepage compact hero layout 20261030: keep the existing copy and two-column checklist. */
+.hero .hero-grid{padding-top:42px;padding-bottom:42px}
+@media(max-width:820px){.hero .hero-grid{padding-top:38px;padding-bottom:38px}}
+@media(max-width:540px){.hero .hero-grid{padding-top:30px;padding-bottom:30px}}
