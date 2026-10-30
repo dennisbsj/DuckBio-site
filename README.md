@@ -1,52 +1,109 @@
-# DuckBio — software for scientific workflows
+# DuckBio — scientific software suite
 
-This repository is the **new DuckBio website and shared application-suite source**. DuckBio is a software-only business offering six applications: **GoFlo, EEL, MethPipe, ManTrain, LIMSMan and DuckMan**.
+DuckBio develops six independent scientific applications and a public marketing
+preview. Repository/product names have changed; legacy runtime identifiers remain
+compatible. Documentation status: **30 October 2026**.
 
-## Status — migration in progress
+| App and current repository | Former name | Purpose |
+|---|---|---|
+| [DuckNote](https://github.com/dennisbsj/DuckNote) | EEL | Electronic laboratory notebook |
+| [CytoDuck](https://github.com/dennisbsj/CytoDuck) | GoFlo | Flow cytometry analysis |
+| [DuckTrain](https://github.com/dennisbsj/DuckTrain) | ManTrain | Training and competency |
+| [DuckPipe](https://github.com/dennisbsj/DuckPipe) | MethPipe / Prove It | Methods and validation workspace |
+| [LabDuck](https://github.com/dennisbsj/LabDuck) | LIMSMan | Laboratory information management |
+| [DuckMan](https://github.com/dennisbsj/DuckMan) | DuckMan | Controlled documents and revisions |
 
-**This repository is not yet a production website. Do not deploy it in place of the existing site or point live domains at it.**
+## Website source and publishing status
 
-The existing `dennisbsj/celluloid-consulting-site` repository remains the active website/deployment source until a separately verified cutover. Its historical content must not be deleted before backups and release verification.
+The static marketing preview is at
+[dennisbsj.github.io/DuckBio-site](https://dennisbsj.github.io/DuckBio-site/).
+The documented publishing source is **`development` → `/docs`**, using GitHub
+Pages **Deploy from a branch**. The source homepage is
+[development/docs/index.html](https://github.com/dennisbsj/DuckBio-site/blob/development/docs/index.html)
+and pricing is
+[development/docs/pricing.html](https://github.com/dennisbsj/DuckBio-site/blob/development/docs/pricing.html).
 
-The first migration step preserves the canonical authorization policy and shared app UI **byte-for-byte**. This keeps all six installed application copies compatible. Existing legacy names in these files (including `Celluloid Science Apps`, the `cc-suite-theme` local-storage key and their JS global/event names) are compatibility contracts, **not the new DuckBio marketing brand**. Do not rename these contracts during the repository migration. Rebranding them requires separate testing across all six apps.
+This README is on `development`; the marketing files are in this checkout's
+`docs/` folder. It aligns the previously stale development README with main's
+verified publishing-source documentation without changing website content.
 
-## Canonical shared files
+Root HTML on `main` is not the publishing source. The existing
+`development/docs/.nojekyll` skips Jekyll; there is no need to restore an old
+custom deployment workflow. This README-only PR neither pushes to a publishing
+branch nor changes `docs/`, Pages configuration or the published website.
 
-- `suite-permissions.json`: shared roles and permission policy.
-- `suite-ui.js`: shared login/header/theme helper.
-- `scripts/sync-suite-permissions.py`: verifies/updates six app-local copies.
-- `scripts/sync-suite-ui.py`: verifies/updates six app-local copies.
-- `assets/app-icons/`: selected pre-existing product icons.
+The preview is **static marketing**, not a completed SaaS platform. Pricing is
+tentative; live Stripe checkout, unified customer login, billing, inbox and
+messaging must not be described as launched. No domains, payments, licenses,
+app databases or production runtime are changed by this documentation.
+The former [celluloid-consulting-site](https://github.com/dennisbsj/celluloid-consulting-site)
+is a historical source/QA archive, not the current app runtime source. Preserve
+its snapshots/backups; do not execute its old hosting scripts or access cHosting.
 
-The six apps each retain a local release copy of these shared files and **do not load their runtime code remotely from this website**.
+## Application backend and review status
 
-When the site and all six repositories are checked out as sibling directories:
+All six app backends use Node.js technology, with **separate app data**.
+DuckNote uses PostgreSQL; CytoDuck, DuckTrain, DuckPipe, LabDuck and DuckMan use
+private SQLite for their backend records. Scientific workspaces and some file
+bytes can still be browser-persistent. LabDuck's PHP→Node source migration has
+synthetic database/hash/session/backup/rollback evidence; retained PHP is only a
+compatibility reference, not a required Node interpreter.
+
+The reviewed API/migration/security/recovery changes remain in draft PRs and
+app `qa/duckbio-validation-20261030` snapshots, not merged default branches or
+confirmed production releases. Read the [dated QA report](https://github.com/dennisbsj/celluloid-consulting-site/blob/16b300b232acd0dac82681d24a6bd6c2e0370ef0/DUCKBIO_QA_20261030.md)
+for exact commits, test scope and limitations. DuckTrain's explicit evidence
+server copies do not recover files that were never copied; DuckPipe still has
+prototype areas. No common identity/database, formal regulatory validation or
+commercial release readiness is implied by sharing Node.js technology.
+
+## Shared policy/UI and legacy checkout names
+
+The canonical shared source is maintained in
+[DuckBio-site](https://github.com/dennisbsj/DuckBio-site):
+`suite-permissions.json`, `suite-ui.js` and the two `scripts/sync-suite-*.py` tools.
+Each application vendors its own reviewed copy; no app loads its runtime code
+from the marketing site. The older website's copies are historical and must not
+silently overwrite newer app branding or reviewed fixes.
+
+The sync tools still address legacy **local directory names** and internal
+permission keys. For a deliberately prepared sibling-checkout layout:
+
+| Current GitHub repository | Local directory expected by existing sync tools |
+|---|---|
+| `dennisbsj/DuckNote` | `EEL` |
+| `dennisbsj/CytoDuck` | `GoFlo` |
+| `dennisbsj/DuckTrain` | `ManTrain` |
+| `dennisbsj/DuckPipe` | `MethPipe` |
+| `dennisbsj/LabDuck` | `LIMSMan` |
+| `dennisbsj/DuckMan` | `DuckMan` |
+
+For example, clone `dennisbsj/DuckNote` into a directory named `EEL` when using
+these unmodified sync tools. This is a local path alias, not a repository rename.
+From the DuckBio-site checkout, with the six sibling directories prepared:
 
 ```sh
 python scripts/sync-suite-permissions.py --check
 python scripts/sync-suite-ui.py --check
 ```
 
-Only after deliberately modifying an approved canonical file should the corresponding `--write` command be used; review diffs, run app tests and deploy each app separately.
+Checks report drift or missing sibling paths. Review differences before any
+intentional `--write`; never use it merely to silence drift, because app-local
+DuckBio changes may be newer than a shared baseline. This README change does not
+run the sync tools, change shared policy/UI, or alter installed app permissions.
 
-## Website direction (not implemented yet)
+Legacy `Celluloid Science Apps`, `CelluloidSuiteUI`, `cc-suite-theme`, policy app
+keys, environment variables, stored IDs, filenames and backup formats remain
+compatibility contracts. Public product names are the DuckBio names above.
 
-- Software products and subscription licensing only; **no consulting services**.
-- Keep the light navy/blue/aqua/coral look from preferred concept #1.
-- No photography or illustrations of people.
-- Home; All apps; six product details; Platform; Pricing; Solutions; About; Support/Contact.
-- Public marketing site and authenticated customer platform are separate products.
-- Avoid claiming unified login, billing, inbox, messaging, compliance certification or other features are live until implemented and verified.
-- Use real product UI screenshots and product icons rather than fake application screenshots.
-- Proposed tagline: **Serious science. Smarter software.**
+## Design and release boundaries
 
-## Safety gates before old repository can be retired
+Keep the software-only light navy/blue/aqua/coral design, existing product icons,
+reviewed logo/favicon variants and verified product visuals. Preserve Home,
+Applications, Pricing, How it works, About and Support navigation. No people
+photography. Tagline: **Serious science. Smarter software.**
 
-1. Preserve an independent archive/backup of the original website repository and public assets.
-2. Move required website content/assets, rebuild and review the DuckBio site.
-3. Verify shared policy and UI are still identical in all six apps.
-4. Update remaining source links, sync instructions, deployment scripts and domain references in controlled PRs, not as a bulk blind replace.
-5. Migrate hosting, DNS, HTTPS, licensing/contacts and any redirects; verify the production source and rollback.
-6. Only then archive the old repository. Consider permanent deletion separately.
-
-**No production deployment, DNS change, app migration or old-repository deletion is authorized by this README.**
+GitHub Pages is public even when source is private: never place credentials,
+private configuration, app runtime files, customer data or backups in `docs/`.
+Publishing marketing content does not deploy any app. App release/cutover,
+secret custody, retention/restore and hosting decisions remain separate.
