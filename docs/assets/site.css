@@ -207,7 +207,7 @@ html[data-theme="dark"] a.pr-app:hover{background:#27566a;color:#eaf8fd}
 html[data-theme="dark"] .apps-hero-detail span{background:#163b4d}
 @media(max-width:700px){.apps-landing-hero{padding:54px 0 45px}}
 
-/* Separate platform preview page: resembles a screenshot but the embedded launcher is clickable. */
+/* Separate workspace preview page: resembles a screenshot but the embedded launcher is clickable. */
 .workspace-page-hero{padding:58px 0 50px}
 .workspace-page-hero h1{margin-bottom:14px}
 .workspace-page-hero .lead{max-width:770px;margin-bottom:12px}
@@ -304,4 +304,18 @@ img.suite-sprite.logo-cytoduck{background-image:none;background-color:transparen
  .workspace-toolbar-content p{font-size:11px;line-height:1.35}
  .workspace-preview-section iframe#workspace-frame{height:calc(100dvh - 174px)}
  .workspace-preview-section .workspace-screenshot-chrome{padding:6px 10px}
+}
+
+
+/* Individual app detail pages: increase approved app logos to 4 × 73px. */
+.product-hero .product-icon{
+ width:292px;
+ height:292px;
+ max-width:100%;
+ object-fit:contain;
+ margin-bottom:18px;
+ flex-shrink:0;
+}
+@media(max-width:540px){
+ .product-hero .product-icon{width:min(292px,100%);height:auto;aspect-ratio:1/1}
 }
