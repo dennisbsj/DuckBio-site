@@ -159,7 +159,21 @@
 "use strict";
 const find=(id)=>document.getElementById(id);
 const prices=[0,200,380,540,680,800,1000],rates=[0,0,5,10,15,20,16.7];
-const format=(n)=>"kr "+new Intl.NumberFormat("da-DK",{maximumFractionDigits:0}).format(Math.round(n));
+
+const currencyButtons=[...document.querySelectorAll("[data-currency]")];
+const fxRates={DKK:1,EUR:1/7.4736,USD:1.1130/7.4736};
+let currency="DKK";
+const format=(n)=>{
+ const locales={DKK:"da-DK",EUR:"de-DE",USD:"en-US"};
+ return new Intl.NumberFormat(locales[currency],{style:"currency",currency,minimumFractionDigits:currency==="DKK"?0:2,maximumFractionDigits:currency==="DKK"?0:2}).format(n*fxRates[currency]);
+};
+function renderStaticPrices(){document.querySelectorAll("[data-price-dkk]").forEach(el=>{el.textContent=format(Number(el.dataset.priceDkk))})}
+currencyButtons.forEach(btn=>btn.addEventListener("click",()=>{
+ currency=btn.dataset.currency;
+ currencyButtons.forEach(b=>b.setAttribute("aria-pressed",String(b===btn)));
+ renderStaticPrices();
+ recalculate();
+}));
 let estimate=null;
 function recalculate(){
  const apps=Number(find("pr-app-count").value),users=Number(find("pr-users").value),early=find("pr-early").checked;
@@ -188,10 +202,11 @@ function recalculate(){
 find("pr-copy").addEventListener("click",async()=>{
  if(!estimate)return;
  const x=estimate;
- const content="DuckBio provisional pricing estimate\nApps per user: "+x.apps+"\nUsers: "+x.users+"\n"+(x.custom?"Bundle-adjusted baseline (custom quote required): "+format(x.suite):"Estimated total: "+format(x.final))+" per month\nEarly adopter discount selected: "+(x.early?"Yes":"No")+"\nPrices exclude VAT. This is not a purchase offer.";
+ const content="DuckBio provisional pricing estimate\nApps per user: "+x.apps+"\nUsers: "+x.users+"\n"+(x.custom?"Bundle-adjusted baseline (custom quote required): "+format(x.suite):"Estimated total: "+format(x.final))+" per month\nEarly adopter discount selected: "+(x.early?"Yes":"No")+"\nPrices exclude VAT. EUR/USD prices use indicative ECB rates from 29 October 2026; DKK remains the base price. Not a purchase offer.";
  try{await navigator.clipboard.writeText(content);find("pr-copy-status").textContent="Copied."}
  catch{find("pr-copy-status").textContent="Copy unavailable in this browser."}
 });
+renderStaticPrices();
 recalculate();
 })();
 </script></body></html>
