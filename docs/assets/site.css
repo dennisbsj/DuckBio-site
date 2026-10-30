@@ -360,7 +360,7 @@ img.suite-sprite{
   object-fit:contain;
 }
 img.suite-sprite.logo-limsduck{
-  background-image:url("icons/duckbio-20261030/labduck.png");
+  background-image:url("icons/duckbio-20261030/labduck-v2.png");
   background-size:114% 114%;
   background-position:center center;
 }
