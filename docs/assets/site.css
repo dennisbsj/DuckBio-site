@@ -284,3 +284,24 @@ img.suite-sprite.logo-cytoduck{background-image:none;background-color:transparen
 
 /* Emphasise CYTO and DUCK in app subtitles without changing text size. */
 .hero-app .hero-app-category b{font-weight:900;font-size:inherit}
+
+
+/* Full-window Workspace preview. Its iframe is resized to its entire content to prevent an embedded scrollbar. */
+.workspace-page-toolbar{padding:10px 0;background:linear-gradient(110deg,#eaf7fb,#fbfdfe);border-bottom:1px solid var(--line)}
+.workspace-page-toolbar .wrap{width:calc(100% - 36px);max-width:none}
+.workspace-toolbar-content{display:flex;align-items:center;gap:18px;flex-wrap:wrap;min-height:43px}
+.workspace-toolbar-content h1{margin:0;font-size:clamp(22px,2.2vw,30px);line-height:1.2}
+.workspace-toolbar-content p{font-size:12px;color:var(--muted);margin:0}
+.workspace-preview-section{padding:0 0 28px}
+.workspace-preview-section>.workspace-preview-wrap{width:100%;max-width:none}
+.workspace-preview-section .workspace-screenshot{border:0;border-radius:0;box-shadow:none;width:100%;background:#eaf5f9;overflow:visible}
+.workspace-preview-section .workspace-screenshot-chrome{min-height:36px;padding:7px 16px}
+.workspace-preview-section iframe#workspace-frame{display:block;width:100%;height:calc(100dvh - 166px);min-height:390px;border:0;overflow:hidden;background:#eaf5f9}
+.workspace-preview-section .workspace-below,.workspace-preview-section .workspace-note{max-width:1170px;margin-left:auto;margin-right:auto;padding-left:18px;padding-right:18px}
+.workspace-preview-section .workspace-below{margin-top:12px}
+@media(max-width:760px){
+ .workspace-toolbar-content{align-items:flex-start;gap:3px;flex-direction:column}
+ .workspace-toolbar-content p{font-size:11px;line-height:1.35}
+ .workspace-preview-section iframe#workspace-frame{height:calc(100dvh - 174px)}
+ .workspace-preview-section .workspace-screenshot-chrome{padding:6px 10px}
+}
