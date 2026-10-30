@@ -173,8 +173,9 @@ const currencyButtons=[...document.querySelectorAll("[data-currency]")];
 const fxRates={DKK:1,EUR:1/7.4736,USD:1.1130/7.4736};
 let currency="DKK";
 const format=(n)=>{
- const locales={DKK:"da-DK",EUR:"de-DE",USD:"en-US"};
- return new Intl.NumberFormat(locales[currency],{style:"currency",currency,minimumFractionDigits:currency==="DKK"?0:2,maximumFractionDigits:currency==="DKK"?0:2}).format(n*fxRates[currency]);
+ if(currency==="DKK")return "kr "+new Intl.NumberFormat("da-DK",{maximumFractionDigits:0}).format(Math.round(n));
+ const locales={EUR:"de-DE",USD:"en-US"};
+ return new Intl.NumberFormat(locales[currency],{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(n*fxRates[currency]);
 };
 function renderStaticPrices(){document.querySelectorAll("[data-price-dkk]").forEach(el=>{el.textContent=format(Number(el.dataset.priceDkk))})}
 currencyButtons.forEach(btn=>btn.addEventListener("click",()=>{
