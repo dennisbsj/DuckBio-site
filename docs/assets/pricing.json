@@ -42,7 +42,7 @@
       "earlyAdopterMonthly": 160
     }
   },
-  "policy": "Proposed 2027 subscription prices. Preferred EUR list prices per user/month for 1–6 apps: €27, €51, €72, €91, €107 and €134. Early adopter EUR prices are exactly 20% lower for eligible subscriptions from January to March 2027, first 12 months. Previously proposed DKK listed monthly amounts remain 200, 380, 540, 680, 800 and 1000; the six-app early adopter DKK price remains 800. USD display uses dated ECB EUR/USD rate. Organisation discount rules remain separate and do not stack with early adopter rates. Trial, subscription provisioning and payment checkout are not yet active.",
+  "policy": "Proposed 2027 subscription prices. EUR is the standard display; normal EUR list prices per user/month for 1–6 apps are €27, €51, €72, €91, €107, €134; early adopter EUR prices are €21, €41, €58, €73, €86, €107. Target early adopter savings are ~20% in whole-unit EUR/USD prices (exact percentages are computed by currency); the DKK early-adopter prices remain exactly 20% below DKK normal prices. Planned DKK normal prices remain 200, 380, 540, 680, 800, and 1000. The early adopter period is January–March 2027 for eligible first-year subscriptions. Organisation discount eligibility remains separate and does not stack with early adopter offers. Checkout and billing are not enabled.",
   "pricesTentative": true,
   "bundleMonthlyDKK": {
     "1": 200,
@@ -63,7 +63,7 @@
     "dkkPerEUR": 7.4736,
     "usdPerEUR": 1.113,
     "source": "European Central Bank",
-    "note": "EUR normal prices are the preferred rounded whole-euro list amounts, selected to be nearest to existing DKK normal prices. USD display values are EUR times the dated EUR/USD reference rate. DKK listed amounts stay at their previously proposed values; there is no live FX conversion or checkout."
+    "note": "ECB reference rates from 29 October 2026 explain the EUR nearest-DKK list levels; the EUR and USD figures are fixed whole-unit planned prices for clear display, not live FX rates. DKK remains its own planned price list. Early adopter savings in EUR/USD are approximately 20% and vary slightly with rounding."
   },
   "defaultDisplayCurrency": "EUR",
   "referencePriceCurrency": "EUR",
@@ -76,11 +76,27 @@
     "6": 134
   },
   "earlyAdopterBundleMonthlyEUR": {
-    "1": 21.6,
-    "2": 40.8,
-    "3": 57.6,
-    "4": 72.8,
-    "5": 85.6,
-    "6": 107.2
+    "1": 21,
+    "2": 41,
+    "3": 58,
+    "4": 73,
+    "5": 86,
+    "6": 107
+  },
+  "normalBundleMonthlyUSD": {
+    "1": 30,
+    "2": 57,
+    "3": 81,
+    "4": 102,
+    "5": 120,
+    "6": 150
+  },
+  "earlyAdopterBundleMonthlyUSD": {
+    "1": 24,
+    "2": 46,
+    "3": 65,
+    "4": 81,
+    "5": 96,
+    "6": 120
   }
 }
