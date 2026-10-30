@@ -61,8 +61,9 @@ def main() -> None:
     assert settings["earlyAdopterDiscountPercent"] == 20
     assert settings["defaultDisplayCurrency"] == "EUR"
     assert settings["normalBundleMonthlyEUR"] == {"1": 27, "2": 51, "3": 72, "4": 91, "5": 107, "6": 134}
-    assert all(abs(settings["earlyAdopterBundleMonthlyEUR"][key] - 0.8 * value) < 1e-9
-               for key, value in settings["normalBundleMonthlyEUR"].items())
+    assert settings["earlyAdopterBundleMonthlyEUR"] == {"1": 21, "2": 41, "3": 58, "4": 73, "5": 86, "6": 107}
+    assert settings["normalBundleMonthlyUSD"] == {"1": 30, "2": 57, "3": 81, "4": 102, "5": 120, "6": 150}
+    assert settings["earlyAdopterBundleMonthlyUSD"] == {"1": 24, "2": 46, "3": 65, "4": 81, "5": 96, "6": 120}
     assert settings["referenceConversion"]["dkkPerEUR"] == 7.4736
     assert settings["referenceConversion"]["usdPerEUR"] == 1.1130
     for filename in sorted(EXPECTED_PAGES):
