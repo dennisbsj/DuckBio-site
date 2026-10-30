@@ -271,3 +271,13 @@ html[data-theme="dark"] .hero-app .hero-app-summary{color:#bdd8e0}
 
 /* Distinct CytoDuck foreground-duck illustration; other approved sprite icons stay unchanged. */
 img.suite-sprite.logo-cytoduck{background-image:url("icons/cytoduck-revised.svg?v=cyto-20261030");background-size:100% 100%;background-position:center center;background-repeat:no-repeat}
+
+
+/* Every app capability has its own checkmark. One row on wide screens; one item per line on narrow screens. */
+.trust-grid.trust-grid--features{display:flex;flex-wrap:nowrap;justify-content:space-between;align-items:center;gap:12px}
+.trust-grid.trust-grid--features span{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-size:12px;font-weight:600;line-height:1.4}
+.trust-grid.trust-grid--features i{width:23px;height:23px;font-size:12px}
+@media(max-width:1150px){
+ .trust-grid.trust-grid--features{display:grid;grid-template-columns:minmax(0,1fr);gap:11px}
+ .trust-grid.trust-grid--features span{white-space:normal}
+}
