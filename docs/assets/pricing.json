@@ -42,7 +42,7 @@
       "earlyAdopterMonthly": 160
     }
   },
-  "policy": "Proposed 2027 pricing: DKK 200 per user per app monthly before bundle/organisation discounts. Normal all-six-apps bundle DKK 1000 and early adopter DKK 800 per user monthly. The eligible early adopter promotion (1 January–31 March 2027) is a further 20% off the bundle price for the first 12 months; it does not stack with organisation discounts. Checkout and billing are not enabled.",
+  "policy": "Proposed 2027 subscription prices. Preferred EUR list prices per user/month for 1–6 apps: €27, €51, €72, €91, €107 and €134. Early adopter EUR prices are exactly 20% lower for eligible subscriptions from January to March 2027, first 12 months. Previously proposed DKK listed monthly amounts remain 200, 380, 540, 680, 800 and 1000; the six-app early adopter DKK price remains 800. USD display uses dated ECB EUR/USD rate. Organisation discount rules remain separate and do not stack with early adopter rates. Trial, subscription provisioning and payment checkout are not yet active.",
   "pricesTentative": true,
   "bundleMonthlyDKK": {
     "1": 200,
@@ -63,6 +63,24 @@
     "dkkPerEUR": 7.4736,
     "usdPerEUR": 1.113,
     "source": "European Central Bank",
-    "note": "Indicative display conversion only; canonical prices remain in DKK."
+    "note": "EUR normal prices are the preferred rounded whole-euro list amounts, selected to be nearest to existing DKK normal prices. USD display values are EUR times the dated EUR/USD reference rate. DKK listed amounts stay at their previously proposed values; there is no live FX conversion or checkout."
+  },
+  "defaultDisplayCurrency": "EUR",
+  "referencePriceCurrency": "EUR",
+  "normalBundleMonthlyEUR": {
+    "1": 27,
+    "2": 51,
+    "3": 72,
+    "4": 91,
+    "5": 107,
+    "6": 134
+  },
+  "earlyAdopterBundleMonthlyEUR": {
+    "1": 21.6,
+    "2": 40.8,
+    "3": 57.6,
+    "4": 72.8,
+    "5": 85.6,
+    "6": 107.2
   }
 }
