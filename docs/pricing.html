@@ -167,17 +167,25 @@
 (()=>{
 "use strict";
 const find=(id)=>document.getElementById(id);
-const prices=[0,200,380,540,680,800,1000],rates=[0,0,5,10,15,20,16.7];
-
+const pricesDKK=[0,200,380,540,680,800,1000], pricesEUR=[0,27,51,72,91,107,134];
 const currencyButtons=[...document.querySelectorAll("[data-currency]")];
-const fxRates={DKK:1,EUR:1/7.4736,USD:1.1130/7.4736};
-let currency="DKK";
+const eurUsdRate=1.1130;
+let currency="EUR";
 const format=(n)=>{
  if(currency==="DKK")return "kr "+new Intl.NumberFormat("da-DK",{maximumFractionDigits:0}).format(Math.round(n));
- const locales={EUR:"de-DE",USD:"en-US"};
- return new Intl.NumberFormat(locales[currency],{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(n*fxRates[currency]);
+ return new Intl.NumberFormat(currency==="EUR"?"de-DE":"en-US",{style:"currency",currency,minimumFractionDigits:Number.isInteger(n)?0:2,maximumFractionDigits:2}).format(n);
 };
-function renderStaticPrices(){document.querySelectorAll("[data-price-dkk]").forEach(el=>{el.textContent=format(Number(el.dataset.priceDkk))})}
+const units=(apps)=>currency==="DKK"?pricesDKK[apps]:pricesEUR[apps]*(currency==="USD"?eurUsdRate:1);
+const rounded=(n)=>currency==="DKK"?Math.round(n):Math.round((n+Number.EPSILON)*100)/100;
+const bundleDiscount=(apps)=>apps===1?0:Math.round((1-units(apps)/(units(1)*apps))*1000)/10;
+function renderStaticPrices(){
+ document.querySelectorAll("[data-price-dkk]").forEach(el=>{
+  const eur=Number(el.dataset.priceEur);
+  const amount=currency==="DKK"?Number(el.dataset.priceDkk):currency==="USD"?eur*eurUsdRate:eur;
+  el.textContent=format(rounded(amount));
+ });
+ document.querySelectorAll("[data-bundle-apps]").forEach(el=>{el.textContent=bundleDiscount(Number(el.dataset.bundleApps))+"%"});
+}
 currencyButtons.forEach(btn=>btn.addEventListener("click",()=>{
  currency=btn.dataset.currency;
  currencyButtons.forEach(b=>b.setAttribute("aria-pressed",String(b===btn)));
@@ -191,13 +199,13 @@ function recalculate(){
  if(!Number.isInteger(users)||users<1||users>10000){
    label.textContent="Enter a valid team size";totalElement.textContent="Use 1–10,000 users";find("pr-copy").disabled=true;estimate=null;return;
  }
- const base=200*apps*users,suite=prices[apps]*users,orgRate=users>=20?20:users>=5?10:0,custom=users>=50;
+ const base=units(1)*apps*users,suite=units(apps)*users,orgRate=users>=20?20:users>=5?10:0,custom=users>=50;
  const effectiveRate=early?Math.max(orgRate,20):orgRate;
- const extra=Math.round(suite*effectiveRate/100),final=suite-extra;
+ const extra=rounded(suite*effectiveRate/100),final=rounded(suite-extra);
  label.textContent=custom?"Indicative total before custom quote":"Estimated monthly total";
  totalElement.textContent=custom?format(suite)+" /month*":format(final)+" /month";
  find("pr-base").textContent=format(base);
- find("pr-bundle-label").textContent="Multi-app discount ("+rates[apps]+"%)";
+ find("pr-bundle-label").textContent="Multi-app discount ("+bundleDiscount(apps)+"%)";
  find("pr-bundle").textContent="− "+format(base-suite);
  find("pr-extra-label").textContent=early?"Early adopter discount (20%)":"Organisation discount ("+orgRate+"%)";
  find("pr-extra").textContent=custom?"Custom quote":"− "+format(extra);
