@@ -268,3 +268,6 @@ html[data-theme="dark"] .hero-app .hero-app-summary{color:#bdd8e0}
 .trust-grid{grid-template-columns:minmax(0,1.4fr) minmax(0,.9fr)}
 .trust-grid span{font-weight:600;line-height:1.6;align-items:flex-start}
 @media(max-width:700px){.trust-grid{grid-template-columns:1fr}.hero-suitable{font-size:13px}}
+
+/* Distinct CytoDuck foreground-duck illustration; other approved sprite icons stay unchanged. */
+img.suite-sprite.logo-cytoduck{background-image:url("icons/cytoduck-revised.svg?v=cyto-20261030");background-size:100% 100%;background-position:center center;background-repeat:no-repeat}
