@@ -42,6 +42,27 @@
       "earlyAdopterMonthly": 160
     }
   },
-  "policy": "Proposed 2027 pricing only: DKK 200 per user per app per month before multi-app, organisation and eligible early adopter discounts. Early adopter period is 1 January–31 March 2027, with the promotional discount valid for the first 12 months. Checkout and billing are not enabled.",
-  "pricesTentative": true
+  "policy": "Proposed 2027 pricing: DKK 200 per user per app monthly before bundle/organisation discounts. Normal all-six-apps bundle DKK 1000 and early adopter DKK 800 per user monthly. The eligible early adopter promotion (1 January–31 March 2027) is a further 20% off the bundle price for the first 12 months; it does not stack with organisation discounts. Checkout and billing are not enabled.",
+  "pricesTentative": true,
+  "bundleMonthlyDKK": {
+    "1": 200,
+    "2": 380,
+    "3": 540,
+    "4": 680,
+    "5": 800,
+    "6": 1000
+  },
+  "earlyAdopterDiscountPercent": 20,
+  "displayCurrencies": [
+    "DKK",
+    "EUR",
+    "USD"
+  ],
+  "referenceConversion": {
+    "date": "2026-10-29",
+    "dkkPerEUR": 7.4736,
+    "usdPerEUR": 1.113,
+    "source": "European Central Bank",
+    "note": "Indicative display conversion only; canonical prices remain in DKK."
+  }
 }
