@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="DuckFlow logo">
+<title>DuckFlow — DuckBio scientific software</title>
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#05283f"/><stop offset="1" stop-color="#001b30"/></linearGradient>
+ <linearGradient id="white" x1="0" y1="0" x2=".65" y2="1"><stop stop-color="#ffffff"/><stop offset=".65" stop-color="#e5f9ff"/><stop offset="1" stop-color="#9cdce9"/></linearGradient>
+ <linearGradient id="aqua" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8ffbf2"/><stop offset=".5" stop-color="#1fcbd7"/><stop offset="1" stop-color="#087cae"/></linearGradient>
+ <clipPath id="rounded"><rect width="192" height="192" rx="32"/></clipPath>
+</defs>
+<g clip-path="url(#rounded)">
+ <rect width="192" height="192" fill="url(#bg)"/>
+ <path d="M0 170L52 126L99 152L152 88L192 128V192H0Z" fill="#053450" opacity=".65"/>
+ <path d="M-8 34L50 -6M152 197L206 132" stroke="#0a6382" stroke-width="4" opacity=".25"/>
+ <g fill="#14bde0" opacity=".55"><rect x="17" y="20" width="5" height="5"/><rect x="25" y="20" width="5" height="5"/><rect x="25" y="28" width="5" height="5"/><rect x="34" y="29" width="3" height="3"/><rect x="152" y="156" width="4" height="4"/><rect x="161" y="156" width="4" height="4"/><rect x="161" y="164" width="4" height="4"/></g>
+ 
+ <!-- White, outlined angular duck. Larger head and line treatment echo the detailed original LIMSMan and DuckMan illustrations. -->
+ <path d="M56 144L68 115L87 101L95 79L94 60L102 44L117 29L137 27L150 37L158 53L158 63L170 69L160 78L156 90L143 99L139 123L159 147L148 165L122 171L101 164L81 172L60 162Z"
+  fill="#031f35" stroke="#effaff" stroke-width="5.5" stroke-linejoin="miter"/>
+ <path d="M92 83L99 63L108 45L120 33L134 33L144 43L151 58L152 69L145 83L132 94L119 106L121 131L111 147L95 153L80 142L77 116L88 105Z" fill="url(#white)" stroke="#0a4262" stroke-width="3.2" stroke-linejoin="miter"/>
+ <path d="M147 63L172 67L161 75L148 79Z" fill="#e6fbff" stroke="#117ca6" stroke-width="2.7" stroke-linejoin="miter"/>
+ <path d="M151 66L165 68L157 71" fill="none" stroke="#0b3859" stroke-width="2"/>
+ <circle cx="135" cy="54" r="4.5" fill="#052944"/><circle cx="136" cy="53" r="1.25" fill="#ffffff"/>
+ <path d="M104 44L121 33L131 34M103 59L95 79L111 97" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="square"/>
+ <path d="M98 88L113 98L117 123L103 142L81 139L74 116Z" fill="#0578a7" stroke="#eafcff" stroke-width="3.2" stroke-linejoin="miter"/>
+ <path d="M82 111L100 100L107 117L94 136L77 126Z" fill="url(#aqua)" stroke="#ffffff" stroke-width="2.2"/>
+ <path d="M120 105L133 97L133 123L146 142L134 155L115 144Z" fill="#0c5c86" stroke="#d6faff" stroke-width="2.5"/>
+ <path d="M123 111L129 113M123 119L129 121M123 128L130 132" stroke="#6ee9ef" stroke-width="2.2"/>
+ 
+ <!-- Flow cytometry: sample cells, axes and two distinct gating curves -->
+<path d="M20 153L20 102M20 153H111" fill="none" stroke="#e8faff" stroke-width="3.7" stroke-linecap="square"/>
+<path d="M24 141C42 141 44 115 57 117C75 120 70 89 101 97" fill="none" stroke="#56e1ed" stroke-width="5" stroke-linecap="round"/>
+<path d="M27 154C44 155 57 145 65 134C77 118 89 136 108 124" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+<g fill="#43cddd" stroke="#d1faff" stroke-width="1.4"><circle cx="34" cy="127" r="4.8"/><circle cx="46" cy="113" r="3"/><circle cx="59" cy="129" r="4"/><circle cx="75" cy="109" r="5.1"/><circle cx="97" cy="103" r="3.4"/><circle cx="42" cy="148" r="2.8"/></g>
+<path d="M33 109L44 100L55 108L61 122L48 131L33 125Z" fill="none" stroke="#e1feff" stroke-width="2.8" stroke-dasharray="4 3"/>
+<path d="M108 142L120 137L130 141" fill="none" stroke="#53dce3" stroke-width="2.2"/>
+ <path d="M15 174H177" stroke="#45dbe0" opacity=".18" stroke-width="2"/>
+</g>
+</svg>

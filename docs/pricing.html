@@ -1,0 +1,423 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#123c55"><meta name="description" content="Explore DuckBio's proposed EUR-based subscription pricing: EUR 30 per user per app, bundle discounts, team pricing and the January–March 2027 early adopter offer."><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="strict-origin-when-cross-origin"><title>DuckBio pricing | Choose apps and save on your suite</title><script>try{document.documentElement.dataset.theme=localStorage.getItem("duckbio-theme")==="dark"?"dark":"light"}catch(e){document.documentElement.dataset.theme="light"}</script><link rel="stylesheet" href="assets/site.css?v=duckbio-frames-final-20261030"><script src="assets/site.js?v=duckbio-night-20261029-2" defer></script><link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: light)" href="assets/duckbio-favicon-v2.svg"><link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: dark)" href="assets/duckbio-favicon-v2-dark.svg">
+<style>
+/* Pricing page component styles; all site-wide header, navigation, logo and footer are shared. */
+.pr-hero{padding:24px 0 74px;background:radial-gradient(circle at 80% 18%,#d7f6f3,transparent 37%),linear-gradient(120deg,#f6fbfc,#eaf7f9);border-bottom:1px solid var(--line)}
+.pr-hero-grid{display:grid;grid-template-columns:1.18fr .82fr;gap:55px;align-items:center}
+.pr-hero h1{color:var(--navy);font-size:clamp(43px,5vw,64px);line-height:1.06;letter-spacing:-.06em;margin:0 0 20px}
+.pr-hero h1 span{color:#148ca0}.pr-hero .lead{color:#557585;margin:0 0 24px;max-width:630px}
+.pr-actions{display:flex;flex-wrap:wrap;gap:11px}.pr-tiny{font-size:12px;color:#6a8591;margin:15px 0 0}
+.pr-hero-card{background:white;border:1px solid #d8eaf0;border-radius:19px;padding:33px;box-shadow:var(--shadow);transform:rotate(1deg)}
+.pr-hero-card .pr-amount{display:block;margin:9px 0;font-size:clamp(48px,5vw,70px);font-weight:850;color:var(--navy);letter-spacing:-.065em;line-height:1.1}
+.pr-hero-card .pr-amount small{font-size:18px;letter-spacing:0}.pr-hero-card .pr-unit{color:var(--muted);font-size:13px}
+.pr-hero-card hr{border:0;border-top:1px solid var(--line);margin:23px 0}.pr-bullet{font-size:13px;margin:10px 0;color:#527281}.pr-bullet b{color:#13899d;margin-right:8px}
+.pr-heading{text-align:center;max-width:730px;margin:0 auto 36px}.pr-heading h2{color:var(--navy);margin:11px 0}.pr-heading p:last-child{color:var(--muted)}
+.pr-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:19px}
+.pr-plan{position:relative;background:white;border:1px solid var(--line);border-radius:17px;padding:30px;display:flex;flex-direction:column;min-width:0}
+.pr-plan.featured{border:2px solid #1d98a7;padding:29px;box-shadow:var(--shadow)}
+.pr-flag{position:absolute;top:-14px;left:26px;border-radius:7px;background:var(--navy);color:white;font-size:11px;font-weight:850;padding:6px 13px}
+.pr-plan h3{margin:3px 0 6px;color:var(--navy)}.pr-plan .pr-desc{font-size:13px;min-height:49px;color:var(--muted);margin:0 0 18px}
+.pr-plan .pr-price{color:var(--navy);font-size:clamp(39px,4vw,48px);font-weight:850;letter-spacing:-.06em;line-height:1.13}
+.pr-plan .pr-price small{font-size:16px;letter-spacing:0}.pr-plan .pr-period{color:var(--muted);font-size:12px;margin:8px 0 19px}
+.pr-plan ul{list-style:none;padding:0;margin:0 0 25px;display:grid;gap:10px;flex:1;font-size:13px;color:#405d6e}
+.pr-plan li:before{content:"✓";color:#078e9a;font-weight:850;margin-right:9px}.pr-plan .btn{width:100%}.pr-after{font-size:12px;color:var(--muted);text-align:center;margin:20px 0 0}
+.pr-offer{border-radius:17px;background:linear-gradient(110deg,#133f56,#195c6e);color:#fff;padding:36px 40px;display:flex;gap:30px;align-items:center;justify-content:space-between}
+.pr-offer .eyebrow{color:#7ce6ec}.pr-offer h2{margin:7px 0 12px;color:#fff;font-size:clamp(27px,3vw,36px)}.pr-offer p:last-child{color:#cfe7ee;margin:0;font-size:14px;max-width:700px}
+.pr-offer .btn{white-space:nowrap}
+.pr-calc-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:57px;align-items:center}
+.pr-calc-intro h2{color:var(--navy);margin:10px 0 14px}.pr-calc-intro p{color:var(--muted)}
+.pr-step{display:flex;gap:12px;align-items:center;color:#567583;font-size:13px;margin:15px 0}.pr-step b{display:inline-grid;place-items:center;width:29px;height:29px;flex:0 0 29px;border:1px solid #b1dae1;border-radius:8px;color:#147f98}
+.pr-calc-card{background:white;border:1px solid var(--line);border-radius:18px;padding:30px;box-shadow:var(--shadow)}
+.pr-input-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.pr-field label{display:block;color:var(--navy);font-size:12px;font-weight:850;margin-bottom:8px}
+.pr-field select,.pr-field input{width:100%;min-width:0;height:48px;border:1px solid #c5dce2;border-radius:9px;background:white;color:var(--ink);padding:11px 12px}
+.pr-promo{display:flex;align-items:start;gap:11px;background:#ecf9f7;border:1px solid #c7e9e6;border-radius:11px;padding:15px;margin:20px 0;cursor:pointer}
+.pr-promo input{margin-top:4px;accent-color:#168ea0}.pr-promo strong{display:block;font-size:13px;color:var(--navy)}.pr-promo small{display:block;font-size:11px;color:#64838d}
+.pr-result{border-top:1px solid var(--line);padding-top:19px}.pr-result .pr-result-label{font-size:12px;color:var(--muted)}
+.pr-result strong.pr-total{display:block;font-size:clamp(32px,4vw,46px);line-height:1.2;color:var(--navy);letter-spacing:-.055em;margin:8px 0 19px}
+.pr-total small{font-size:14px;letter-spacing:0;font-weight:500;color:var(--muted)}
+.pr-breakdown{display:grid;gap:10px;border-top:1px solid var(--line);padding-top:15px}
+.pr-breakdown div{display:flex;justify-content:space-between;gap:12px;color:#597380;font-size:12px}
+.pr-breakdown b{color:#163f52}.pr-breakdown .pr-saved{font-weight:850;color:#137f8f}.pr-breakdown .pr-saved b{color:#137f8f}
+.pr-hint{font-size:11px;color:#728894;line-height:1.5;margin:17px 0 0}.pr-copy-row{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:18px}
+.pr-copy-status{font-size:12px;color:#107e8b}
+.pr-tables{display:grid;grid-template-columns:1fr 1fr;gap:27px}.pr-table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:13px}
+.pr-tables h3{color:var(--navy);font-size:21px;margin:0 0 15px}.pr-table{border-collapse:collapse;width:100%;min-width:315px;background:white}
+.pr-table th,.pr-table td{text-align:left;padding:14px 17px;border-bottom:1px solid #e6eef0;font-size:13px}
+.pr-table tr:last-child td{border-bottom:0}.pr-table th{background:#f1f9fa;color:#537382;font-size:11px;letter-spacing:.045em;text-transform:uppercase}
+.pr-table td:last-child{color:var(--navy);font-weight:850}.pr-small{font-size:12px;color:var(--muted);margin:19px 0 0}
+.pr-apps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;max-width:750px;margin:17px auto 0}.pr-app{display:flex;gap:9px;align-items:center;border:1px solid var(--line);border-radius:10px;background:white;padding:8px 12px;font-size:12px;font-weight:750;color:var(--navy)}
+.pr-app img{height:24px;width:24px;border-radius:6px}
+.pr-faq{max-width:910px;margin:auto}.pr-faq details{border:1px solid var(--line);background:#fff;border-radius:12px;padding:17px 20px;margin-bottom:10px}
+.pr-faq summary{font-weight:800;cursor:pointer;color:var(--navy)}.pr-faq summary::marker{color:#128f9a}.pr-faq p{color:var(--muted);font-size:13px;margin:13px 0 0}
+@media(max-width:920px){.pr-hero-grid{gap:30px}.pr-calc-grid{gap:30px}.pr-plan{padding:24px}.pr-plan.featured{padding:23px}}
+@media(max-width:760px){.pr-currency-top{margin:0 0 17px}.pr-apps{grid-template-columns:repeat(2,minmax(0,1fr))}.pr-hero{padding:55px 0}.pr-hero-grid,.pr-calc-grid,.pr-tables{grid-template-columns:1fr}.pr-hero-card{transform:none;max-width:400px}.pr-grid{grid-template-columns:1fr}.pr-plan .pr-desc{min-height:0}.pr-offer{flex-direction:column;align-items:start;padding:27px}.pr-offer .btn{width:100%}}
+@media(max-width:450px){.pr-apps{grid-template-columns:1fr}.pr-input-grid{grid-template-columns:1fr}.pr-calc-card{padding:22px}.pr-hero h1{font-size:43px}}
+
+.pr-currency-top{display:flex;justify-content:flex-end;align-items:center;margin:-30px 0 13px;position:relative;z-index:1}
+.pr-currency-toggle{display:inline-flex;align-items:center;border:1px solid #a4cbd8;border-radius:9px;background:#fff;overflow:hidden;box-shadow:0 2px 8px #153b4b10}
+.pr-currency-toggle button{min-width:46px;border:0;border-right:1px solid #d6e8ef;background:transparent;color:#396376;padding:9px 10px;font-size:11px;line-height:1;font-weight:850;cursor:pointer}
+.pr-currency-toggle button:last-child{border-right:0}.pr-currency-toggle button[aria-pressed="true"]{background:#113e56;color:#fff}.pr-currency-toggle button:focus-visible{outline:2px solid #109eb4;outline-offset:-2px}
+.pr-prices{margin:10px 0 2px;display:grid;gap:8px;min-height:108px;align-content:center}
+.pr-normal{display:flex;align-items:baseline;justify-content:space-between;gap:10px;color:#6e8793;font-size:12px;font-weight:650}
+.pr-normal-label{display:flex;flex-wrap:wrap;column-gap:9px;row-gap:4px;align-items:baseline}
+.pr-bundle-save{font-size:11px;font-weight:850;color:#23b0be;white-space:nowrap}
+.pr-normal del{font-size:19px;font-weight:800;color:#738b98;text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:#b55d55;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pr-early{display:flex;flex-wrap:wrap;gap:5px 11px;align-items:baseline}
+.pr-early-label{font-size:11px;font-weight:800;color:#177e95;flex-basis:100%}
+.pr-early strong{font-size:clamp(32px,3.4vw,44px);font-weight:850;color:var(--navy);letter-spacing:-.055em;line-height:1.18;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pr-save{background:#e0f5f1;color:#066c5b;border-radius:6px;padding:5px 7px;font-size:11px;font-weight:850;white-space:nowrap;vertical-align:middle}
+.pr-hero-card .pr-prices{margin-bottom:10px}.pr-hero-card .pr-early strong{font-size:clamp(40px,4vw,55px)}
+.pr-table [data-price-dkk]{white-space:nowrap;font-variant-numeric:tabular-nums}.pr-table .price-early{font-weight:850;color:#0b788b}
+.pr-fx-note{font-size:11px;color:var(--muted);margin-top:11px}
+@media(max-width:500px){.pr-prices{min-height:auto}.pr-currency-toggle button{min-width:43px;padding:8px 9px}.pr-table th,.pr-table td{padding:10px 9px;font-size:11px}}
+
+
+/* Keep early-adopter amount and percentage together on one row. */
+.pr-early{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 7px}
+.pr-early-label{grid-column:1/-1;flex-basis:auto}
+.pr-plan .pr-early strong{font-size:clamp(27px,2.7vw,38px)}
+.pr-early strong{min-width:0;overflow:visible}
+.pr-early .pr-save{justify-self:end}
+.pr-table del{color:#8097a4;text-decoration-color:#b55d55;text-decoration-thickness:1.5px}
+@media(max-width:410px){.pr-plan .pr-early strong{font-size:30px}.pr-save{font-size:10px;padding:4px 5px}}
+
+/* Click-to-select product cards and purchase summary */
+.pr-select-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px}
+.pr-select-card{min-width:0;background:var(--white);border:1px solid var(--line);border-radius:15px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .2s,box-shadow .2s}
+.pr-select-card:has(.pr-select-button[aria-pressed="true"]){border:2px solid #159fac;box-shadow:0 0 0 3px rgba(20,168,180,.13)}
+.pr-select-button{position:relative;background:transparent;border:0;cursor:pointer;color:var(--navy);padding:23px 15px 13px;display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;min-height:155px;font:inherit}
+.pr-select-button:focus-visible{outline:3px solid #1eb6d0;outline-offset:-4px}
+.pr-select-button img.suite-sprite{width:73px;height:73px;flex:0 0 73px}
+.pr-select-button strong{font-size:17px;font-weight:850}
+.pr-select-state{color:var(--muted);font-size:12px;font-weight:700}
+.pr-select-button[aria-pressed="true"] .pr-select-state{color:#25bbc9}
+.pr-select-check{position:absolute;top:13px;right:14px;width:26px;height:26px;border:1px solid var(--line);border-radius:50%;display:grid;place-items:center;color:transparent;font-weight:900}
+.pr-select-button[aria-pressed="true"] .pr-select-check{color:#fff;background:#159fac;border-color:#159fac}
+.pr-select-details{align-self:center;color:var(--blue);font-size:12px;font-weight:800;padding:0 12px 17px;text-align:center}
+.pr-select-review{display:grid;grid-template-columns:1fr 1fr;gap:30px;background:var(--white);border:1px solid var(--line);border-radius:17px;padding:28px;margin-top:24px}
+.pr-select-review h3{color:var(--navy);margin-bottom:12px}
+.pr-select-review-main>p:not(.eyebrow){font-size:13px;color:var(--muted);min-height:36px}
+.pr-select-fields{display:flex;gap:20px;align-items:end;flex-wrap:wrap;margin-top:22px}
+.pr-select-fields label{font-size:12px;color:var(--navy);font-weight:800;display:grid;gap:7px}
+.pr-select-fields input[type="number"]{max-width:140px;width:100%;border:1px solid var(--line);border-radius:8px;background:var(--white);color:var(--ink);padding:10px}
+.pr-select-fields label.pr-select-early{display:flex;align-items:center;gap:8px;max-width:310px;line-height:1.5;cursor:pointer}
+.pr-select-fields input[type="checkbox"]{accent-color:#159fac}
+.pr-select-review-price{border-left:1px solid var(--line);padding-left:29px}
+.pr-select-kicker{font-size:12px;color:var(--muted);font-weight:800}
+#pr-select-total{display:block;color:var(--navy);font-size:clamp(26px,3.5vw,42px);line-height:1.2;letter-spacing:-.045em;margin:7px 0 9px}
+#pr-select-breakdown{font-size:12px;color:var(--muted);line-height:1.55}
+.pr-select-actions{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 10px}
+.pr-select-actions .btn{font-size:12px;min-height:41px;padding:10px 14px;cursor:pointer}
+.pr-select-actions .btn:disabled{opacity:.48;cursor:not-allowed;transform:none}
+.pr-select-note{font-size:11px;line-height:1.6;color:var(--muted);margin:0 0 8px}
+@media(max-width:780px){.pr-select-review{grid-template-columns:1fr}.pr-select-review-price{border-left:0;border-top:1px solid var(--line);padding:20px 0 0}}
+@media(max-width:560px){.pr-select-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pr-select-button{min-height:140px;padding:16px 8px 11px}.pr-select-button img.suite-sprite{width:60px;height:60px}.pr-select-review{padding:19px}}
+
+/* Compact app selection and checkout preview side-by-side on wide screens. */
+.pr-select-layout{display:grid;grid-template-columns:minmax(0,1.52fr) minmax(335px,.98fr);gap:24px;align-items:start}
+.pr-select-layout .pr-select-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-self:start}
+.pr-select-layout .pr-select-card{border-radius:12px}
+.pr-select-layout .pr-select-button{min-height:116px;padding:12px 8px 5px;gap:5px}
+.pr-select-layout .pr-select-button img.suite-sprite{width:56px;height:56px;flex:0 0 56px}
+.pr-select-layout .pr-select-button strong{font-size:14px}
+.pr-select-layout .pr-select-state{font-size:11px}
+.pr-select-layout .pr-select-check{top:9px;right:9px;width:22px;height:22px;font-size:12px}
+.pr-select-layout .pr-select-details{font-size:11px;padding:3px 7px 12px}
+.pr-select-layout .pr-select-review{display:flex;flex-direction:column;gap:16px;margin:0;padding:23px;min-width:0}
+.pr-select-layout .pr-select-review-main>p:not(.eyebrow){min-height:0}
+.pr-select-layout .pr-select-review-price{border-left:0;border-top:1px solid var(--line);padding:18px 0 0}
+.pr-select-layout .pr-select-fields{flex-direction:column;align-items:flex-start;gap:15px;margin-top:18px}
+.pr-select-layout .pr-select-fields label.pr-select-early{max-width:100%}
+.pr-select-layout .pr-select-actions{margin:16px 0 10px}
+@media(max-width:760px){
+ .pr-select-layout{grid-template-columns:minmax(0,1fr)}
+ .pr-select-layout .pr-select-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .pr-select-layout .pr-select-review{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+ .pr-select-layout .pr-select-review-price{border-top:0;border-left:1px solid var(--line);padding:0 0 0 20px}
+}
+@media(max-width:600px){
+ .pr-select-layout .pr-select-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .pr-select-layout .pr-select-review{display:flex;flex-direction:column;gap:16px}
+ .pr-select-layout .pr-select-review-price{border-left:0;border-top:1px solid var(--line);padding:17px 0 0}
+}
+
+/* Compact app descriptions in the selectable cards. */
+.pr-select-layout .pr-select-button{min-height:190px;gap:5px}
+.pr-select-layout .pr-select-button .pr-select-name{font-size:12px;font-weight:400;line-height:1.4;color:var(--navy)}
+.pr-select-layout .pr-select-button .pr-select-name b{font-size:inherit;font-weight:900}
+.pr-select-layout .pr-select-button .pr-select-description{font-size:11px;font-weight:400;line-height:1.45;color:var(--muted);text-align:center;max-width:250px;flex:1}
+.pr-promo-automatic{cursor:default}
+.pr-auto-early{font-size:12px;line-height:1.45;color:#17aabd;font-weight:800;margin:8px 0 6px}
+.pr-auto-early small{display:block;color:var(--muted);font-weight:500;font-size:11px;margin-top:3px}
+html[data-theme="dark"] .pr-select-layout .pr-select-button .pr-select-name{color:#e7f7fb}
+@media(max-width:560px){.pr-select-layout .pr-select-button{min-height:190px}}
+.pr-select-category{font-size:10px;line-height:1.35;letter-spacing:0;text-transform:uppercase;color:#168aa6;font-weight:500;display:block;text-align:center;margin:1px 2px 6px}.pr-select-layout .pr-select-button{min-height:217px}.pr-select-layout .pr-select-button .pr-select-name{font-weight:400}.pr-select-layout .pr-select-button .pr-select-name b{font-weight:900;font-size:inherit}
+.pr-select-category b{font-size:inherit;font-weight:900}
+
+</style></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
+<section class="pr-hero">
+  <div class="wrap pr-hero-grid">
+    <div><p class="eyebrow">Flexible subscriptions · transparent pricing</p>
+      <h1>Good science.<br><span>Clear pricing.</span></h1>
+      <p class="lead">Choose one focused DuckBio app or equip your whole laboratory. Every app starts at the same price, with better value as you add more tools and users.</p>
+      <div class="pr-actions"><a class="btn btn-outline" href="#calculator">Calculate your price</a></div>
+      <p class="pr-tiny">EUR is our reference currency. DKK and USD prices are converted from EUR using the same indicative exchange rates from 30 October 2026. All prices exclude VAT.</p>
+    </div>
+    <div class="pr-hero-card"><p class="eyebrow">Every app. One starting price.</p>
+      <div class="pr-prices"><div class="pr-normal"><span>Normal price</span><del data-eur-apps="1" data-price-kind="normal">30 €</del></div><div class="pr-early"><span class="pr-early-label">Early adopter</span><strong data-eur-apps="1" data-price-kind="early">24 €</strong><span class="pr-save">Save 20%</span></div></div><span class="pr-unit">per user · per app · per month</span>
+      <hr><strong>Made to scale with your team</strong>
+      <p class="pr-bullet"><b>✓</b> Pick exactly the apps you need</p><p class="pr-bullet"><b>✓</b> Save as you bundle apps</p><p class="pr-bullet"><b>✓</b> Additional organisation discounts</p>
+    </div>
+  </div>
+</section>
+<section class="section" id="plans"><div class="wrap">
+ <div class="pr-heading"><p class="eyebrow">Choose your setup</p><h2>Start small. Build your suite.</h2><p>Use a single specialist tool or combine several apps around your scientific workflows.</p></div>
+ <div class="pr-currency-top"><div class="pr-currency-toggle" role="group" aria-label="Choose display currency"><button type="button" data-currency="DKK" aria-pressed="false">DKK</button><button type="button" data-currency="EUR" aria-pressed="true">EUR</button><button type="button" data-currency="USD" aria-pressed="false">USD</button></div></div>
+ <div class="pr-grid">
+<article class="pr-plan"><h3>Single</h3><p class="pr-desc">Start with one app and add more when you need them.</p><div class="pr-prices"><div class="pr-normal"><span>Normal price</span><del data-eur-apps="1" data-price-kind="normal">30 €</del></div><div class="pr-early"><span class="pr-early-label">Early adopter</span><strong data-eur-apps="1" data-price-kind="early">24 €</strong><span class="pr-save">Save 20%</span></div></div><div class="pr-period">per user / month · one app</div><ul><li>Choose the individual apps you need</li><li>Access to each selected app</li><li>Scale to more apps whenever needed</li></ul><a class="btn btn-outline" href="#choose-apps">Choose app →</a></article>
+<article class="pr-plan"><h3>Mixed</h3><p class="pr-desc">Combine two to five apps.</p><div class="pr-prices"><div class="pr-normal"><span class="pr-normal-label">Normal price, from <span class="pr-bundle-save" data-bundle-save="2">Additional saving: 20%</span></span><del data-eur-apps="2" data-price-kind="normal">48 €</del></div><div class="pr-early"><span class="pr-early-label">Early adopter</span><strong data-eur-apps="2" data-price-kind="early">38,40 €</strong><span class="pr-save">Save 20%</span></div></div><div class="pr-period">per user / month · starting with two apps</div><ul><li>Choose any combination of 2–5 apps</li><li>Bundle discounts on combinations of 2–5 apps</li><li>Different users can choose different apps</li></ul><a class="btn btn-outline" href="#choose-apps">Choose apps →</a></article>
+<article class="pr-plan featured"><span class="pr-flag">ALL SIX APPS</span><h3>Bundle</h3><p class="pr-desc">All six apps together at one bundle price.</p><div class="pr-prices"><div class="pr-normal"><span class="pr-normal-label">Normal price <span class="pr-bundle-save" data-bundle-save="6">Additional saving: 25%</span></span><del data-eur-apps="6" data-price-kind="normal">135 €</del></div><div class="pr-early"><span class="pr-early-label">Early adopter</span><strong data-eur-apps="6" data-price-kind="early">108 €</strong><span class="pr-save">Save 20%</span></div></div><div class="pr-period">per user / month · all six apps</div><ul><li>Access to all six DuckBio apps</li><li>Bundle savings included</li><li>Save 20% more with the early adopter offer</li></ul><a class="btn btn-secondary" href="#choose-apps">Select bundle →</a></article>
+</div>
+<p class="pr-after">Choosing all six apps saves <span data-eur-savings="all">45 €</span> per user per month compared with six individual subscriptions, before any early adopter discount.</p>
+ <div class="pr-apps" aria-label="DuckBio apps">
+   <a class="pr-app" href="labduck.html" aria-label="Explore LabDuck"><img class="suite-sprite logo-limsduck" src="assets/icons/transparent.svg" alt="">LabDuck<span class="pr-app-arrow" aria-hidden="true">↗</span></a>
+   <a class="pr-app" href="cytoduck.html" aria-label="Explore CytoDuck"><img class="suite-sprite logo-cytoduck" src="assets/icons/transparent.svg" alt="">CytoDuck<span class="pr-app-arrow" aria-hidden="true">↗</span></a>
+   <a class="pr-app" href="duckpipe.html" aria-label="Explore DuckPipe"><img class="suite-sprite logo-methduck" src="assets/icons/transparent.svg" alt="">DuckPipe<span class="pr-app-arrow" aria-hidden="true">↗</span></a>
+   <a class="pr-app" href="eel.html" aria-label="Explore DuckNote"><img class="suite-sprite logo-ducknote" src="assets/icons/transparent.svg" alt="">DuckNote<span class="pr-app-arrow" aria-hidden="true">↗</span></a>
+   <a class="pr-app" href="duckman.html" aria-label="Explore DuckMan"><img class="suite-sprite logo-duckman" src="assets/icons/transparent.svg" alt="">DuckMan<span class="pr-app-arrow" aria-hidden="true">↗</span></a>
+   <a class="pr-app" href="mantrain.html" aria-label="Explore DuckTrain"><img class="suite-sprite logo-ducktrain" src="assets/icons/transparent.svg" alt="">DuckTrain<span class="pr-app-arrow" aria-hidden="true">↗</span></a>
+ </div>
+</div></section>
+<section class="section soft" id="launch-offer"><div class="wrap"><div class="pr-offer">
+ <div><p class="eyebrow">Early adopter offer · 1 January – 31 March 2027</p><h2>Your first year, 20% less.</h2>
+ <p>Start a new subscription during the launch period and retain the introductory discount for your first 12 months. One app from <strong data-eur-apps="1" data-price-kind="early">24 €</strong>, or all six from <strong data-eur-apps="6" data-price-kind="early">108 €</strong> per user per month.</p></div>
+ 
+</div></div></section>
+<section class="section" id="calculator"><div class="wrap pr-calc-grid">
+ <div class="pr-calc-intro"><p class="eyebrow">Pricing calculator</p><h2>Find the right fit for your lab.</h2>
+ <p>Choose the number of apps assigned to each user and the size of your team. The calculator includes the applicable bundle and organisation or early adopter discount.</p>
+ <p class="pr-step"><b>1</b> Select the number of apps</p><p class="pr-step"><b>2</b> Enter the number of users</p><p class="pr-step"><b>3</b> Review your estimated monthly cost</p>
+ <p class="pr-small">Users may have different app combinations. This example assumes the same number of apps per user.</p></div>
+ <div class="pr-calc-card">
+  <div class="pr-input-grid">
+   <div class="pr-field"><label for="pr-app-count">Apps per user</label><select id="pr-app-count"><option value="1">1 app</option><option value="2">2 apps</option><option value="3" selected>3 apps</option><option value="4">4 apps</option><option value="5">5 apps</option><option value="6">All 6 apps</option></select></div>
+   <div class="pr-field"><label for="pr-users">Number of users</label><input id="pr-users" type="number" min="1" max="10000" step="1" inputmode="numeric" value="5"></div>
+  </div>
+  <div class="pr-promo pr-promo-automatic"><span><strong>Early adopter offer automatically applied</strong><small>For eligible subscriptions starting 1 Jan – 31 Mar 2027, valid for the first 12 months.</small></span></div>
+  <div class="pr-result" aria-live="polite" aria-atomic="true">
+    <div class="pr-result-label" id="pr-result-label">Your estimated monthly total</div>
+    <strong class="pr-total" id="pr-total">288 € <small>/month</small></strong>
+    <div class="pr-breakdown">
+      <div><span>Standard price without discounts</span><b id="pr-base">450 €</b></div>
+      <div><span id="pr-bundle-label">Multi-app discount (20%)</span><b id="pr-bundle">− 90 €</b></div>
+      <div><span id="pr-extra-label">Early adopter discount (20%)</span><b id="pr-extra">− 72 €</b></div>
+      <div class="pr-saved"><span>Total monthly savings</span><b id="pr-saved">162 €</b></div>
+    </div>
+    <p class="pr-hint" id="pr-hint">The launch discount is applied after the multi-app discount instead of the organisation discount. Prices exclude VAT.</p>
+    <div class="pr-copy-row"><button class="btn btn-secondary" type="button" id="pr-copy">Export estimate .xlsx</button><span id="pr-copy-status" class="pr-copy-status" role="status"></span></div>
+  </div>
+ </div>
+</div></section>
+<section class="section soft" id="discounts"><div class="wrap"><div class="pr-heading"><p class="eyebrow">Simple, predictable savings</p><h2>Discounts for apps and teams.</h2><p>Bundle discounts always apply. Afterward, either the organisation discount or the early adopter discount is applied, whichever is higher.</p></div>
+<div class="pr-tables">
+  <div><h3>Multi-app discounts</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Apps per user</th><th>Bundle discount</th><th>Normal / month</th><th>Early adopter / month</th></tr></thead><tbody>
+  <tr><td>1 app</td><td data-bundle-apps="1">0%</td><td><del data-eur-apps="1" data-price-kind="normal">30 €</del></td><td class="price-early" data-eur-apps="1" data-price-kind="early">24 €</td></tr>
+  <tr><td>2 apps</td><td data-bundle-apps="2">20%</td><td><del data-eur-apps="2" data-price-kind="normal">48 €</del></td><td class="price-early" data-eur-apps="2" data-price-kind="early">38,40 €</td></tr>
+  <tr><td>3 apps</td><td data-bundle-apps="3">20%</td><td><del data-eur-apps="3" data-price-kind="normal">72 €</del></td><td class="price-early" data-eur-apps="3" data-price-kind="early">57,60 €</td></tr>
+  <tr><td>4 apps</td><td data-bundle-apps="4">20%</td><td><del data-eur-apps="4" data-price-kind="normal">96 €</del></td><td class="price-early" data-eur-apps="4" data-price-kind="early">76,80 €</td></tr>
+  <tr><td>5 apps</td><td data-bundle-apps="5">20%</td><td><del data-eur-apps="5" data-price-kind="normal">120 €</del></td><td class="price-early" data-eur-apps="5" data-price-kind="early">96 €</td></tr>
+  <tr><td>6 apps</td><td data-bundle-apps="6">25%</td><td><del data-eur-apps="6" data-price-kind="normal">135 €</del></td><td class="price-early" data-eur-apps="6" data-price-kind="early">108 €</td></tr></tbody></table></div></div>
+  <div><h3>Organisation discounts</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Number of users</th><th>Extra discount</th></tr></thead><tbody>
+  <tr><td>1–4 users</td><td>0%</td></tr><tr><td>5–19 users</td><td>10%</td></tr><tr><td>20–49 users</td><td>20%</td></tr><tr><td>50+ users</td><td>Custom quote</td></tr></tbody></table></div><p class="pr-small">Organisation discounts are based on the number of licensed users and apply automatically for teams of 5–49. For 50+ users, request a custom quote. After bundle savings, only the higher of the organisation or early adopter discount applies.</p></div>
+</div><p class="pr-small">All prices are provisional and exclude VAT. EUR is the sole reference price currency. DKK and USD are converted from EUR at published indicative exchange rates and displayed to two decimal places. Early adopter savings are exactly 20% of EUR prices. Custom pricing for organisations with 50+ users is determined separately.</p>
+</div></section>
+<section class="section" id="choose-apps"><div class="wrap">
+ <div class="pr-heading"><p class="eyebrow">Build your subscription</p><h2>Choose your apps.</h2><p>Click the apps you want to include. Your selection and monthly price update automatically.</p></div>
+ <div class="pr-select-layout">
+ <div class="pr-select-grid" role="group" aria-label="Choose DuckBio apps">
+ <div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="labduck" data-app-name="LabDuck" aria-pressed="false" aria-label="Select LabDuck"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-limsduck" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category"><b>LAB</b>ORATORY INFORMATION MANAGEMENT SYSTEM</span><span class="pr-select-name"><b>Lab</b>Duck</span><span class="pr-select-description">Track samples, inventory, batches and laboratory results with role-based review.</span></button><a class="pr-select-details" href="labduck.html" aria-label="Learn more about LabDuck">Learn more →</a></div>
+<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="cytoduck" data-app-name="CytoDuck" aria-pressed="false" aria-label="Select CytoDuck"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-cytoduck" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category">FLOW <b>CYTO</b>METRY ANALYSIS</span><span class="pr-select-name"><b>Cyto</b>Duck</span><span class="pr-select-description">Explore FCS data with flexible plots, gating and analysis reports.</span></button><a class="pr-select-details" href="cytoduck.html" aria-label="Learn more about CytoDuck">Learn more →</a></div>
+<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="duckpipe" data-app-name="DuckPipe" aria-pressed="false" aria-label="Select DuckPipe"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-methduck" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category">METHOD VALIDATION <b>PIPE</b>LINE MANAGEMENT</span><span class="pr-select-name">Duck<b>Pipe</b></span><span class="pr-select-description">Organise methods, validation activities and review access.</span></button><a class="pr-select-details" href="duckpipe.html" aria-label="Learn more about DuckPipe">Learn more →</a></div>
+<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="ducknote" data-app-name="DuckNote" aria-pressed="false" aria-label="Select DuckNote"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-ducknote" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category">ELECTRONIC LAB <b>NOTE</b>BOOK</span><span class="pr-select-name">Duck<b>Note</b></span><span class="pr-select-description">Record experiments, revisit versions and organise scientific documentation.</span></button><a class="pr-select-details" href="eel.html" aria-label="Learn more about DuckNote">Learn more →</a></div>
+<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="duckman" data-app-name="DuckMan" aria-pressed="false" aria-label="Select DuckMan"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-duckman" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category"><b>DUCK</b>UMENT MANAGEMENT</span><span class="pr-select-name">Duck<b>Man</b></span><span class="pr-select-description">Control document versions, reviews, approvals and release histories.</span></button><a class="pr-select-details" href="duckman.html" aria-label="Learn more about DuckMan">Learn more →</a></div>
+<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="ducktrain" data-app-name="DuckTrain" aria-pressed="false" aria-label="Select DuckTrain"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-ducktrain" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category"><b>TRAIN</b>ING &amp; QUALIFICATION MANAGEMENT</span><span class="pr-select-name">Duck<b>Train</b></span><span class="pr-select-description">Assign training, track qualifications and maintain competency records.</span></button><a class="pr-select-details" href="mantrain.html" aria-label="Learn more about DuckTrain">Learn more →</a></div>
+ </div>
+ <div class="pr-select-review">
+  <div class="pr-select-review-main"><p class="eyebrow">Your selection</p><h3 id="pr-select-title">No apps selected</h3><p id="pr-select-names">Select one or more apps above to calculate your subscription.</p>
+   <div class="pr-select-fields"><label for="pr-select-users">Licensed users<input id="pr-select-users" type="number" min="1" max="10000" value="1" step="1" inputmode="numeric"></label>
+   </div>
+  </div>
+  <div class="pr-select-review-price" aria-live="polite"><span class="pr-select-kicker">Estimated monthly price</span><p class="pr-auto-early">Early adopter offer automatically applied <small>(eligible subscriptions starting 1 Jan – 31 Mar 2027; first 12 months)</small></p><strong id="pr-select-total">Choose an app</strong><p id="pr-select-breakdown">EUR reference prices; excludes VAT.</p>
+   <div class="pr-select-actions"><button class="btn btn-outline" type="button" id="pr-select-copy" disabled>Export selection in .xlsx</button><button class="btn btn-secondary" type="button" id="pr-select-buy" disabled title="Secure checkout has not been configured">Buy selected apps</button></div>
+   <p class="pr-select-note" id="pr-select-note">Checkout is not live yet. Selecting apps prepares a price estimate; no payment or subscription is created. <a href="support.html#pricing-and-subscriptions">Pricing and subscription FAQs</a></p><span class="pr-copy-status" role="status" id="pr-select-status"></span>
+  </div>
+ </div>
+ </div>
+</div></section>
+</main><footer class="footer"><div class="wrap"><div class="footer-grid"><div><a class="brand" href="index.html"><img class="brand-mark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><p>Specialised scientific software for laboratory teams, research and structured workflows.</p></div><div><h4>Products</h4><nav aria-label="Products"><a href="apps.html">App workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></nav></div><div><h4>DuckBio</h4><nav aria-label="Company"><a href="index.html#contact">Contact</a><a href="pricing.html">Pricing</a><a href="apps.html">App workspace</a><a href="support.html">Support</a></nav></div><div><h4>Legal</h4><nav aria-label="Legal information"><a href="terms.html">Terms (draft)</a><a href="privacy.html">Privacy (draft)</a><a href="cookies.html">Cookies (draft)</a><a href="subscriptions.html">Subscriptions (draft)</a><a href="refunds.html">Refunds (draft)</a></nav></div></div><div class="footer-bottom"><span>© <span data-year>2026</span> DuckBio</span><span>Preview site · Authentication, trial and payments not yet launched</span></div></div></footer><script src="assets/xlsx-export.js"></script><script>
+(()=>{
+"use strict";
+const find=(id)=>document.getElementById(id);
+
+
+const eurNormal=[0,30,48,72,96,120,135];
+const earlyDiscount=0.20;
+const fxPerEUR={EUR:1,DKK:7.47384,USD:1.11952}; // Reference rates 30 October 2026
+const currencyButtons=[...document.querySelectorAll("[data-currency]")];
+let currency="EUR";
+const converted=(eur)=>eur*fxPerEUR[currency];
+const round2=(n)=>Math.round((n+Number.EPSILON)*100)/100;
+const display=(n)=>{
+ const amount=round2(n),locale=currency==="DKK"?"da-DK":currency==="EUR"?"de-DE":"en-US";
+ return new Intl.NumberFormat(locale,{style:"currency",currency,
+  minimumFractionDigits:currency==="EUR"&&Number.isInteger(amount)?0:2,
+  maximumFractionDigits:2}).format(amount);
+};
+const formatEUR=(eur)=>display(converted(eur));
+const unitEUR=(apps,early=false)=>eurNormal[apps]*(early?1-earlyDiscount:1);
+const pct=(n)=>new Intl.NumberFormat("en-US",{maximumFractionDigits:1}).format(n)+"%";
+const bundleDiscount=(apps)=>100*(1-unitEUR(apps)/(unitEUR(1)*apps));
+function renderStaticPrices(){
+ document.querySelectorAll("[data-eur-apps]").forEach(el=>{
+  const apps=Number(el.dataset.eurApps);
+  el.textContent=formatEUR(unitEUR(apps,el.dataset.priceKind==="early"));
+ });
+ document.querySelectorAll("[data-eur-savings]").forEach(el=>{
+  el.textContent=formatEUR(unitEUR(1)*6-unitEUR(6));
+ });
+ document.querySelectorAll("[data-bundle-apps]").forEach(el=>{
+  el.textContent=pct(bundleDiscount(Number(el.dataset.bundleApps)));
+ });
+ document.querySelectorAll("[data-bundle-save]").forEach(el=>{
+  el.textContent="Additional saving: "+pct(bundleDiscount(Number(el.dataset.bundleSave)));
+ });
+ document.querySelectorAll(".pr-save").forEach(el=>{el.textContent="Save 20%";});
+}
+currencyButtons.forEach(btn=>btn.addEventListener("click",()=>{
+ currency=btn.dataset.currency;
+ currencyButtons.forEach(b=>b.setAttribute("aria-pressed",String(b===btn)));
+ renderStaticPrices();recalculate();renderSelection();
+}));
+let estimate=null;
+function recalculate(){
+ const apps=Number(find("pr-app-count").value),users=Number(find("pr-users").value);
+ const label=find("pr-result-label"),totalElement=find("pr-total");
+ if(!Number.isInteger(users)||users<1||users>10000){
+  label.textContent="Enter a valid team size";totalElement.textContent="Use 1–10,000 users";find("pr-copy").disabled=true;estimate=null;return;
+ }
+ const baseEUR=unitEUR(1)*apps*users,suiteEUR=unitEUR(apps)*users;
+ const orgRate=users>=20?20:users>=5?10:0,custom=users>=50;
+ const orgTotalEUR=suiteEUR*(1-orgRate/100),earlyTotalEUR=unitEUR(apps,true)*users;
+ const useEarly=earlyTotalEUR<=orgTotalEUR+1e-8;
+ const finalEUR=useEarly?earlyTotalEUR:orgTotalEUR;
+ /* All arithmetic is performed in EUR. Currency conversion happens once, at display. */
+ const baseShown=round2(converted(baseEUR)),suiteShown=round2(converted(suiteEUR)),finalShown=round2(converted(finalEUR));
+ label.textContent=custom?"Indicative total before custom quote":"Estimated monthly total";
+ totalElement.textContent=formatEUR(custom?suiteEUR:finalEUR)+(custom?" /month*":" /month");
+ find("pr-base").textContent=formatEUR(baseEUR);
+ find("pr-bundle-label").textContent="Multi-app discount ("+pct(bundleDiscount(apps))+")";
+ find("pr-bundle").textContent="− "+display(baseShown-suiteShown);
+ find("pr-extra-label").textContent=useEarly?"Early adopter discount (20%)":"Organisation discount ("+orgRate+"%)";
+ find("pr-extra").textContent=custom?"Custom quote":"− "+display(suiteShown-finalShown);
+ find("pr-saved").textContent=custom?"To be confirmed":display(baseShown-finalShown);
+ find("pr-hint").textContent=custom?
+  "*For 50+ users, the figure shown is the bundle-adjusted baseline, not a final offer. Contact DuckBio for individual pricing. Excluding VAT.":
+  useEarly?"The early adopter discount is applied to EUR prices before converting to the selected currency. It replaces the organisation discount for the first 12 months of eligible subscriptions. Excluding VAT.":
+  "Organisation discounts are applied to EUR prices before converting to the selected currency. Prices exclude VAT.";
+ find("pr-copy").disabled=false;estimate={apps,users,custom,baseEUR,suiteEUR,finalEUR,useEarly,orgRate};
+}
+["pr-app-count","pr-users"].forEach(id=>{find(id).addEventListener("input",recalculate);find(id).addEventListener("change",recalculate)});
+
+function exportPriceRows(info,chosenApps){
+ const label=info.apps===1?"Single":info.apps===6?"Bundle":"Mixed";
+ const rows=[
+  ["DuckBio","Provisional monthly estimate"],
+  ["Status","Not a confirmed offer or order"],
+  ["Plan",label],["Apps per user",info.apps],["Licensed users",info.users],
+  ["Display currency",currency],["Units of display currency per EUR",fxPerEUR[currency]],
+  ["Standard app price (EUR)",unitEUR(1)],
+  ["Normal total without bundle savings (EUR/month)",info.baseEUR],
+  ["Total after bundle savings (EUR/month)",info.suiteEUR],
+  ["Bundle savings",pct(bundleDiscount(info.apps))],
+  ["Early adopter offer",info.useEarly?"Automatically applied – 20%":"Organisation discount takes precedence"],
+  ["Early adopter eligible start dates","1 January – 31 March 2027"],
+  ["Early adopter discount duration","First 12 months for eligible subscriptions"],
+  ["Organisation discount",pct(info.orgRate)],
+  ["Total monthly estimate (EUR)",info.custom?"Individual quote required":round2(info.finalEUR)],
+  ["Total monthly estimate ("+currency+")",info.custom?"Individual quote required":round2(converted(info.finalEUR))],
+  ["VAT","Excluded"],
+  ["Conversion rates","Indicative reference rates of 30 October 2026"],
+  ["Disclaimer","Provisional, not an order. Payment and subscriptions are not live."]
+ ];
+ if(chosenApps&&chosenApps.length){rows.push(["Selected apps",""]);chosenApps.forEach((n,i)=>rows.push(["App "+(i+1),n]));}
+ else rows.push(["Exact app choices","Not specified in this calculator"]);
+ return rows;
+}
+find("pr-copy").addEventListener("click",()=>{
+ if(!estimate)return;
+ try{
+  if(!window.DuckBioXlsx)throw Error("Export utility unavailable");
+  window.DuckBioXlsx.download("DuckBio-pricing-estimate.xlsx",exportPriceRows(estimate));
+  find("pr-copy-status").textContent="Excel estimate exported.";
+ }catch{find("pr-copy-status").textContent="Excel export failed. Reload the page and try again.";}
+});
+
+
+/* App selection is an order preview; payment must not be enabled until verified secure checkout exists. */
+const appSelections=[...document.querySelectorAll("[data-select-app]")];
+const selectedAppIds=new Set();
+let selectionEstimate=null;
+const selectedLabel=(count)=>count===1?"Single":count===6?"Bundle":count>=2?"Mixed":"No apps selected";
+function renderSelection(){
+ const count=selectedAppIds.size;
+ appSelections.forEach(button=>{
+  const selected=selectedAppIds.has(button.dataset.selectApp);
+  button.setAttribute("aria-pressed",String(selected));
+  button.setAttribute("aria-label",(selected?"Remove ":"Select ")+button.dataset.appName);
+ });
+ find("pr-select-title").textContent=count?selectedLabel(count)+" · "+count+" "+(count===1?"app":"apps"):"No apps selected";
+ const selectedNames=appSelections.filter(el=>selectedAppIds.has(el.dataset.selectApp)).map(el=>el.dataset.appName);
+ find("pr-select-names").textContent=count?selectedNames.join(" · "):"Select one or more apps above to calculate your subscription.";
+ const users=Number(find("pr-select-users").value);
+ const valid=Number.isInteger(users)&&users>=1&&users<=10000;
+ find("pr-select-copy").disabled=!count||!valid;
+ if(!count){selectionEstimate=null;find("pr-select-total").textContent="Choose an app";find("pr-select-breakdown").textContent="EUR reference prices; excludes VAT.";return;}
+ if(!valid){selectionEstimate=null;find("pr-select-total").textContent="Invalid user count";find("pr-select-breakdown").textContent="Enter between 1 and 10,000 licensed users.";return;}
+ const priceEUR=unitEUR(count)*users;
+ const organisationRate=users>=20?20:users>=5?10:0;
+ const earlyEUR=priceEUR*.8,organisationEUR=priceEUR*(1-organisationRate/100);
+ const useEarly=earlyEUR<=organisationEUR+1e-8;
+ const totalEUR=useEarly?earlyEUR:organisationEUR;
+ const custom=users>=50;
+ find("pr-select-total").textContent=custom?"Individual quote":formatEUR(totalEUR)+" / month";
+ find("pr-select-breakdown").textContent=
+  "Plan: "+selectedLabel(count)+" · "+count+" "+(count===1?"app":"apps")+" · "+users+" "+(users===1?"user":"users")+
+  " · Additional saving: "+pct(bundleDiscount(count))+
+  " · "+(useEarly?"Early adopter: 20%": "Organisation discount: "+organisationRate+"%")+
+  (custom?" · 50+ users require custom pricing.":" · Excl. VAT.");
+ selectionEstimate={apps:count,users,custom,baseEUR:unitEUR(1)*count*users,suiteEUR:priceEUR,finalEUR:totalEUR,useEarly,orgRate:organisationRate};
+}
+appSelections.forEach(button=>button.addEventListener("click",()=>{
+ if(selectedAppIds.has(button.dataset.selectApp))selectedAppIds.delete(button.dataset.selectApp);
+ else selectedAppIds.add(button.dataset.selectApp);
+ renderSelection();
+}));
+["pr-select-users"].forEach(id=>{
+ find(id).addEventListener("input",renderSelection);
+ find(id).addEventListener("change",renderSelection);
+});
+
+find("pr-select-copy").addEventListener("click",()=>{
+ if(!selectionEstimate)return;
+ const chosen=appSelections.filter(el=>selectedAppIds.has(el.dataset.selectApp)).map(el=>el.dataset.appName);
+ if(!chosen.length)return;
+ try{
+  if(!window.DuckBioXlsx)throw Error("Export utility unavailable");
+  window.DuckBioXlsx.download("DuckBio-app-selection.xlsx",exportPriceRows(selectionEstimate,chosen));
+  find("pr-select-status").textContent="Excel selection exported. No order placed.";
+ }catch{find("pr-select-status").textContent="Excel export failed. Reload the page and try again.";}
+});
+renderStaticPrices();
+renderSelection();
+recalculate();
+})();
+</script></body></html>

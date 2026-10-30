@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="t d">
+<title id="t">CytoDuck</title><desc id="d">A white lab duck standing in front of a flow cytometer, a small coloured signal wave and a dot plot.</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#051b36"/><stop offset="1" stop-color="#04506b"/></linearGradient>
+<linearGradient id="white" x1="0" y1="0" x2=".65" y2="1"><stop stop-color="#ffffff"/><stop offset=".65" stop-color="#e5f9ff"/><stop offset="1" stop-color="#9cdce9"/></linearGradient>
+<linearGradient id="aqua" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8ffbf2"/><stop offset=".5" stop-color="#1fcbd7"/><stop offset="1" stop-color="#087cae"/></linearGradient>
+<linearGradient id="hardware" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#205b84"/><stop offset=".6" stop-color="#0d3358"/><stop offset="1" stop-color="#062138"/></linearGradient>
+<clipPath id="round"><rect width="192" height="192" rx="32"/></clipPath>
+</defs>
+<g clip-path="url(#round)">
+<rect width="192" height="192" fill="url(#bg)"/>
+<path d="M0 166Q80 121 192 153V192H0Z" fill="#0c4160" opacity=".7"/>
+<!-- Flow cytometer is deliberately behind the duck in the foreground. -->
+<g stroke-linejoin="round">
+<rect x="108" y="28" width="68" height="83" rx="7" fill="#05253d" stroke="#82d6e3" stroke-width="3"/>
+<rect x="115" y="36" width="54" height="55" rx="3" fill="#0c3755" stroke="#1db8cd" stroke-width="1.5"/>
+<!-- FSC/SSC dot plot with small, distinct populations -->
+<path d="M121 43V85H164" stroke="#b9f7ff" stroke-width="1.4" fill="none"/>
+<g fill="#3fe3ec">
+<circle cx="132" cy="76" r="2"/><circle cx="136" cy="71" r="1.7"/><circle cx="140" cy="73" r="1.4"/><circle cx="143" cy="69" r="2"/><circle cx="138" cy="79" r="1.6"/><circle cx="133" cy="66" r="1.5"/>
+</g>
+<g fill="#ffd16e"><circle cx="147" cy="56" r="1.7"/><circle cx="151" cy="61" r="2.1"/><circle cx="155" cy="54" r="2"/><circle cx="159" cy="59" r="1.3"/><circle cx="152" cy="49" r="1.5"/></g>
+<path d="M128 80Q131 61 146 65M143 63Q149 41 164 49" fill="none" stroke="#78c7cf" stroke-dasharray="2 3" stroke-width="1.2" opacity=".8"/>
+<rect x="119" y="96" width="47" height="8" rx="2" fill="#124c68"/><circle cx="157" cy="100" r="2" fill="#7eedf1"/>
+<rect x="115" y="114" width="60" height="47" rx="7" fill="url(#hardware)" stroke="#84c9d9" stroke-width="3"/>
+<path d="M122 131H167" stroke="#1f8aac" stroke-width="2"/>
+<rect x="126" y="119" width="18" height="7" rx="2" fill="#75d3e8"/><rect x="150" y="120" width="18" height="5" rx="1" fill="#23749b"/>
+<circle cx="158" cy="145" r="5" fill="#0c233c" stroke="#60cbd8" stroke-width="2"/>
+<circle cx="140" cy="145" r="3.5" fill="#39d1de"/>
+<rect x="113" y="163" width="66" height="9" rx="2" fill="#062338" stroke="#7ac7d9" stroke-width="2"/>
+</g>
+<!-- compact flow peaks: subordinate to instrument and duck -->
+<g transform="translate(9 146)">
+<path d="M0 18H73" stroke="#c9faff" stroke-width="1.7"/>
+<path d="M1 17C12 17 11 9 19 9C27 9 26 17 34 17C43 17 43 3 52 3C61 3 61 17 73 17" fill="none" stroke="#37dddf" stroke-width="2.8" stroke-linecap="round"/>
+<path d="M1 17C12 17 12 14 20 14C30 14 30 17 38 17C48 17 49 8 56 8C64 8 65 17 73 17" fill="none" stroke="#f6b548" stroke-width="1.8" stroke-linecap="round"/>
+</g>
+<!-- White duck, drawn in front of cytometer and scatter plot. -->
+<g transform="translate(-31 9) scale(.92)">
+
+ <path d="M56 144L68 115L87 101L95 79L94 60L102 44L117 29L137 27L150 37L158 53L158 63L170 69L160 78L156 90L143 99L139 123L159 147L148 165L122 171L101 164L81 172L60 162Z"
+  fill="#031f35" stroke="#effaff" stroke-width="5.5" stroke-linejoin="miter"/>
+ <path d="M92 83L99 63L108 45L120 33L134 33L144 43L151 58L152 69L145 83L132 94L119 106L121 131L111 147L95 153L80 142L77 116L88 105Z" fill="url(#white)" stroke="#0a4262" stroke-width="3.2" stroke-linejoin="miter"/>
+ <path d="M147 63L172 67L161 75L148 79Z" fill="#e6fbff" stroke="#117ca6" stroke-width="2.7" stroke-linejoin="miter"/>
+ <path d="M151 66L165 68L157 71" fill="none" stroke="#0b3859" stroke-width="2"/>
+ <circle cx="135" cy="54" r="4.5" fill="#052944"/><circle cx="136" cy="53" r="1.25" fill="#ffffff"/>
+ <path d="M104 44L121 33L131 34M103 59L95 79L111 97" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="square"/>
+ <path d="M98 88L113 98L117 123L103 142L81 139L74 116Z" fill="#0578a7" stroke="#eafcff" stroke-width="3.2" stroke-linejoin="miter"/>
+ <path d="M82 111L100 100L107 117L94 136L77 126Z" fill="url(#aqua)" stroke="#ffffff" stroke-width="2.2"/>
+ <path d="M120 105L133 97L133 123L146 142L134 155L115 144Z" fill="#0c5c86" stroke="#d6faff" stroke-width="2.5"/>
+ <path d="M123 111L129 113M123 119L129 121M123 128L130 132" stroke="#6ee9ef" stroke-width="2.2"/>
+ 
+ 
+<path d="M122 54L126 53M143 52L155 56" fill="none" stroke="#3a8199" stroke-width="1.6" stroke-linecap="round"/>
+<circle cx="135" cy="54" r="8.1" fill="none" stroke="#2d6f87" stroke-width="1.7"/>
+</g>
+<path d="M14 177H180" stroke="#36cad7" opacity=".25" stroke-width="2"/>
+</g>
+</svg>

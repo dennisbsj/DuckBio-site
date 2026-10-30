@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="DuckBio — abstract duck symbol">
+<title>DuckBio — abstract duck</title>
+<path d="M7 63C19 64 29 61 39 54C46 49 49 43 47 38C43 31 43 23 48 16C54 7 68 7 75 16C79 21 79 27 77 32L85 36L77 45C79 58 71 71 59 78C40 87 19 78 7 63Z" fill="#ecfbfd"/>
+<path d="M12 62C22 63 36 59 45 49C54 51 62 59 58 68C44 79 25 74 12 62Z" fill="#27c5d2"/>
+<path d="M33 61C44 57 49 50 50 44C55 51 59 58 55 64C49 70 41 70 33 67C42 66 47 63 49 60C44 62 38 62 33 61Z" fill="#ecfbfd"/>
+<path d="M75 33L93 37L77 44C76 40 75 37 75 33Z" fill="#ff9774"/>
+<circle cx="68" cy="25" r="3.1" fill="#123c55"/>
+</svg>

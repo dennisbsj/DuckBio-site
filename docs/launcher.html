@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#09283a">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Interactive preview of DuckBio apps and planned workspace.">
+<title>DuckBio Launcher — Interactive Preview</title>
+<link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: light)" href="assets/duckbio-favicon-v2.svg"><link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: dark)" href="assets/duckbio-favicon-v2-dark.svg">
+<style>
+*{box-sizing:border-box}html{background:#0e2b3b}body{margin:0;color:#13384c;background:#f1f7fa;font:14px/1.52 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{text-decoration:none;color:inherit}a:focus-visible{outline:3px solid #20b9c4;outline-offset:3px}img{max-width:100%;display:block}
+.bar{min-height:74px;display:flex;gap:16px;align-items:center;justify-content:space-between;padding:15px clamp(18px,3.5vw,40px);background:#102f43;color:white}.brand{display:flex;align-items:center;gap:10px;font-size:19px;letter-spacing:-.04em;font-weight:850}.brand img{width:36px;height:36px;background:transparent;border-radius:0}.brand em{color:#84e0e2;font-style:normal}.tag{display:flex;align-items:center;gap:8px;border:1px solid #426b7b;border-radius:99px;padding:7px 13px;font-size:11px;color:#c9e9ef}.dot{width:7px;height:7px;border-radius:50%;background:#46d5a5}
+.shell{display:grid;grid-template-columns:215px minmax(0,1fr);min-height:620px}
+aside{background:#13384a;color:#d8eaf1;padding:30px 17px;display:flex;flex-direction:column;gap:10px}
+.label{font-size:10px;letter-spacing:.16em;font-weight:850;color:#8fb9c8;padding:6px 13px;margin-bottom:5px}
+.side-link,.side-placeholder{display:block;border-radius:9px;padding:12px 13px;font-size:13px;color:#adc9d5}.side-link{color:#d4f7f8;background:#21556a;font-weight:850}.side-placeholder{opacity:.78}
+aside .aside-note{font-size:11px;color:#a7c6d1;margin-top:auto;border-top:1px solid #3a6273;padding:19px 10px 0}
+main{padding:clamp(25px,4vw,48px)}.kicker{font-size:11px;letter-spacing:.17em;font-weight:850;color:#167f9a}.main-title{display:flex;gap:20px;align-items:flex-start;justify-content:space-between;margin-bottom:28px}.main-title h1{font-size:clamp(27px,3.8vw,42px);line-height:1.12;letter-spacing:-.045em;margin:9px 0;color:#12384b}.main-title p{color:#617c89;margin:0}.count{flex-shrink:0;background:#e1f1f5;color:#265d72;font-size:11px;font-weight:800;padding:9px 12px;border-radius:99px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px}.app{background:#fff;border:1px solid #d5e5eb;border-radius:16px;display:flex;flex-direction:column;min-height:215px;padding:23px;box-shadow:0 10px 30px #133f5609;transition:transform .14s,border-color .14s,box-shadow .14s}.app:hover{transform:translateY(-3px);border-color:#58b9c3;box-shadow:0 15px 35px #133f561a}.icon{width:66px;height:66px;object-fit:contain;border-radius:13px;margin-bottom:13px}.app strong{font-size:18px;color:#153649}.app small{font-size:12px;color:#6b8793;min-height:38px;margin-top:6px}.app .action{margin-top:auto;color:#147e99;font-weight:850;font-size:12px;padding-top:16px}
+.sprite{display:block;background-image:url("assets/icons/duckbio-approved-sprite.webp?v=approved-20261029");background-size:300% 200%;background-repeat:no-repeat;background-color:transparent}.s1{background-position:0 0}.s2{background-position:50% 0}.s3{background-position:100% 0}.s4{background-position:0 100%}.s5{background-position:50% 100%}.s6{background-position:100% 100%}
+.notice{margin-top:28px;border-radius:11px;background:#e5f1f5;border:1px solid #cce2e9;padding:14px 17px;color:#42687a;font-size:12px;line-height:1.65}
+@media(max-width:760px){.shell{grid-template-columns:1fr}aside{display:none}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.app{padding:17px;min-height:193px}.icon{width:55px;height:55px}.bar{min-height:61px}.tag{font-size:10px;padding:6px 9px}}
+@media(max-width:400px){.grid{gap:12px}.app{padding:13px;min-height:178px}.app strong{font-size:16px}.app small{font-size:11px;min-height:42px}.main-title{flex-direction:column}.notice{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.app{transition:none}}
+/* The interactive launcher is always LIGHT, independently of the main site theme. */
+html,html[data-theme="dark"]{color-scheme:light!important;background:#f1f7fa!important}
+html body,html[data-theme="dark"] body{color:#13384c!important;background:#f1f7fa!important}
+.app{cursor:pointer}.app:focus-visible{outline:3px solid #19a5ba;outline-offset:3px}
+.app .action{display:inline-flex;align-items:center;gap:5px}
+.preview-instruction{margin:0 0 22px;display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:12px 16px;border-radius:11px;border:1px solid #94d8db;background:#dcf6f5;color:#145b6c;font-size:13px;font-weight:750}
+.preview-instruction .preview-indicator{display:inline-flex;align-items:center;justify-content:center;border-radius:99px;background:#0b8395;color:#fff;padding:5px 10px;font-size:10px;letter-spacing:.065em}
+@media(max-width:400px){.preview-instruction{font-size:12px;padding:10px 12px}}
+.settings-menu{position:relative;margin-left:auto;z-index:50}.settings-menu summary{list-style:none;cursor:pointer;border:1px solid #5f91a3;border-radius:10px;padding:6px 12px;color:#dff9ff;background:#194d63;font-size:23px;line-height:1.1;min-width:43px;text-align:center}
+.settings-menu summary::-webkit-details-marker{display:none}.settings-menu summary:hover,.settings-menu[open] summary{background:#276780}.settings-menu summary:focus-visible{outline:3px solid #27c4d0;outline-offset:3px}
+.settings-panel{position:absolute;right:0;top:calc(100% + 8px);width:240px;background:#fff;color:#12384b;border:1px solid #bdd7e0;border-radius:12px;box-shadow:0 12px 30px #092c3e35;padding:13px;display:grid;gap:3px}
+.settings-panel strong{padding:6px 9px}.settings-panel a{padding:9px;border-radius:7px;color:#0c5672;font-weight:750;font-size:12px}.settings-panel a:hover,.settings-panel a:focus-visible{background:#e9f6f9}.settings-panel p{color:#617c89;font-size:11px;margin:9px 9px 3px;line-height:1.4}
+
+
+/* Functional preview navigation and safe, in-memory account and permissions dialogs. */
+button{font:inherit}button:focus-visible{outline:3px solid #24b7c7;outline-offset:2px}
+.bar-tools{display:flex;align-items:center;gap:13px}.preview-current-user{font-size:11px;color:#bde8ed}
+.settings-panel button{appearance:none;background:transparent;border:0;text-align:left;padding:9px;color:#0c5672;font-weight:750;font-size:12px;cursor:pointer;border-radius:7px}
+.settings-panel button:hover,.settings-panel button:focus-visible{background:#e9f6f9}
+.side-link{border:0;text-align:left;cursor:pointer;width:100%;display:flex;justify-content:space-between;align-items:center;font-weight:800}
+.side-link[aria-expanded="false"] span{transform:rotate(-90deg)}
+.side-app-list{display:grid;gap:3px;margin:0 0 5px 9px}
+.side-app-list[hidden]{display:none}
+.side-app-list a{padding:7px 12px 7px 20px;border-radius:7px;color:#cce9f3;font-size:12px}
+.side-app-list a:hover,.side-app-list a:focus-visible{background:#25556a}
+.side-separator{border-top:1px solid #436879;margin:13px 10px 5px}
+.side-communication{background:transparent;border:0;color:#d5eaf1;text-align:left;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13px}
+.side-communication:hover,.side-communication:focus-visible{background:#25556a;color:white}
+.launcher-dialog{width:min(90vw,750px);max-height:calc(100vh - 42px);overflow:auto;border:1px solid #a7d5e0;border-radius:17px;padding:25px;color:#183e51;background:#fff;box-shadow:0 30px 95px #071d2a88}
+.launcher-dialog::backdrop{background:rgba(5,23,35,.72)}
+.modal-head{display:flex;justify-content:space-between;align-items:start;gap:14px}
+.modal-head h2{font-size:27px;margin:3px 0 12px;line-height:1.2}
+.modal-eyebrow{font-size:10px;font-weight:850;color:#1b8b9e;letter-spacing:.13em;text-transform:uppercase;margin:0}
+.modal-close{border:0;background:#e6f2f6;color:#24576c;font-size:27px;line-height:1;border-radius:9px;width:36px;height:36px;cursor:pointer}
+.modal-note{color:#607d8c;background:#f0f8fb;border-radius:9px;padding:12px;font-size:12px;margin:3px 0 18px}
+.account-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.account-fields label{display:grid;gap:5px;font-size:12px;font-weight:800;color:#245268}
+.account-fields input,.account-fields textarea{width:100%;font:inherit;color:#153c50;font-size:13px;border:1px solid #b9d2dd;border-radius:8px;padding:11px;background:#fff}
+.account-fields textarea{resize:vertical}
+.account-full{grid-column:1/-1}
+.modal-actions{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:9px}
+.modal-actions #account-status{font-size:11px;color:#177c8f;margin-right:auto}
+.modal-btn{border-radius:9px;padding:10px 15px;cursor:pointer;font-size:12px;font-weight:800;border:1px solid #88b8c5}
+.modal-btn.primary{background:#16617a;color:#fff;border-color:#16617a}
+.modal-btn.secondary{background:#f5fafc;color:#276177}
+.permission-tabs{display:flex;border-bottom:1px solid #bdd8e1;gap:9px;margin-bottom:15px}
+.permission-tabs button{border:0;background:transparent;padding:10px 13px;color:#507286;font-weight:800;cursor:pointer}
+.permission-tabs button[aria-selected="true"]{color:#006d8a;border-bottom:3px solid #11a8b5}
+.perm-pane h3{margin:9px 0 5px;font-size:18px}.perm-caption{color:#6a8696;font-size:12px;margin:0 0 15px}
+.permission-list{padding:0;list-style:none;display:grid;gap:8px}
+.permission-list li{padding:11px 12px;border:1px solid #d8e8ed;border-radius:8px;display:flex;justify-content:space-between;gap:12px}
+.permission-list li span{color:#527386;font-size:12px}
+.matrix-scroll{overflow:auto}.perm-table{border-collapse:collapse;width:100%;min-width:525px;font-size:12px;text-align:center}
+.perm-table caption{text-align:left;font-size:11px;color:#678392;margin-bottom:5px}
+.perm-table th,.perm-table td{border-bottom:1px solid #deebef;padding:9px}
+.perm-table th:first-child{text-align:left}.perm-table thead{background:#eaf6f8}.perm-table td{color:#187a8e;font-weight:900}
+.empty-communication{padding:28px;background:#f0f8fb;border:1px solid #d4e8ed;border-radius:12px}
+.empty-communication p{color:#557789;font-size:13px}
+@media(max-width:760px){.shell{grid-template-columns:1fr}aside{display:flex;padding:15px;gap:6px}.side-app-list{grid-template-columns:repeat(3,minmax(0,1fr));margin:0}.side-separator{margin:4px 10px}.aside-note{display:none}.launch-menu{position:relative}}
+@media(max-width:480px){.side-app-list{grid-template-columns:repeat(2,minmax(0,1fr))}.account-fields{grid-template-columns:1fr}.account-full{grid-column:auto}.launcher-dialog{width:96vw;padding:15px}.preview-current-user{display:none}}
+.side-communication .sidebar-chat-icon{display:inline-block;vertical-align:middle;flex-shrink:0;margin-right:8px}.launcher-app-category{display:block;font-size:10px;line-height:1.35;font-weight:500;letter-spacing:0;color:#25819b;text-transform:uppercase;margin:2px 0 6px}.app .launcher-app-name{font-size:14px;font-weight:400;color:#153649;line-height:1.45}.app .launcher-app-name b{font-weight:900;font-size:inherit}.app small{font-size:12px;line-height:1.55;min-height:0;margin:7px 0 12px}.app{min-height:260px}.side-communication{display:flex;align-items:center}
+.launcher-app-category b{font-size:inherit;font-weight:900}
+
+/* Workspace preview: compact desktop dashboard, full-length descriptions, no internal page scroll. */
+html,body{overflow-x:hidden}
+body{min-height:0}
+.shell{min-height:0}
+.shell main{min-width:0;padding:clamp(13px,1.6vw,24px)}
+.main-title{margin-bottom:13px;align-items:center;gap:12px}
+.main-title h1{font-size:clamp(23px,2.65vw,33px);margin:5px 0}
+.main-title p{font-size:12px;line-height:1.4}
+.grid{gap:12px;grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}
+.app{min-height:0;height:auto;padding:clamp(11px,1.4vw,18px);border-radius:12px}
+.app .icon{width:clamp(40px,4vw,54px);height:clamp(40px,4vw,54px);margin-bottom:8px;flex-shrink:0}
+.app .launcher-app-category{font-size:9px;line-height:1.28;word-break:normal}
+.app .launcher-app-name{font-size:14px;line-height:1.25}
+.app small{display:block;white-space:normal;overflow:visible;text-overflow:clip;font-size:11px;line-height:1.4;min-height:0;flex-grow:1;margin:6px 0 0}
+.app .action{padding-top:7px}
+.notice{margin-top:12px;padding:9px 12px;line-height:1.4;font-size:11px}
+.bar{min-height:57px;padding:10px 16px}
+.bar .brand img{width:31px;height:31px}
+.bar .brand{font-size:17px}
+aside{padding:15px 10px;gap:5px}
+aside .label{padding:4px 10px;margin:2px 0;font-size:10px}
+.side-link{padding:9px 10px}
+.side-app-list a{padding:4px 8px 4px 16px;font-size:11px}
+.side-separator{margin:8px 5px 3px}
+.side-communication{padding:8px 10px}
+aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
+@media(max-width:850px){.shell{grid-template-columns:175px minmax(0,1fr)}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.shell{grid-template-columns:minmax(0,1fr)}aside{display:flex;flex-direction:column;width:100%;gap:3px;padding:10px}.side-app-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;margin:0}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.app .icon{width:44px;height:44px}.notice{margin-top:10px}}
+@media(max-width:400px){.app{padding:11px}.app small{font-size:11px;min-height:0}.grid{gap:9px}.main-title{flex-direction:column;align-items:flex-start}}
+
+/* Approved DuckBio high-resolution icons: retain the compact Workspace card sizing. */
+.app img.sprite{
+ background-repeat:no-repeat;
+ background-position:center center;
+ background-color:transparent;
+ background-size:100% 100%;
+}
+.app img.sprite.s1{background-image:url("assets/icons/duckbio-20261030/labduck-framed-final.png?v=framed-20261030-2");background-size:100% 100%;background-position:center center}
+.app img.sprite.s2{background-image:url("assets/icons/duckbio-20261030/ducknote-framed-final.png?v=framed-20261030-2");background-size:100% 100%;background-position:center center}
+.app img.sprite.s3{background-image:url("assets/icons/duckbio-20261030/ducktrain.png");background-size:100% 100%;background-position:center center}
+.app img.sprite.s4{background-image:url("assets/icons/duckbio-20261030/duckpipe.png");background-size:100% 100%;background-position:center center}
+.app img.sprite.s5{background-image:url("assets/icons/duckbio-20261030/cytoduck-framed-final.png?v=framed-20261030-2");background-size:100% 100%;background-position:center center}
+.app img.sprite.s6{background-image:url("assets/icons/duckbio-20261030/duckman.png");background-size:100% 100%;background-position:center center}
+</style>
+</head>
+<body>
+<div class="bar"><div class="brand"><img src="assets/duckbio-brand-nofill-dark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><div class="bar-tools"><span class="preview-current-user" id="preview-current-user">Preview user</span><details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button><a href="pricing.html" target="_top">Subscriptions &amp; pricing</a><a href="support.html" target="_top">Help &amp; support</a><p>Preview only — no live account or permissions are changed.</p></div></details></div></div>
+<div class="shell">
+<aside>
+<div class="label">WORKSPACE</div>
+<button type="button" class="side-link" id="workspace-apps-toggle" aria-expanded="true" aria-controls="workspace-app-links">▦ &nbsp; Apps <span aria-hidden="true">▾</span></button>
+<nav class="side-app-list" id="workspace-app-links" aria-label="App links"><a href="labduck.html" target="_top">LabDuck</a><a href="cytoduck.html" target="_top">CytoDuck</a><a href="duckpipe.html" target="_top">DuckPipe</a><a href="eel.html" target="_top">DuckNote</a><a href="duckman.html" target="_top">DuckMan</a><a href="mantrain.html" target="_top">DuckTrain</a></nav>
+<div class="side-separator"></div><div class="label">COMMUNICATION</div>
+<button class="side-communication" type="button" data-communication="Messaging"><svg class="sidebar-chat-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.3 9.6 9.6 0 0 1-3.4-.6L3 21l1.8-5.6A8.4 8.4 0 1 1 21 11.5Z"/><path d="M8 11.5h8"/></svg><span>Messaging</span></button>
+<button class="side-communication" type="button" data-communication="Mail">✉ &nbsp; Mail</button>
+<p class="aside-note">Interactive preview only. App links open public pages; communication and account administration are not live.</p>
+</aside>
+<main>
+<div class="main-title"><div><span class="kicker">MY APPS</span><h1>Your DuckBio workspace</h1><p>Click or tap a card below to open that app’s product page.</p></div><span class="count">6 apps</span></div>
+<div class="grid">
+<a class="app" href="labduck.html" target="_top" aria-label="Open LabDuck product page"><img class="sprite s1 icon" src="assets/icons/transparent.svg" alt=""><span class="launcher-app-category"><b>LAB</b>ORATORY INFORMATION MANAGEMENT SYSTEM</span><strong class="launcher-app-name"><b>Lab</b>Duck</strong><small>Track samples, inventory, batches and laboratory results with role-based review.</small><span class="action">Learn more ↗</span></a>
+<a class="app" href="cytoduck.html" target="_top" aria-label="Open CytoDuck product page"><img class="sprite s5 icon" src="assets/icons/transparent.svg" alt="CytoDuck logo"><span class="launcher-app-category">FLOW <b>CYTO</b>METRY ANALYSIS</span><strong class="launcher-app-name"><b>Cyto</b>Duck</strong><small>Explore FCS data with flexible plots, gating and analysis reports.</small><span class="action">Learn more ↗</span></a>
+<a class="app" href="duckpipe.html" target="_top" aria-label="Open DuckPipe product page"><img class="sprite s4 icon" src="assets/icons/transparent.svg" alt=""><span class="launcher-app-category">METHOD VALIDATION <b>PIPE</b>LINE MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Pipe</b></strong><small>Organise methods, validation activities and review access.</small><span class="action">Learn more ↗</span></a>
+<a class="app" href="eel.html" target="_top" aria-label="Open DuckNote product page"><img class="sprite s2 icon" src="assets/icons/transparent.svg" alt=""><span class="launcher-app-category">ELECTRONIC LAB <b>NOTE</b>BOOK</span><strong class="launcher-app-name">Duck<b>Note</b></strong><small>Record experiments, revisit versions and organise scientific documentation.</small><span class="action">Learn more ↗</span></a>
+<a class="app" href="duckman.html" target="_top" aria-label="Open DuckMan product page"><img class="sprite s6 icon" src="assets/icons/transparent.svg" alt=""><span class="launcher-app-category"><b>DUCK</b>UMENT MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Man</b></strong><small>Control document versions, reviews, approvals and release histories.</small><span class="action">Learn more ↗</span></a>
+<a class="app" href="mantrain.html" target="_top" aria-label="Open DuckTrain product page"><img class="sprite s3 icon" src="assets/icons/transparent.svg" alt=""><span class="launcher-app-category"><b>TRAIN</b>ING &amp; QUALIFICATION MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Train</b></strong><small>Assign training, track qualifications and maintain competency records.</small><span class="action">Learn more ↗</span></a>
+</div>
+<div class="notice">Preview only. These links open public product pages, not authenticated apps. Access controls, billing and workspace accounts will be connected separately when implemented.</div>
+</main></div>
+
+<dialog class="launcher-dialog" id="account-dialog" aria-labelledby="account-heading">
+ <div class="modal-head"><div><p class="modal-eyebrow">Profile preview</p><h2 id="account-heading">Account settings</h2></div><button type="button" class="modal-close" data-close-dialog aria-label="Close account settings">×</button></div>
+ <p class="modal-note">Changes are temporary and only affect this preview. No account details are sent or saved to DuckBio.</p>
+ <form id="preview-account-form" class="account-fields" autocomplete="off">
+ <label>Name<input name="name" maxlength="120" placeholder="Full name"></label>
+ <label>Nickname<input name="nickname" maxlength="80" placeholder="Display name"></label>
+ <label>Email<input name="email" type="email" maxlength="254" placeholder="you@example.com"></label>
+ <label>Phone number<input name="phone" type="tel" maxlength="40" placeholder="+45 ..."></label>
+ <label>Organisation<input name="organisation" maxlength="150" placeholder="Organisation"></label>
+ <label>Title<input name="title" maxlength="100" placeholder="Job title"></label>
+ <label class="account-full">Bio<textarea name="bio" rows="4" maxlength="1200" placeholder="A short introduction"></textarea></label>
+ <div class="modal-actions account-full"><span id="account-status" role="status"></span><button type="button" class="modal-btn secondary" data-close-dialog>Cancel</button><button class="modal-btn primary" type="submit">Save preview</button></div>
+ </form>
+</dialog>
+<dialog class="launcher-dialog permissions-modal" id="permissions-dialog" aria-labelledby="permissions-heading">
+ <div class="modal-head"><div><p class="modal-eyebrow">Access preview</p><h2 id="permissions-heading">Permissions</h2></div><button type="button" class="modal-close" data-close-dialog aria-label="Close permissions">×</button></div>
+ <p class="modal-note">Illustrative permissions only. These are not your real permissions or an active authorisation system.</p>
+ <div role="tablist" class="permission-tabs" aria-label="Permissions views">
+  <button type="button" role="tab" id="perm-my-tab" aria-controls="perm-my" aria-selected="true" tabindex="0" data-perm-tab="my">My permissions</button>
+  <button type="button" role="tab" id="perm-matrix-tab" aria-controls="perm-matrix" aria-selected="false" tabindex="-1" data-perm-tab="matrix">Permission matrix</button>
+ </div>
+ <div role="tabpanel" id="perm-my" aria-labelledby="perm-my-tab" class="perm-pane">
+ <h3>Example app access</h3><p class="perm-caption">The preview shows an illustrative member role, not data from a signed-in account.</p>
+ <ul class="permission-list"><li><strong>LabDuck</strong><span>View, create, edit</span></li><li><strong>CytoDuck</strong><span>View, analyse</span></li><li><strong>DuckPipe</strong><span>View, create</span></li><li><strong>DuckNote</strong><span>View, create, edit</span></li><li><strong>DuckMan</strong><span>View only</span></li><li><strong>DuckTrain</strong><span>View, complete training</span></li></ul>
+ </div>
+ <div role="tabpanel" id="perm-matrix" aria-labelledby="perm-matrix-tab" class="perm-pane" hidden>
+ <h3>Illustrative permission matrix</h3><p class="perm-caption">Example permissions for a member role. Real permissions must come from authenticated backend roles and licensing.</p>
+ <div class="matrix-scroll"><table class="perm-table"><caption>Example member permissions by app</caption><thead><tr><th scope="col">App</th><th scope="col">View</th><th scope="col">Create</th><th scope="col">Edit</th><th scope="col">Approve</th><th scope="col">Admin</th></tr></thead><tbody>
+ <tr><th scope="row">LabDuck</th><td>✓</td><td>✓</td><td>✓</td><td>—</td><td>—</td></tr>
+ <tr><th scope="row">CytoDuck</th><td>✓</td><td>✓</td><td>—</td><td>—</td><td>—</td></tr>
+ <tr><th scope="row">DuckPipe</th><td>✓</td><td>✓</td><td>—</td><td>—</td><td>—</td></tr>
+ <tr><th scope="row">DuckNote</th><td>✓</td><td>✓</td><td>✓</td><td>—</td><td>—</td></tr>
+ <tr><th scope="row">DuckMan</th><td>✓</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+ <tr><th scope="row">DuckTrain</th><td>✓</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+ </tbody></table></div>
+ </div>
+</dialog>
+<dialog class="launcher-dialog" id="communication-dialog" aria-labelledby="communication-heading">
+ <div class="modal-head"><div><p class="modal-eyebrow">Communication preview</p><h2 id="communication-heading">Communication</h2></div><button type="button" class="modal-close" data-close-dialog aria-label="Close communication preview">×</button></div>
+ <div class="empty-communication"><strong id="communication-label">Messaging</strong><p>Messaging and Mail are planned features. No real messages can be sent or received from this preview.</p></div>
+ <div class="modal-actions"><button type="button" class="modal-btn primary" data-close-dialog>Close</button></div>
+</dialog>
+
+<script>
+(()=>{
+"use strict";
+const get=id=>document.getElementById(id);
+const appsToggle=get("workspace-apps-toggle");
+appsToggle.addEventListener("click",()=>{
+ const expanded=appsToggle.getAttribute("aria-expanded")!=="true";
+ appsToggle.setAttribute("aria-expanded",String(expanded));
+ get("workspace-app-links").hidden=!expanded;
+});
+const settings=get("launcher-settings-menu");
+function openDialog(id){
+ const element=get(id);
+ if(!element||typeof element.showModal!=="function")return;
+ settings.open=false;
+ element.showModal();
+ const initial=element.querySelector("input,button");
+ initial?.focus();
+}
+document.querySelectorAll("[data-launcher-dialog]").forEach(btn=>btn.addEventListener("click",()=>openDialog(btn.dataset.launcherDialog)));
+document.querySelectorAll("[data-close-dialog]").forEach(btn=>btn.addEventListener("click",()=>btn.closest("dialog")?.close()));
+document.querySelectorAll("dialog").forEach(dlg=>dlg.addEventListener("click",evt=>{if(evt.target===dlg)dlg.close()}));
+const accountForm=get("preview-account-form");
+accountForm.addEventListener("submit",event=>{
+ event.preventDefault();
+ if(!accountForm.reportValidity())return;
+ const values=new FormData(accountForm),nickname=String(values.get("nickname")||"").trim(),name=String(values.get("name")||"").trim();
+ get("preview-current-user").textContent=nickname||name||"Preview user";
+ get("account-status").textContent="Updated in this preview only.";
+});
+document.querySelectorAll("[data-communication]").forEach(button=>button.addEventListener("click",()=>{
+ const feature=button.dataset.communication;
+ get("communication-heading").textContent=feature;
+ get("communication-label").textContent=feature+" — coming soon";
+ openDialog("communication-dialog");
+}));
+const tabs=[...document.querySelectorAll("[data-perm-tab]")];
+function setTab(value){
+ for(const tab of tabs){
+  const active=tab.dataset.permTab===value;
+  tab.setAttribute("aria-selected",String(active));
+  tab.tabIndex=active?0:-1;
+ }
+ get("perm-my").hidden=value!=="my";
+ get("perm-matrix").hidden=value!=="matrix";
+}
+tabs.forEach((tab,index)=>{
+ tab.addEventListener("click",()=>setTab(tab.dataset.permTab));
+ tab.addEventListener("keydown",event=>{
+  if(event.key!=="ArrowRight"&&event.key!=="ArrowLeft")return;
+  event.preventDefault();
+  const next=tabs[(index+(event.key==="ArrowRight"?1:tabs.length-1))%tabs.length];
+  setTab(next.dataset.permTab);next.focus();
+ });
+});
+setTab("my");
+/* Let the parent page size the iframe to content so the full app descriptions remain visible. */
+let lastReportedHeight=0;
+function reportWorkspaceHeight(){
+ if(window.parent===window)return;
+ const height=Math.ceil(Math.max(document.body.scrollHeight,document.documentElement.scrollHeight));
+ if(height<200||Math.abs(height-lastReportedHeight)<2)return;
+ lastReportedHeight=height;
+ window.parent.postMessage({type:"duckbio-workspace-height",height},window.location.origin);
+}
+const scheduleSize=()=>window.requestAnimationFrame(reportWorkspaceHeight);
+if("ResizeObserver" in window){
+ const observer=new ResizeObserver(scheduleSize);
+ observer.observe(document.body);
+ const shell=document.querySelector(".shell");
+ if(shell)observer.observe(shell);
+}
+window.addEventListener("resize",scheduleSize);
+window.addEventListener("load",scheduleSize);
+document.fonts?.ready?.then(scheduleSize);
+appsToggle.addEventListener("click",scheduleSize);
+scheduleSize();
+})();
+</script>
+</body></html>
