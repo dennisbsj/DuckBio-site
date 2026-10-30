@@ -257,3 +257,14 @@ html[data-theme="dark"] .hero-app .hero-app-name{color:#effaff}
 html[data-theme="dark"] .hero-app .hero-app-category{color:#91dfe9}
 html[data-theme="dark"] .hero-app .hero-app-summary{color:#bdd8e0}
 @media(max-width:540px){.hero-app{padding:11px}.hero-app .hero-app-category{min-height:0}}
+
+/* More stable typography on the compact app overview; no mid-word bold changes. */
+.hero-suitable{display:block;margin-top:16px;font-size:14px;line-height:1.65;color:#a9e0e8;max-width:600px}
+.hero-app .hero-app-category{font-family:inherit;font-size:10.5px;line-height:1.5;letter-spacing:0;font-weight:500;word-break:normal;overflow-wrap:normal;hyphens:none;min-height:0}
+.hero-app .hero-app-category b{font-size:inherit;font-weight:inherit}
+.hero-app .hero-app-name{font-weight:400;font-size:12px;letter-spacing:0;line-height:1.5}
+.hero-app .hero-app-name b{font-size:inherit;line-height:inherit;font-weight:800}
+.app-card .app-subtitle{font-weight:500;letter-spacing:0;word-break:normal;overflow-wrap:normal;hyphens:none}
+.trust-grid{grid-template-columns:minmax(0,1.4fr) minmax(0,.9fr)}
+.trust-grid span{font-weight:600;line-height:1.6;align-items:flex-start}
+@media(max-width:700px){.trust-grid{grid-template-columns:1fr}.hero-suitable{font-size:13px}}
