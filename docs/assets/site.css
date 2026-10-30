@@ -319,3 +319,11 @@ img.suite-sprite.logo-cytoduck{background-image:none;background-color:transparen
 @media(max-width:540px){
  .product-hero .product-icon{width:min(292px,100%);height:auto;aspect-ratio:1/1}
 }
+
+/* Homepage: keep the six suitability points inside the hero, not in a separate strip. */
+.hero-suitable-block{margin-top:24px;max-width:430px}
+.hero .hero-suitable-heading{font-size:16px;line-height:1.4;font-weight:650;color:#dff5f7;margin:0 0 12px}
+.hero-suitable-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr;gap:10px}
+.hero-suitable-list li{display:flex;align-items:center;gap:11px;color:#effbfc;font-size:15px;line-height:1.45}
+.hero-suitable-list i{display:inline-grid;place-items:center;flex:0 0 25px;width:25px;height:25px;border-radius:50%;background:#daf5f5;color:#178d9c;font-size:14px;font-style:normal;font-weight:850}
+@media(max-width:540px){.hero-suitable-block{margin-top:20px}.hero-suitable-list{gap:9px}.hero-suitable-list li{font-size:14px}}
