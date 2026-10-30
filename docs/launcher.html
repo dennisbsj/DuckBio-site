@@ -113,6 +113,20 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
 @media(max-width:850px){.shell{grid-template-columns:175px minmax(0,1fr)}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.shell{grid-template-columns:minmax(0,1fr)}aside{display:flex;flex-direction:column;width:100%;gap:3px;padding:10px}.side-app-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;margin:0}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.app .icon{width:44px;height:44px}.notice{margin-top:10px}}
 @media(max-width:400px){.app{padding:11px}.app small{font-size:11px;min-height:0}.grid{gap:9px}.main-title{flex-direction:column;align-items:flex-start}}
+
+/* Approved DuckBio high-resolution icons: retain the compact Workspace card sizing. */
+.app img.sprite{
+ background-repeat:no-repeat;
+ background-position:center center;
+ background-color:transparent;
+ background-size:100% 100%;
+}
+.app img.sprite.s1{background-image:url("assets/icons/duckbio-20261030/labduck.png");background-size:114% 114%;background-position:center center}
+.app img.sprite.s2{background-image:url("assets/icons/duckbio-20261030/ducknote.png");background-size:114% 114%;background-position:center center}
+.app img.sprite.s3{background-image:url("assets/icons/duckbio-20261030/ducktrain.png");background-size:100% 100%;background-position:center center}
+.app img.sprite.s4{background-image:url("assets/icons/duckbio-20261030/duckpipe.png");background-size:100% 100%;background-position:center center}
+.app img.sprite.s5{background-image:url("assets/icons/duckbio-20261030/cytoduck.png");background-size:114% 114%;background-position:center center}
+.app img.sprite.s6{background-image:url("assets/icons/duckbio-20261030/duckman.png");background-size:100% 100%;background-position:center center}
 </style>
 </head>
 <body>
@@ -131,7 +145,7 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
 <div class="main-title"><div><span class="kicker">MY APPS</span><h1>Your DuckBio workspace</h1><p>Click or tap a card below to open that app’s product page.</p></div><span class="count">6 apps</span></div>
 <div class="grid">
 <a class="app" href="labduck.html" target="_top" aria-label="Open LabDuck product page"><img class="sprite s1 icon" src="assets/icons/transparent.svg" alt=""><span class="launcher-app-category"><b>LAB</b>ORATORY INFORMATION MANAGEMENT SYSTEM</span><strong class="launcher-app-name"><b>Lab</b>Duck</strong><small>Track samples, inventory, batches and laboratory results with role-based review.</small><span class="action">Learn more ↗</span></a>
-<a class="app" href="cytoduck.html" target="_top" aria-label="Open CytoDuck product page"><img class="icon" src="assets/icons/cytoduck-exact-approved.svg?v=approved-20261030-final" alt="CytoDuck logo"><span class="launcher-app-category">FLOW <b>CYTO</b>METRY ANALYSIS</span><strong class="launcher-app-name"><b>Cyto</b>Duck</strong><small>Explore FCS data with flexible plots, gating and analysis reports.</small><span class="action">Learn more ↗</span></a>
+<a class="app" href="cytoduck.html" target="_top" aria-label="Open CytoDuck product page"><img class="sprite s5 icon" src="assets/icons/transparent.svg" alt="CytoDuck logo"><span class="launcher-app-category">FLOW <b>CYTO</b>METRY ANALYSIS</span><strong class="launcher-app-name"><b>Cyto</b>Duck</strong><small>Explore FCS data with flexible plots, gating and analysis reports.</small><span class="action">Learn more ↗</span></a>
 <a class="app" href="duckpipe.html" target="_top" aria-label="Open DuckPipe product page"><img class="sprite s4 icon" src="assets/icons/transparent.svg" alt=""><span class="launcher-app-category">METHOD VALIDATION <b>PIPE</b>LINE MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Pipe</b></strong><small>Organise methods, validation activities and review access.</small><span class="action">Learn more ↗</span></a>
 <a class="app" href="eel.html" target="_top" aria-label="Open DuckNote product page"><img class="sprite s2 icon" src="assets/icons/transparent.svg" alt=""><span class="launcher-app-category">ELECTRONIC LAB <b>NOTE</b>BOOK</span><strong class="launcher-app-name">Duck<b>Note</b></strong><small>Record experiments, revisit versions and organise scientific documentation.</small><span class="action">Learn more ↗</span></a>
 <a class="app" href="duckman.html" target="_top" aria-label="Open DuckMan product page"><img class="sprite s6 icon" src="assets/icons/transparent.svg" alt=""><span class="launcher-app-category"><b>DUCK</b>UMENT MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Man</b></strong><small>Control document versions, reviews, approvals and release histories.</small><span class="action">Learn more ↗</span></a>
