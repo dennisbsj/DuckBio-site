@@ -59,6 +59,10 @@ def main() -> None:
                and info["stripePriceId"] is None for info in settings["products"].values())
     assert settings["bundleMonthlyDKK"] == {str(i): price for i, price in enumerate([0, 200, 380, 540, 680, 800, 1000]) if i}
     assert settings["earlyAdopterDiscountPercent"] == 20
+    assert settings["defaultDisplayCurrency"] == "EUR"
+    assert settings["normalBundleMonthlyEUR"] == {"1": 27, "2": 51, "3": 72, "4": 91, "5": 107, "6": 134}
+    assert all(abs(settings["earlyAdopterBundleMonthlyEUR"][key] - 0.8 * value) < 1e-9
+               for key, value in settings["normalBundleMonthlyEUR"].items())
     assert settings["referenceConversion"]["dkkPerEUR"] == 7.4736
     assert settings["referenceConversion"]["usdPerEUR"] == 1.1130
     for filename in sorted(EXPECTED_PAGES):
