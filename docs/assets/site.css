@@ -347,3 +347,45 @@ img.suite-sprite.logo-cytoduck{background-image:none;background-color:transparen
 .hero .hero-grid{padding-top:42px;padding-bottom:42px}
 @media(max-width:820px){.hero .hero-grid{padding-top:38px;padding-bottom:38px}}
 @media(max-width:540px){.hero .hero-grid{padding-top:30px;padding-bottom:30px}}
+
+/* Approved high-resolution DuckBio logos, 2026-10-30.
+   Each image uses the identical approved artwork at every display size.
+   Keep the display sizes from the existing card and product-page rules. */
+img.suite-sprite{
+  background-image:none;
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+  background-color:transparent;
+  object-fit:contain;
+}
+img.suite-sprite.logo-limsduck{
+  background-image:url("icons/duckbio-20261030/labduck.png");
+  background-size:114% 114%;
+  background-position:center center;
+}
+img.suite-sprite.logo-cytoduck{
+  background-image:url("icons/duckbio-20261030/cytoduck.png");
+  background-size:114% 114%;
+  background-position:center center;
+}
+img.suite-sprite.logo-methduck{
+  background-image:url("icons/duckbio-20261030/duckpipe.png");
+  background-size:100% 100%;
+  background-position:center center;
+}
+img.suite-sprite.logo-ducknote{
+  background-image:url("icons/duckbio-20261030/ducknote.png");
+  background-size:114% 114%;
+  background-position:center center;
+}
+img.suite-sprite.logo-duckman{
+  background-image:url("icons/duckbio-20261030/duckman.png");
+  background-size:100% 100%;
+  background-position:center center;
+}
+img.suite-sprite.logo-ducktrain{
+  background-image:url("icons/duckbio-20261030/ducktrain.png");
+  background-size:100% 100%;
+  background-position:center center;
+}
