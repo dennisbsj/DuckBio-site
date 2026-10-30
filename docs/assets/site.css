@@ -360,13 +360,13 @@ img.suite-sprite{
   object-fit:contain;
 }
 img.suite-sprite.logo-limsduck{
-  background-image:url("icons/duckbio-20261030/labduck-v2.png");
-  background-size:114% 114%;
+  background-image:url("icons/duckbio-20261030/labduck-corner-overlay.svg?v=frame-only-20261030"),url("icons/duckbio-20261030/labduck-v2.png");
+  background-size:114% 114%,114% 114%;
   background-position:center center;
 }
 img.suite-sprite.logo-cytoduck{
-  background-image:url("icons/duckbio-20261030/cytoduck.png");
-  background-size:114% 114%;
+  background-image:url("icons/duckbio-20261030/cytoduck-corner-overlay.svg?v=frame-only-20261030"),url("icons/duckbio-20261030/cytoduck.png");
+  background-size:114% 114%,114% 114%;
   background-position:center center;
 }
 img.suite-sprite.logo-methduck{
@@ -375,8 +375,8 @@ img.suite-sprite.logo-methduck{
   background-position:center center;
 }
 img.suite-sprite.logo-ducknote{
-  background-image:url("icons/duckbio-20261030/ducknote.png");
-  background-size:114% 114%;
+  background-image:url("icons/duckbio-20261030/ducknote-corner-overlay.svg?v=frame-only-20261030"),url("icons/duckbio-20261030/ducknote.png");
+  background-size:114% 114%,114% 114%;
   background-position:center center;
 }
 img.suite-sprite.logo-duckman{
