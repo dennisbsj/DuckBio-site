@@ -83,6 +83,36 @@ button{font:inherit}button:focus-visible{outline:3px solid #24b7c7;outline-offse
 @media(max-width:480px){.side-app-list{grid-template-columns:repeat(2,minmax(0,1fr))}.account-fields{grid-template-columns:1fr}.account-full{grid-column:auto}.launcher-dialog{width:96vw;padding:15px}.preview-current-user{display:none}}
 .side-communication .sidebar-chat-icon{display:inline-block;vertical-align:middle;flex-shrink:0;margin-right:8px}.launcher-app-category{display:block;font-size:10px;line-height:1.35;font-weight:500;letter-spacing:0;color:#25819b;text-transform:uppercase;margin:2px 0 6px}.app .launcher-app-name{font-size:14px;font-weight:400;color:#153649;line-height:1.45}.app .launcher-app-name b{font-weight:900;font-size:inherit}.app small{font-size:12px;line-height:1.55;min-height:0;margin:7px 0 12px}.app{min-height:260px}.side-communication{display:flex;align-items:center}
 .launcher-app-category b{font-size:inherit;font-weight:900}
+
+/* Workspace preview: compact desktop dashboard, full-length descriptions, no internal page scroll. */
+html,body{overflow-x:hidden}
+body{min-height:0}
+.shell{min-height:0}
+.shell main{min-width:0;padding:clamp(13px,1.6vw,24px)}
+.main-title{margin-bottom:13px;align-items:center;gap:12px}
+.main-title h1{font-size:clamp(23px,2.65vw,33px);margin:5px 0}
+.main-title p{font-size:12px;line-height:1.4}
+.grid{gap:12px;grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}
+.app{min-height:0;height:auto;padding:clamp(11px,1.4vw,18px);border-radius:12px}
+.app .icon{width:clamp(40px,4vw,54px);height:clamp(40px,4vw,54px);margin-bottom:8px;flex-shrink:0}
+.app .launcher-app-category{font-size:9px;line-height:1.28;word-break:normal}
+.app .launcher-app-name{font-size:14px;line-height:1.25}
+.app small{display:block;white-space:normal;overflow:visible;text-overflow:clip;font-size:11px;line-height:1.4;min-height:0;flex-grow:1;margin:6px 0 0}
+.app .action{padding-top:7px}
+.notice{margin-top:12px;padding:9px 12px;line-height:1.4;font-size:11px}
+.bar{min-height:57px;padding:10px 16px}
+.bar .brand img{width:31px;height:31px}
+.bar .brand{font-size:17px}
+aside{padding:15px 10px;gap:5px}
+aside .label{padding:4px 10px;margin:2px 0;font-size:10px}
+.side-link{padding:9px 10px}
+.side-app-list a{padding:4px 8px 4px 16px;font-size:11px}
+.side-separator{margin:8px 5px 3px}
+.side-communication{padding:8px 10px}
+aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
+@media(max-width:850px){.shell{grid-template-columns:175px minmax(0,1fr)}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.shell{grid-template-columns:minmax(0,1fr)}aside{display:flex;flex-direction:column;width:100%;gap:3px;padding:10px}.side-app-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;margin:0}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.app .icon{width:44px;height:44px}.notice{margin-top:10px}}
+@media(max-width:400px){.app{padding:11px}.app small{font-size:11px;min-height:0}.grid{gap:9px}.main-title{flex-direction:column;align-items:flex-start}}
 </style>
 </head>
 <body>
@@ -107,7 +137,7 @@ button{font:inherit}button:focus-visible{outline:3px solid #24b7c7;outline-offse
 <a class="app" href="duckman.html" target="_top" aria-label="Open DuckMan product page"><img class="sprite s6 icon" src="assets/icons/transparent.svg" alt=""><span class="launcher-app-category"><b>DUCK</b>UMENT MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Man</b></strong><small>Control document versions, reviews, approvals and release histories.</small><span class="action">Learn more ↗</span></a>
 <a class="app" href="mantrain.html" target="_top" aria-label="Open DuckTrain product page"><img class="sprite s3 icon" src="assets/icons/transparent.svg" alt=""><span class="launcher-app-category"><b>TRAIN</b>ING &amp; QUALIFICATION MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Train</b></strong><small>Assign training, track qualifications and maintain competency records.</small><span class="action">Learn more ↗</span></a>
 </div>
-<div class="notice">Preview only. These links open public product pages, not authenticated apps. Access controls, billing and platform accounts will be connected separately when implemented.</div>
+<div class="notice">Preview only. These links open public product pages, not authenticated apps. Access controls, billing and workspace accounts will be connected separately when implemented.</div>
 </main></div>
 
 <dialog class="launcher-dialog" id="account-dialog" aria-labelledby="account-heading">
@@ -209,6 +239,27 @@ tabs.forEach((tab,index)=>{
  });
 });
 setTab("my");
+/* Let the parent page size the iframe to content so the full app descriptions remain visible. */
+let lastReportedHeight=0;
+function reportWorkspaceHeight(){
+ if(window.parent===window)return;
+ const height=Math.ceil(Math.max(document.body.scrollHeight,document.documentElement.scrollHeight));
+ if(height<200||Math.abs(height-lastReportedHeight)<2)return;
+ lastReportedHeight=height;
+ window.parent.postMessage({type:"duckbio-workspace-height",height},window.location.origin);
+}
+const scheduleSize=()=>window.requestAnimationFrame(reportWorkspaceHeight);
+if("ResizeObserver" in window){
+ const observer=new ResizeObserver(scheduleSize);
+ observer.observe(document.body);
+ const shell=document.querySelector(".shell");
+ if(shell)observer.observe(shell);
+}
+window.addEventListener("resize",scheduleSize);
+window.addEventListener("load",scheduleSize);
+document.fonts?.ready?.then(scheduleSize);
+appsToggle.addEventListener("click",scheduleSize);
+scheduleSize();
 })();
 </script>
 </body></html>
