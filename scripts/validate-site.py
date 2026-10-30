@@ -55,8 +55,12 @@ def main() -> None:
     settings = json.loads((ROOT / "assets/pricing.json").read_text(encoding="utf-8"))
     assert set(settings["products"]) == EXPECTED_APPS
     assert settings["subscriptionsLive"] is False and settings["trialConfigured"] is False
-    assert all(info["monthly"] is None and info["stripePriceId"] is None
-               for info in settings["products"].values())
+    assert all(info["monthly"] == 200 and info["earlyAdopterMonthly"] == 160
+               and info["stripePriceId"] is None for info in settings["products"].values())
+    assert settings["bundleMonthlyDKK"] == {str(i): price for i, price in enumerate([0, 200, 380, 540, 680, 800, 1000]) if i}
+    assert settings["earlyAdopterDiscountPercent"] == 20
+    assert settings["referenceConversion"]["dkkPerEUR"] == 7.4736
+    assert settings["referenceConversion"]["usdPerEUR"] == 1.1130
     for filename in sorted(EXPECTED_PAGES):
         html = (ROOT / filename).read_text(encoding="utf-8")
         assert not re.search(r"Celluloid|celluloidconsulting|built by scientists", html, re.I), filename
