@@ -296,7 +296,7 @@ currencyButtons.forEach(btn=>btn.addEventListener("click",()=>{
 }));
 let estimate=null;
 function recalculate(){
- const apps=Number(find("pr-app-count").value),users=Number(find("pr-users").value),early=find("pr-early").checked;
+ const apps=Number(find("pr-app-count").value),users=Number(find("pr-users").value);
  const label=find("pr-result-label"),totalElement=find("pr-total");
  if(!Number.isInteger(users)||users<1||users>10000){
   label.textContent="Enter a valid team size";totalElement.textContent="Use 1–10,000 users";find("pr-copy").disabled=true;estimate=null;return;
@@ -304,7 +304,7 @@ function recalculate(){
  const baseEUR=unitEUR(1)*apps*users,suiteEUR=unitEUR(apps)*users;
  const orgRate=users>=20?20:users>=5?10:0,custom=users>=50;
  const orgTotalEUR=suiteEUR*(1-orgRate/100),earlyTotalEUR=unitEUR(apps,true)*users;
- const useEarly=early&&earlyTotalEUR<=orgTotalEUR+1e-8;
+ const useEarly=earlyTotalEUR<=orgTotalEUR+1e-8;
  const finalEUR=useEarly?earlyTotalEUR:orgTotalEUR;
  /* All arithmetic is performed in EUR. Currency conversion happens once, at display. */
  const baseShown=round2(converted(baseEUR)),suiteShown=round2(converted(suiteEUR)),finalShown=round2(converted(finalEUR));
@@ -320,40 +320,69 @@ function recalculate(){
   "*For 50+ users, the figure shown is the bundle-adjusted baseline, not a final offer. Contact DuckBio for individual pricing. Excluding VAT.":
   useEarly?"The early adopter discount is applied to EUR prices before converting to the selected currency. It replaces the organisation discount for the first 12 months of eligible subscriptions. Excluding VAT.":
   "Organisation discounts are applied to EUR prices before converting to the selected currency. Prices exclude VAT.";
- find("pr-copy").disabled=false;estimate={apps,users,early,custom,finalEUR,suiteEUR};
+ find("pr-copy").disabled=false;estimate={apps,users,custom,baseEUR,suiteEUR,finalEUR,useEarly,orgRate};
 }
-["pr-app-count","pr-users","pr-early"].forEach(id=>{find(id).addEventListener("input",recalculate);find(id).addEventListener("change",recalculate)});
-find("pr-copy").addEventListener("click",async()=>{
+["pr-app-count","pr-users"].forEach(id=>{find(id).addEventListener("input",recalculate);find(id).addEventListener("change",recalculate)});
+
+function exportPriceRows(info,chosenApps){
+ const label=info.apps===1?"Single":info.apps===6?"Bundle":"Mixed";
+ const rows=[
+  ["DuckBio","Provisional monthly estimate"],
+  ["Status","Not a confirmed offer or order"],
+  ["Plan",label],["Apps per user",info.apps],["Licensed users",info.users],
+  ["Display currency",currency],["Units of display currency per EUR",fxPerEUR[currency]],
+  ["Standard app price (EUR)",unitEUR(1)],
+  ["Normal total without bundle savings (EUR/month)",info.baseEUR],
+  ["Total after bundle savings (EUR/month)",info.suiteEUR],
+  ["Bundle savings",pct(bundleDiscount(info.apps))],
+  ["Early adopter offer",info.useEarly?"Automatically applied – 20%":"Organisation discount takes precedence"],
+  ["Early adopter eligible start dates","1 January – 31 March 2027"],
+  ["Early adopter discount duration","First 12 months for eligible subscriptions"],
+  ["Organisation discount",pct(info.orgRate)],
+  ["Total monthly estimate (EUR)",info.custom?"Individual quote required":round2(info.finalEUR)],
+  ["Total monthly estimate ("+currency+")",info.custom?"Individual quote required":round2(converted(info.finalEUR))],
+  ["VAT","Excluded"],
+  ["Conversion rates","Indicative reference rates of 30 October 2026"],
+  ["Disclaimer","Provisional, not an order. Payment and subscriptions are not live."]
+ ];
+ if(chosenApps&&chosenApps.length){rows.push(["Selected apps",""]);chosenApps.forEach((n,i)=>rows.push(["App "+(i+1),n]));}
+ else rows.push(["Exact app choices","Not specified in this calculator"]);
+ return rows;
+}
+find("pr-copy").addEventListener("click",()=>{
  if(!estimate)return;
- const x=estimate;
- const content="DuckBio provisional pricing estimate\nApps per user: "+x.apps+"\nUsers: "+x.users+"\n"+(x.custom?"Bundle-adjusted baseline (custom quote required): "+formatEUR(x.suiteEUR):"Estimated total: "+formatEUR(x.finalEUR))+" per month\nEarly adopter discount selected: "+(x.early?"Yes":"No")+"\nPrices exclude VAT. All amounts are calculated from EUR reference prices using the published reference conversion rates. Not a purchase offer.";
- try{await navigator.clipboard.writeText(content);find("pr-copy-status").textContent="Copied."}
- catch{find("pr-copy-status").textContent="Copy unavailable in this browser."}
+ try{
+  if(!window.DuckBioXlsx)throw Error("Export utility unavailable");
+  window.DuckBioXlsx.download("DuckBio-pricing-estimate.xlsx",exportPriceRows(estimate));
+  find("pr-copy-status").textContent="Excel estimate exported.";
+ }catch{find("pr-copy-status").textContent="Excel export failed. Reload the page and try again.";}
 });
+
 
 /* App selection is an order preview; payment must not be enabled until verified secure checkout exists. */
 const appSelections=[...document.querySelectorAll("[data-select-app]")];
 const selectedAppIds=new Set();
+let selectionEstimate=null;
 const selectedLabel=(count)=>count===1?"Single":count===6?"Bundle":count>=2?"Mixed":"No apps selected";
 function renderSelection(){
  const count=selectedAppIds.size;
  appSelections.forEach(button=>{
   const selected=selectedAppIds.has(button.dataset.selectApp);
   button.setAttribute("aria-pressed",String(selected));
-  button.querySelector(".pr-select-state").textContent=selected?"Selected":"Select app";
+  button.setAttribute("aria-label",(selected?"Remove ":"Select ")+button.dataset.appName);
  });
  find("pr-select-title").textContent=count?selectedLabel(count)+" · "+count+" "+(count===1?"app":"apps"):"No apps selected";
  const selectedNames=appSelections.filter(el=>selectedAppIds.has(el.dataset.selectApp)).map(el=>el.dataset.appName);
  find("pr-select-names").textContent=count?selectedNames.join(" · "):"Select one or more apps above to calculate your subscription.";
- const users=Number(find("pr-select-users").value),early=find("pr-select-early").checked;
+ const users=Number(find("pr-select-users").value);
  const valid=Number.isInteger(users)&&users>=1&&users<=10000;
  find("pr-select-copy").disabled=!count||!valid;
- if(!count){find("pr-select-total").textContent="Choose an app";find("pr-select-breakdown").textContent="EUR reference prices; excludes VAT.";return;}
- if(!valid){find("pr-select-total").textContent="Invalid user count";find("pr-select-breakdown").textContent="Enter between 1 and 10,000 licensed users.";return;}
+ if(!count){selectionEstimate=null;find("pr-select-total").textContent="Choose an app";find("pr-select-breakdown").textContent="EUR reference prices; excludes VAT.";return;}
+ if(!valid){selectionEstimate=null;find("pr-select-total").textContent="Invalid user count";find("pr-select-breakdown").textContent="Enter between 1 and 10,000 licensed users.";return;}
  const priceEUR=unitEUR(count)*users;
  const organisationRate=users>=20?20:users>=5?10:0;
  const earlyEUR=priceEUR*.8,organisationEUR=priceEUR*(1-organisationRate/100);
- const useEarly=early&&earlyEUR<=organisationEUR+1e-8;
+ const useEarly=earlyEUR<=organisationEUR+1e-8;
  const totalEUR=useEarly?earlyEUR:organisationEUR;
  const custom=users>=50;
  find("pr-select-total").textContent=custom?"Individual quote":formatEUR(totalEUR)+" / month";
@@ -362,26 +391,27 @@ function renderSelection(){
   " · Bundle saving: "+pct(bundleDiscount(count))+
   " · "+(useEarly?"Early adopter: 20%": "Organisation discount: "+organisationRate+"%")+
   (custom?" · 50+ users require custom pricing.":" · Excl. VAT.");
+ selectionEstimate={apps:count,users,custom,baseEUR:unitEUR(1)*count*users,suiteEUR:priceEUR,finalEUR:totalEUR,useEarly,orgRate:organisationRate};
 }
 appSelections.forEach(button=>button.addEventListener("click",()=>{
  if(selectedAppIds.has(button.dataset.selectApp))selectedAppIds.delete(button.dataset.selectApp);
  else selectedAppIds.add(button.dataset.selectApp);
  renderSelection();
 }));
-["pr-select-users","pr-select-early"].forEach(id=>{
+["pr-select-users"].forEach(id=>{
  find(id).addEventListener("input",renderSelection);
  find(id).addEventListener("change",renderSelection);
 });
-find("pr-select-copy").addEventListener("click",async()=>{
+
+find("pr-select-copy").addEventListener("click",()=>{
+ if(!selectionEstimate)return;
  const chosen=appSelections.filter(el=>selectedAppIds.has(el.dataset.selectApp)).map(el=>el.dataset.appName);
  if(!chosen.length)return;
- const text="DuckBio subscription selection (not an order)\nApps: "+chosen.join(", ")+"\nUsers: "+find("pr-select-users").value+
-  "\nEarly adopter selected: "+(find("pr-select-early").checked?"Yes":"No")+
-  "\nEstimated total: "+find("pr-select-total").textContent+"\nPrices exclude VAT; checkout is not live.";
  try{
-  await navigator.clipboard.writeText(text);
-  find("pr-select-status").textContent="Selection copied. No order has been placed.";
- }catch{find("pr-select-status").textContent="Copy unavailable in this browser. No order has been placed.";}
+  if(!window.DuckBioXlsx)throw Error("Export utility unavailable");
+  window.DuckBioXlsx.download("DuckBio-app-selection.xlsx",exportPriceRows(selectionEstimate,chosen));
+  find("pr-select-status").textContent="Excel selection exported. No order placed.";
+ }catch{find("pr-select-status").textContent="Excel export failed. Reload the page and try again.";}
 });
 renderStaticPrices();
 renderSelection();
