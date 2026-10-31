@@ -42,7 +42,7 @@
       "earlyAdopterMonthly": 24
     }
   },
-  "policy": "Provisional 2027 prices with EUR as the sole reference: one app is €30/month with no normal bundle discount; Mix apps (2–5 apps) has a 20% normal bundle discount, giving €48, €72, €96 and €120/month; All apps (6 apps) has a 25% normal bundle discount, giving €135/month. Early adopters receive an additional 20% off the applicable EUR bundle price for their first year when starting between 1 January and 31 March 2027. DKK and USD are converted only from EUR at the same reference rates, not independently priced. Organisation discounts are evaluated in EUR and do not stack with early adopter discounts. All amounts exclude VAT. Checkout and billing are not live.",
+  "policy": "Provisional 2027 prices with EUR as the sole reference: one app is €30/month with no normal bundle discount; Mix apps (2–5 apps) has a 20% normal bundle discount, giving €48, €72, €96 and €120/month; All apps (6 apps) has a 30% normal bundle discount, giving €126/month. Early adopters receive an additional 20% off the applicable EUR bundle price for their first year when starting between 1 January and 31 March 2027. DKK and USD are converted only from EUR at the same reference rates, not independently priced. Organisation discounts are evaluated in EUR and do not stack with early adopter discounts. All amounts exclude VAT. Checkout and billing are not live.",
   "pricesTentative": true,
   "bundleMonthlyDKK": {
     "1": 224.22,
@@ -50,7 +50,7 @@
     "3": 538.12,
     "4": 717.49,
     "5": 896.86,
-    "6": 1008.97
+    "6": 941.7
   },
   "earlyAdopterDiscountPercent": 20,
   "displayCurrencies": [
@@ -73,7 +73,7 @@
     "3": 72,
     "4": 96,
     "5": 120,
-    "6": 135
+    "6": 126
   },
   "earlyAdopterBundleMonthlyEUR": {
     "1": 24,
@@ -81,7 +81,7 @@
     "3": 57.6,
     "4": 76.8,
     "5": 96,
-    "6": 108
+    "6": 100.8
   },
   "normalBundleMonthlyUSD": {
     "1": 33.59,
@@ -89,7 +89,7 @@
     "3": 80.61,
     "4": 107.47,
     "5": 134.34,
-    "6": 151.14
+    "6": 141.06
   },
   "earlyAdopterBundleMonthlyUSD": {
     "1": 26.87,
@@ -97,7 +97,15 @@
     "3": 64.48,
     "4": 85.98,
     "5": 107.47,
-    "6": 120.91
+    "6": 112.85
   },
-  "derivedDisplayCurrencyNote": "Do not independently edit converted DKK or USD prices: derive all display amounts from the EUR reference pricing."
+  "derivedDisplayCurrencyNote": "Do not independently edit converted DKK or USD prices: derive all display amounts from the EUR reference pricing.",
+  "earlyAdopterBundleMonthlyDKK": {
+    "1": 179.37,
+    "2": 287,
+    "3": 430.49,
+    "4": 573.99,
+    "5": 717.49,
+    "6": 753.36
+  }
 }
