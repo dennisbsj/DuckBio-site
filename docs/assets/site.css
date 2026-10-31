@@ -903,3 +903,26 @@ img.suite-sprite.logo-limsduck,
 @media(max-width:360px){
  .workspace-preview-section iframe#workspace-frame{height:1580px;min-height:0}
 }
+
+
+/* Approved 2026-10-31 artwork: CytoDuck with tabletop flow cytometer,
+   DuckPipe mug with official DuckBio insignia. Card image 224px, hero 1024px.
+   Other app artwork and product display sizes remain unchanged. */
+img.suite-sprite.logo-cytoduck{
+  background-image:url("icons/duckbio-20261031/cytoduck-with-instrument-224.webp");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
+.product-hero img.suite-sprite.logo-cytoduck{
+  background-image:url("icons/duckbio-20261031/cytoduck-with-instrument-1024.webp");
+}
+img.suite-sprite.logo-methduck{
+  background-image:url("icons/duckbio-20261031/duckpipe-duckbio-mug-224.webp");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
+.product-hero img.suite-sprite.logo-methduck{
+  background-image:url("icons/duckbio-20261031/duckpipe-duckbio-mug-1024.webp");
+}
