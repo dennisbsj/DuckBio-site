@@ -29,8 +29,9 @@ verified publishing-source documentation without changing website content.
 
 Root HTML on `main` is not the publishing source. The existing
 `development/docs/.nojekyll` skips Jekyll; there is no need to restore an old
-custom deployment workflow. This README-only PR neither pushes to a publishing
-branch nor changes `docs/`, Pages configuration or the published website.
+custom deployment workflow. These documentation changes affect only root `README.md`; `docs/`, Pages
+configuration and app runtimes remain unchanged. Merging to the publishing
+branch can start an automatic Pages rebuild of the existing website files.
 
 The preview is **static marketing**, not a completed SaaS platform. Pricing is
 tentative; live Stripe checkout, unified customer login, billing, inbox and
@@ -49,9 +50,10 @@ bytes can still be browser-persistent. LabDuck's PHP→Node source migration has
 synthetic database/hash/session/backup/rollback evidence; retained PHP is only a
 compatibility reference, not a required Node interpreter.
 
-The reviewed API/migration/security/recovery changes remain in draft PRs and
-app `qa/duckbio-validation-20261030` snapshots, not merged default branches or
-confirmed production releases. Read the [dated QA report](https://github.com/dennisbsj/celluloid-consulting-site/blob/16b300b232acd0dac82681d24a6bd6c2e0370ef0/DUCKBIO_QA_20261030.md)
+At the **30 October 2026 review snapshot**, the reviewed API/migration/security/
+recovery changes were in draft PRs and app `qa/duckbio-validation-20261030`
+snapshots. Subsequent source merges must be checked in the individual repository;
+a source merge is not confirmation of a production deployment. Read the [dated QA report](https://github.com/dennisbsj/celluloid-consulting-site/blob/16b300b232acd0dac82681d24a6bd6c2e0370ef0/DUCKBIO_QA_20261030.md)
 for exact commits, test scope and limitations. DuckTrain's explicit evidence
 server copies do not recover files that were never copied; DuckPipe still has
 prototype areas. No common identity/database, formal regulatory validation or
