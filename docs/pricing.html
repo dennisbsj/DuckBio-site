@@ -164,6 +164,53 @@ html[data-theme="dark"] .pr-select-layout .pr-select-button .pr-select-name{colo
 html[data-theme="dark"] .pr-select-all{background:#164459;border-color:#65c3d3;color:#e5faff}
 html[data-theme="dark"] .pr-select-all[aria-pressed="true"]{background:#91e9e7;color:#0b3444}
 @media(max-width:560px){.pr-select-toolbar{margin:-4px 0 18px;gap:11px}}
+
+/* Hero-integrated introductory offer and a two-column discount/calculator layout. */
+.pr-hero-card{transform:none}
+.pr-hero-early-info{margin-top:16px;padding-top:18px;border-top:1px solid var(--line)}
+.pr-hero-early-info .eyebrow{font-size:11px;letter-spacing:.035em;color:#12879c}
+.pr-hero-early-info h2{font-size:clamp(19px,2vw,23px);color:var(--navy);margin:8px 0;line-height:1.25}
+.pr-hero-early-info p:last-child{font-size:12px;line-height:1.65;color:var(--muted);margin:0}
+.pr-hero-early-info strong{color:var(--navy);font-weight:850;white-space:nowrap}
+.pr-savings-layout{display:grid;grid-template-columns:minmax(0,1.38fr) minmax(350px,.95fr);gap:24px;align-items:start}
+.pr-savings-layout .pr-tables{display:grid;grid-template-columns:minmax(0,1fr);gap:26px;min-width:0}
+.pr-savings-layout .pr-tables>div{min-width:0}
+.pr-savings-layout .pr-table-wrap{max-width:100%;overflow-x:auto}
+.pr-savings-layout .pr-table{min-width:0}
+.pr-savings-layout .pr-table th,.pr-savings-layout .pr-table td{padding:11px 10px;font-size:12px}
+.pr-savings-layout .pr-table th{font-size:10px}
+.pr-savings-layout .pr-savings-calculator{min-width:0}
+.pr-savings-layout .pr-calc-intro h2{font-size:23px;line-height:1.2}
+.pr-savings-layout .pr-calc-intro>p{font-size:12px;line-height:1.55}
+.pr-savings-layout .pr-calc-intro .pr-step{display:inline-flex;gap:7px;align-items:center;font-size:11px;margin:5px 10px 5px 0}
+.pr-savings-layout .pr-calc-intro .pr-step b{width:23px;height:23px;flex-basis:23px}
+.pr-savings-layout .pr-calc-card{padding:22px;margin-top:16px}
+.pr-savings-layout .pr-input-grid{gap:10px}
+.pr-savings-layout .pr-result strong.pr-total{font-size:clamp(30px,3vw,42px)}
+/* Uniform card heights and text alignment in Build your subscription. */
+.pr-select-layout .pr-select-grid{align-items:stretch;grid-auto-rows:1fr}
+.pr-select-layout .pr-select-card{display:flex;flex-direction:column;min-width:0;height:100%}
+.pr-select-layout .pr-select-button{flex:1 1 auto;height:100%;display:flex;flex-direction:column}
+.pr-select-layout .pr-select-category{min-height:3.8em;display:flex;align-items:center;justify-content:center}
+.pr-select-layout .pr-select-name{min-height:1.5em;display:flex;align-items:center;justify-content:center}
+.pr-select-layout .pr-select-description{flex:1 1 auto}
+.pr-select-layout .pr-select-details{margin-top:auto}
+@media(max-width:1080px){
+ .pr-savings-layout{grid-template-columns:minmax(0,1fr)}
+ .pr-savings-layout .pr-savings-calculator{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:22px;align-items:start}
+ .pr-savings-layout .pr-calc-card{margin-top:0}
+}
+@media(max-width:760px){
+ .pr-savings-layout .pr-savings-calculator{display:block}
+ .pr-savings-layout .pr-calc-card{margin-top:16px}
+ .pr-hero-card{max-width:none}
+}
+@media(max-width:480px){
+ .pr-savings-layout .pr-table{min-width:405px}
+ .pr-savings-layout .pr-table th,.pr-savings-layout .pr-table td{padding:9px 8px;font-size:11px}
+ .pr-savings-layout .pr-calc-card{padding:18px}
+ .pr-savings-layout .pr-input-grid{grid-template-columns:1fr}
+}
 </style></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
 <section class="pr-hero">
   <div class="wrap pr-hero-grid">
@@ -175,16 +222,17 @@ html[data-theme="dark"] .pr-select-all[aria-pressed="true"]{background:#91e9e7;c
     </div>
     <div class="pr-hero-card"><p class="eyebrow">Every app. One starting price.</p>
       <div class="pr-prices"><div class="pr-normal"><span>Normal price</span><del data-eur-apps="1" data-price-kind="normal">30 €</del></div><div class="pr-early"><span class="pr-early-label">Early adopter</span><strong data-eur-apps="1" data-price-kind="early">24 €</strong><span class="pr-save">Save 20%</span></div></div><span class="pr-unit">per user · per app · per month</span>
+      <div class="pr-hero-early-info">
+       <p class="eyebrow">Early adopter offer · 1 January – 31 March 2027</p>
+       <h2>Your first year, 20% less.</h2>
+       <p>Start a new subscription during the launch period and retain the introductory discount for your first 12 months. One app from <strong data-eur-apps="1" data-price-kind="early">24 €</strong>, or all six from <strong data-eur-apps="6" data-price-kind="early">100,80 €</strong> per user per month.</p>
+      </div>
       <hr><strong>Made to scale with your team</strong>
       <p class="pr-bullet"><b>✓</b> Pick exactly the apps you need</p><p class="pr-bullet"><b>✓</b> Save as you bundle apps</p><p class="pr-bullet"><b>✓</b> Additional organisation discounts</p>
     </div>
   </div>
 </section>
-<section class="section soft" id="launch-offer"><div class="wrap"><div class="pr-offer">
- <div><p class="eyebrow">Early adopter offer · 1 January – 31 March 2027</p><h2>Your first year, 20% less.</h2>
- <p>Start a new subscription during the launch period and retain the introductory discount for your first 12 months. One app from <strong data-eur-apps="1" data-price-kind="early">24 €</strong>, or all six from <strong data-eur-apps="6" data-price-kind="early">100,80 €</strong> per user per month.</p></div>
- 
-</div></div></section>
+
 
 <section class="section" id="plans"><div class="wrap">
  <div class="pr-heading"><p class="eyebrow">Choose your setup</p><h2>Start small. Build your suite.</h2><p>Use a single specialist tool or combine several apps around your scientific workflows.</p></div>
@@ -205,12 +253,26 @@ html[data-theme="dark"] .pr-select-all[aria-pressed="true"]{background:#91e9e7;c
  </div>
 </div></section>
 
-<section class="section" id="calculator"><div class="wrap pr-calc-grid">
- <div class="pr-calc-intro"><p class="eyebrow">Pricing calculator</p><h2>Find the right fit for your lab.</h2>
+<section class="section soft" id="discounts"><div class="wrap"><div class="pr-heading"><p class="eyebrow">Simple, predictable savings</p><h2>Discounts for apps and teams.</h2><p>Bundle discounts always apply. Afterward, either the organisation discount or the early adopter discount is applied, whichever is higher.</p></div>
+<div class="pr-savings-layout">
+<div class="pr-tables">
+  <div><h3>Multi-app discounts</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Apps per user</th><th>Bundle discount</th><th>Normal / month</th><th>Early adopter / month</th></tr></thead><tbody>
+  <tr><td>1 app</td><td data-bundle-apps="1">0%</td><td><del data-eur-apps="1" data-price-kind="normal">30 €</del></td><td class="price-early" data-eur-apps="1" data-price-kind="early">24 €</td></tr>
+  <tr><td>2 apps</td><td data-bundle-apps="2">20%</td><td><del data-eur-apps="2" data-price-kind="normal">48 €</del></td><td class="price-early" data-eur-apps="2" data-price-kind="early">38,40 €</td></tr>
+  <tr><td>3 apps</td><td data-bundle-apps="3">20%</td><td><del data-eur-apps="3" data-price-kind="normal">72 €</del></td><td class="price-early" data-eur-apps="3" data-price-kind="early">57,60 €</td></tr>
+  <tr><td>4 apps</td><td data-bundle-apps="4">20%</td><td><del data-eur-apps="4" data-price-kind="normal">96 €</del></td><td class="price-early" data-eur-apps="4" data-price-kind="early">76,80 €</td></tr>
+  <tr><td>5 apps</td><td data-bundle-apps="5">20%</td><td><del data-eur-apps="5" data-price-kind="normal">120 €</del></td><td class="price-early" data-eur-apps="5" data-price-kind="early">96 €</td></tr>
+  <tr><td>6 apps</td><td data-bundle-apps="6">30%</td><td><del data-eur-apps="6" data-price-kind="normal">126 €</del></td><td class="price-early" data-eur-apps="6" data-price-kind="early">100,80 €</td></tr></tbody></table></div></div>
+  <div><h3>Organisation discounts</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Number of users</th><th>Extra discount</th></tr></thead><tbody>
+  <tr><td>1–4 users</td><td>0%</td></tr><tr><td>5–19 users</td><td>10%</td></tr><tr><td>20–49 users</td><td>20%</td></tr><tr><td>50+ users</td><td>Custom quote</td></tr></tbody></table></div><p class="pr-small">Organisation discounts are based on the number of licensed users and apply automatically for teams of 5–49. For 50+ users, request a custom quote. After bundle savings, only the higher of the organisation or early adopter discount applies.</p></div>
+</div>
+<div class="pr-savings-calculator" id="calculator" aria-label="Pricing calculator">
+<div class="pr-calc-intro"><p class="eyebrow">Pricing calculator</p><h2>Find the right fit for your lab.</h2>
  <p>Choose the number of apps assigned to each user and the size of your team. The calculator includes the applicable bundle and organisation or early adopter discount.</p>
  <p class="pr-step"><b>1</b> Select the number of apps</p><p class="pr-step"><b>2</b> Enter the number of users</p><p class="pr-step"><b>3</b> Review your estimated monthly cost</p>
  <p class="pr-small">Users may have different app combinations. This example assumes the same number of apps per user.</p></div>
- <div class="pr-calc-card">
+ 
+<div class="pr-calc-card">
   <div class="pr-input-grid">
    <div class="pr-field"><label for="pr-app-count">Apps per user</label><select id="pr-app-count"><option value="1">1 app</option><option value="2">2 apps</option><option value="3" selected>3 apps</option><option value="4">4 apps</option><option value="5">5 apps</option><option value="6">All 6 apps</option></select></div>
    <div class="pr-field"><label for="pr-users">Number of users</label><input id="pr-users" type="number" min="1" max="10000" step="1" inputmode="numeric" value="5"></div>
@@ -229,19 +291,10 @@ html[data-theme="dark"] .pr-select-all[aria-pressed="true"]{background:#91e9e7;c
     <div class="pr-copy-row"><button class="btn btn-secondary" type="button" id="pr-copy">Export estimate .xlsx</button><span id="pr-copy-status" class="pr-copy-status" role="status"></span></div>
   </div>
  </div>
-</div></section>
-<section class="section soft" id="discounts"><div class="wrap"><div class="pr-heading"><p class="eyebrow">Simple, predictable savings</p><h2>Discounts for apps and teams.</h2><p>Bundle discounts always apply. Afterward, either the organisation discount or the early adopter discount is applied, whichever is higher.</p></div>
-<div class="pr-tables">
-  <div><h3>Multi-app discounts</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Apps per user</th><th>Bundle discount</th><th>Normal / month</th><th>Early adopter / month</th></tr></thead><tbody>
-  <tr><td>1 app</td><td data-bundle-apps="1">0%</td><td><del data-eur-apps="1" data-price-kind="normal">30 €</del></td><td class="price-early" data-eur-apps="1" data-price-kind="early">24 €</td></tr>
-  <tr><td>2 apps</td><td data-bundle-apps="2">20%</td><td><del data-eur-apps="2" data-price-kind="normal">48 €</del></td><td class="price-early" data-eur-apps="2" data-price-kind="early">38,40 €</td></tr>
-  <tr><td>3 apps</td><td data-bundle-apps="3">20%</td><td><del data-eur-apps="3" data-price-kind="normal">72 €</del></td><td class="price-early" data-eur-apps="3" data-price-kind="early">57,60 €</td></tr>
-  <tr><td>4 apps</td><td data-bundle-apps="4">20%</td><td><del data-eur-apps="4" data-price-kind="normal">96 €</del></td><td class="price-early" data-eur-apps="4" data-price-kind="early">76,80 €</td></tr>
-  <tr><td>5 apps</td><td data-bundle-apps="5">20%</td><td><del data-eur-apps="5" data-price-kind="normal">120 €</del></td><td class="price-early" data-eur-apps="5" data-price-kind="early">96 €</td></tr>
-  <tr><td>6 apps</td><td data-bundle-apps="6">30%</td><td><del data-eur-apps="6" data-price-kind="normal">126 €</del></td><td class="price-early" data-eur-apps="6" data-price-kind="early">100,80 €</td></tr></tbody></table></div></div>
-  <div><h3>Organisation discounts</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Number of users</th><th>Extra discount</th></tr></thead><tbody>
-  <tr><td>1–4 users</td><td>0%</td></tr><tr><td>5–19 users</td><td>10%</td></tr><tr><td>20–49 users</td><td>20%</td></tr><tr><td>50+ users</td><td>Custom quote</td></tr></tbody></table></div><p class="pr-small">Organisation discounts are based on the number of licensed users and apply automatically for teams of 5–49. For 50+ users, request a custom quote. After bundle savings, only the higher of the organisation or early adopter discount applies.</p></div>
-</div><p class="pr-small">All prices are provisional and exclude VAT. EUR is the sole reference price currency. DKK and USD are converted from EUR at published indicative exchange rates and displayed to two decimal places. Early adopter savings are exactly 20% of EUR prices. Custom pricing for organisations with 50+ users is determined separately.</p>
+
+</div>
+</div>
+<p class="pr-small">All prices are provisional and exclude VAT. EUR is the sole reference price currency. DKK and USD are converted from EUR at published indicative exchange rates and displayed to two decimal places. Early adopter savings are exactly 20% of EUR prices. Custom pricing for organisations with 50+ users is determined separately.</p>
 </div></section>
 <section class="section" id="choose-apps"><div class="wrap">
  <div class="pr-heading"><p class="eyebrow">Build your subscription</p><h2>Choose your apps.</h2><p>Click the apps you want to include. Your selection and monthly price update automatically.</p></div>
