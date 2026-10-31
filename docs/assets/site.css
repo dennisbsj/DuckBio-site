@@ -2155,3 +2155,10 @@ body.homepage-exact #applications .app-card::after{
  }
  body.homepage-exact #applications .app-card .app-icon{width:58px;height:58px}
 }
+
+/* Keep each app's four existing feature cards in a balanced 2-by-2 grid. */
+@media(min-width:761px){
+ body.product-detail main>section#features .grid.grid2{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+ }
+}
