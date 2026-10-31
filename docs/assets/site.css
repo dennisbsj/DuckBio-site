@@ -1153,3 +1153,10 @@ html[data-theme="dark"] body.homepage-exact #applications .apps-showcase-rays{
  body.homepage-exact #applications .apps-showcase-title{column-gap:.17em}
  body.homepage-exact #applications .apps-showcase-rays{top:-38px;width:80px;height:41px}
 }
+
+/* 2026-10-31: DuckTrain model train at desk; official DuckBio DB brand from site. */
+img.suite-sprite.logo-ducktrain,
+.product-hero img.suite-sprite.logo-ducktrain{
+ background-image:url("icons/duckbio-20261031/ducktrain-office-toy-official-duckbio-1254.webp") !important;
+ background-size:100% 100%;background-position:center;background-repeat:no-repeat;
+}
