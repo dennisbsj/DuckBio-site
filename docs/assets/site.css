@@ -833,3 +833,19 @@ html[data-theme="dark"] body.homepage-exact #contact .contact-status{color:#91e8
 html[data-theme="dark"] body.homepage-exact #contact .contact-form-card .btn-primary{
   background:linear-gradient(110deg,#85e8e4,#4ec4d7);color:#0b3245;border-color:#b0f8f4;
 }
+
+
+/* User-approved 2026-10-31 LabDuck coffee / sleeping DuckMan */
+img.suite-sprite.logo-limsduck{
+  background-image:url("icons/duckbio-20261031/labduck-coffee-approved.png");
+  background-position:center center;
+  background-size:100% 100%;
+  background-repeat:no-repeat;
+}
+img.suite-sprite.logo-duckman{
+  background-image:url("icons/duckbio-20261031/duckman-brand-overlay.svg"),url("icons/duckbio-20261031/duckman-sleeping-original.png");
+  background-size:100% 100%,100% 100%;
+  background-position:center center,center center;
+  background-repeat:no-repeat,no-repeat;
+}
+/* Product pages retain the existing 292px logo container. */
