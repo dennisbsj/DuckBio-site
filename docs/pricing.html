@@ -325,6 +325,43 @@ html[data-theme="dark"] .pr-select-all[aria-pressed="true"]{background:#91e9e7;c
  .pr-select-layout .pr-select-button {min-height:185px}
  .pr-select-layout .pr-select-category {min-height:auto}
 }
+
+/* Align bottom edges of app-grid and Your selection panel. */
+/* On the two-column checkout layout, stretch both child columns to the same
+   grid-track height. Rows inside the app grid share the available height. */
+.pr-select-layout{
+ align-items:stretch;
+}
+.pr-select-layout > .pr-select-grid{
+ align-self:stretch;
+ grid-template-rows:repeat(2,minmax(0,1fr));
+ grid-auto-rows:1fr;
+ min-height:0;
+}
+.pr-select-layout > .pr-select-review{
+ align-self:stretch;
+ height:100%;
+ min-height:0;
+}
+/* At medium desktop/tablet widths the six apps occupy three equal rows. */
+@media (min-width:761px) and (max-width:1080px){
+ .pr-select-layout > .pr-select-grid{
+  grid-template-rows:repeat(3,minmax(0,1fr));
+ }
+}
+/* When the panel moves below the app grid, use natural section heights. */
+@media (max-width:760px){
+ .pr-select-layout{align-items:start}
+ .pr-select-layout > .pr-select-grid{
+  align-self:auto;
+  grid-template-rows:none;
+  grid-auto-rows:1fr;
+ }
+ .pr-select-layout > .pr-select-review{
+  align-self:auto;
+  height:auto;
+ }
+}
 </style></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
 <section class="pr-hero">
   <div class="wrap pr-hero-grid">
