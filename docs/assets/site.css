@@ -884,3 +884,12 @@ img.suite-sprite.logo-ducknote {
 .product-hero img.suite-sprite.logo-ducknote {
  background-image:url("icons/duckbio-20261031/ducknote-approved-1024.webp");
 }
+
+/* LabDuck final approved artwork, 2026-10-31. Use the original high-resolution image at every display size. */
+img.suite-sprite.logo-limsduck,
+.product-hero img.suite-sprite.logo-limsduck {
+  background-image:url("icons/duckbio-20261031/labduck-white-lab-approved-1536.png");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
