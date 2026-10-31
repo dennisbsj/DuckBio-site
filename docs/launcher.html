@@ -236,20 +236,49 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
   background-position:center center;
   background-repeat:no-repeat;
 }
+
+/* Workspace top-bar communications, full-width cards, no sidebar. */
+.shell{display:block;min-height:0;width:100%;background:#f1f7fa}
+.shell>main{width:100%;max-width:1260px;margin-inline:auto;padding:clamp(16px,3vw,35px)}
+.bar{gap:12px}
+.bar-tools{display:flex;align-items:center;gap:9px;flex:0 0 auto}
+.bar-icon-button,.settings-menu>summary{
+ appearance:none;display:grid;place-items:center;flex:0 0 43px;
+ width:43px;height:43px;min-width:43px;padding:0;
+ background:#194d63;color:#e5faff;border:1px solid #5f91a3;
+ border-radius:10px;cursor:pointer;line-height:1;
+}
+.bar-icon-button svg{display:block;width:22px;height:22px}
+.bar-icon-button:hover,.bar-icon-button:focus-visible,
+.settings-menu>summary:hover,.settings-menu[open]>summary{background:#276780;color:#fff}
+.settings-menu{margin:0;position:relative}
+.settings-menu>summary{font-size:24px;text-align:center;list-style:none}
+.settings-panel{right:0;top:calc(100% + 8px)}
+/* Three columns on roomy screens, two on phones; cards can use the full canvas. */
+.shell .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:760px){
+ .shell .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .shell>main{padding:17px 13px 25px}
+ .bar{padding:9px 12px}
+ .bar .brand{font-size:15px;gap:7px}
+ .bar .brand img{width:28px;height:28px}
+ .bar-tools{gap:6px}
+ .bar-icon-button,.settings-menu>summary{width:39px;height:39px;min-width:39px;flex-basis:39px}
+}
+@media(max-width:360px){
+ .bar .brand{font-size:13px}
+ .bar .brand img{width:25px;height:25px}
+ .bar-icon-button,.settings-menu>summary{width:37px;height:37px;min-width:37px;flex-basis:37px}
+ .shell .grid{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
-<div class="bar"><div class="brand"><img src="assets/duckbio-brand-nofill-dark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><div class="bar-tools"><details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button></div></details></div></div>
+<div class="bar"><div class="brand"><img src="assets/duckbio-brand-nofill-dark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><div class="bar-tools" role="toolbar" aria-label="Workspace communication and settings">
+<button class="bar-icon-button" type="button" data-communication="Messaging" aria-label="Messaging" title="Messaging"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.3 9.6 9.6 0 0 1-3.4-.6L3 21l1.8-5.6A8.4 8.4 0 1 1 21 11.5Z"/><path d="M8 11.5h8"/></svg></button>
+<button class="bar-icon-button" type="button" data-communication="Mail" aria-label="Mail" title="Mail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3.5 6 8.5 7 8.5-7"/></svg></button>
+<details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button></div></details></div></div>
 <div class="shell">
-<aside>
-<div class="label">WORKSPACE</div>
-<button type="button" class="side-link" id="workspace-apps-toggle" aria-expanded="true" aria-controls="workspace-app-links">▦ &nbsp; Apps <span aria-hidden="true">▾</span></button>
-<nav class="side-app-list" id="workspace-app-links" aria-label="App links"><a href="labduck.html" target="_top">LabDuck</a><a href="cytoduck.html" target="_top">CytoDuck</a><a href="duckpipe.html" target="_top">DuckPipe</a><a href="eel.html" target="_top">DuckNote</a><a href="duckman.html" target="_top">DuckMan</a><a href="mantrain.html" target="_top">DuckTrain</a></nav>
-<div class="side-separator"></div><div class="label">COMMUNICATION</div>
-<button class="side-communication" type="button" data-communication="Messaging"><svg class="sidebar-chat-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.3 9.6 9.6 0 0 1-3.4-.6L3 21l1.8-5.6A8.4 8.4 0 1 1 21 11.5Z"/><path d="M8 11.5h8"/></svg><span>Messaging</span></button>
-<button class="side-communication" type="button" data-communication="Mail"><svg class="sidebar-chat-icon sidebar-mail-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3.5 6 8.5 7 8.5-7"/></svg><span>Mail</span></button>
-<p class="aside-note">Interactive preview only. App links open public pages; communication and account administration are not live.</p>
-</aside>
 <main>
 <div class="main-title"><div><span class="kicker">MY APPS</span><h1>Your DuckBio workspace</h1><p>Click or tap a card below to open that app’s product page.</p></div><span class="count">6 apps</span></div>
 <div class="grid">
@@ -328,12 +357,6 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
 (()=>{
 "use strict";
 const get=id=>document.getElementById(id);
-const appsToggle=get("workspace-apps-toggle");
-appsToggle.addEventListener("click",()=>{
- const expanded=appsToggle.getAttribute("aria-expanded")!=="true";
- appsToggle.setAttribute("aria-expanded",String(expanded));
- get("workspace-app-links").hidden=!expanded;
-});
 const settings=get("launcher-settings-menu");
 function openDialog(id){
  const element=get(id);
@@ -452,7 +475,6 @@ if("ResizeObserver" in window){
 window.addEventListener("resize",scheduleSize);
 window.addEventListener("load",scheduleSize);
 document.fonts?.ready?.then(scheduleSize);
-appsToggle.addEventListener("click",scheduleSize);
 scheduleSize();
 })();
 </script>
