@@ -289,6 +289,42 @@ html[data-theme="dark"] .pr-select-all[aria-pressed="true"]{background:#91e9e7;c
  .pr-savings-layout .pr-calc-card{padding:17px}
  .pr-savings-layout .pr-input-grid{grid-template-columns:1fr}
 }
+
+/* Fix app-card text wrapping and alignment on narrow screens. */
+.pr-select-layout .pr-select-category {
+ display:block;
+ min-height:3.5em;
+ align-content:center;
+ margin:0 2px 5px;
+ text-align:center;
+ font-size:10px;
+ line-height:1.35;
+ letter-spacing:0;
+ word-break:normal;
+ overflow-wrap:normal;
+ hyphens:none;
+ text-wrap:balance;
+}
+.pr-select-layout .pr-select-category b {display:inline;font-size:inherit;font-weight:900}
+.pr-select-layout .pr-select-grid {align-items:stretch;grid-auto-rows:1fr}
+.pr-select-layout .pr-select-card {display:flex;flex-direction:column;height:100%;min-width:0}
+.pr-select-layout .pr-select-button {flex:1 1 auto;height:100%;min-width:0;padding:13px 12px 10px;gap:7px}
+.pr-select-layout .pr-select-name {min-height:1.5em;display:block;text-align:center;font-size:13px;line-height:1.4;word-break:normal}
+.pr-select-layout .pr-select-description {flex:1 1 auto;max-width:29ch;margin-inline:auto;font-size:11px;line-height:1.5;text-align:center;word-break:normal;overflow-wrap:normal;hyphens:none;text-wrap:pretty}
+.pr-select-layout .pr-select-details {margin-top:auto}
+@media(max-width:1080px) {
+ .pr-select-layout {grid-template-columns:minmax(0,1.15fr) minmax(275px,.85fr);gap:18px}
+ .pr-select-layout .pr-select-grid {grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+}
+@media(max-width:760px) {
+ .pr-select-layout {grid-template-columns:minmax(0,1fr)}
+ .pr-select-layout .pr-select-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:480px) {
+ .pr-select-layout .pr-select-grid {grid-template-columns:minmax(0,1fr)}
+ .pr-select-layout .pr-select-button {min-height:185px}
+ .pr-select-layout .pr-select-category {min-height:auto}
+}
 </style></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
 <section class="pr-hero">
   <div class="wrap pr-hero-grid">
