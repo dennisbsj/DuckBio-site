@@ -461,6 +461,48 @@ html[data-theme="dark"] .perm-table td{color:#98ecf0}
 
 /* Native image sources override the original thumbnail sprite. */
 .app img.sprite.s2,.app img.sprite.s3,.app img.sprite.s6{background-image:none!important;object-fit:cover;}
+
+/* Ensure modal windows open within the currently visible browser viewport. */
+.launcher-dialog[open]{
+ position:fixed;
+ inset:var(--launcher-visible-top,10px) 0 auto 0;
+ margin:0 auto;
+ max-height:var(--launcher-visible-height,calc(100vh - 20px));
+ box-sizing:border-box;
+ overflow-y:auto;
+ overscroll-behavior:contain;
+ scrollbar-width:thin;
+}
+@media(max-width:760px){
+ .launcher-dialog[open]{width:min(96vw,750px);padding:13px 14px}
+ .modal-head h2{font-size:22px;margin:2px 0 7px}
+ .modal-head{gap:9px}
+ .modal-note{margin:1px 0 10px;padding:8px 10px;font-size:11px;line-height:1.4}
+ .modal-close{width:32px;height:32px;flex:0 0 32px}
+ .account-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .account-fields label{gap:3px;font-size:11px;min-width:0}
+ .account-full{grid-column:1/-1}
+ .account-fields input,.account-fields textarea{padding:7px 9px;font-size:12px;min-height:35px}
+ .account-fields textarea{height:58px;min-height:48px;resize:none}
+ .modal-actions{margin-top:3px;flex-wrap:wrap;gap:7px}
+ .modal-btn{padding:8px 11px}
+ .permission-tabs{gap:3px;margin-bottom:8px}
+ .permission-tabs button{min-height:33px;padding:6px 8px;font-size:11px}
+ .perm-pane h3{font-size:16px;margin:5px 0}
+ .perm-caption{margin-bottom:9px;font-size:11px}
+ .permission-list{gap:5px;margin:8px 0}
+ .permission-list li{padding:7px 9px;font-size:12px}
+ .perm-org-summary{margin:8px 0}
+ .perm-org-select{min-height:37px;padding:7px 9px}
+ .perm-org-disclaimer{margin-top:7px}
+ .perm-table th,.perm-table td{padding:6px}
+}
+@media(max-width:370px){
+ .launcher-dialog[open]{padding:10px}
+ .account-fields{column-gap:7px;row-gap:8px}
+ .account-fields input{padding:6px 7px}
+ .permission-tabs button{font-size:10px;padding:6px}
+}
 </style>
 </head>
 <body data-workspace-mode="preview">
@@ -597,12 +639,46 @@ for(const card of appCards){
 }
 updateAppCount();
 const settings=get("launcher-settings-menu");
+/* Dialogs are fixed inside the embedded iframe, not the outer browser page.
+   Position them inside the portion of that iframe actually visible on-screen. */
+function positionVisibleDialog(dialog){
+ let top=10,available=Math.max(180,window.innerHeight-20);
+ try{
+  if(window.parent!==window&&window.frameElement){
+   const frameRect=window.frameElement.getBoundingClientRect();
+   const viewport=window.parent.visualViewport;
+   const viewportTop=viewport?.offsetTop||0;
+   const viewportHeight=viewport?.height||window.parent.innerHeight;
+   const start=Math.max(0,viewportTop-frameRect.top);
+   const end=Math.min(frameRect.height,viewportTop+viewportHeight-frameRect.top);
+   if(end-start>100){
+    top=start+9;
+    available=Math.max(100,end-start-18);
+   }
+  }
+ }catch(error){ /* The iframe's own viewport remains a safe fallback. */ }
+ dialog.style.setProperty("--launcher-visible-top",top+"px");
+ dialog.style.setProperty("--launcher-visible-height",available+"px");
+}
+function refreshVisibleDialogs(){
+ document.querySelectorAll("dialog.launcher-dialog[open]").forEach(positionVisibleDialog);
+}
+if(window.parent!==window){
+ try{
+  window.parent.addEventListener("scroll",refreshVisibleDialogs,{passive:true});
+  window.parent.addEventListener("resize",refreshVisibleDialogs,{passive:true});
+  window.parent.visualViewport?.addEventListener("resize",refreshVisibleDialogs,{passive:true});
+  window.parent.visualViewport?.addEventListener("scroll",refreshVisibleDialogs,{passive:true});
+ }catch(error){ /* Not available in cross-origin embedding. */ }
+}
+window.addEventListener("resize",refreshVisibleDialogs,{passive:true});
 function openDialog(id){
  const element=get(id);
  if(!element||typeof element.showModal!=="function")return;
  settings.open=false;
+ positionVisibleDialog(element);
  element.showModal();
- const initial=element.querySelector("input,button");
+ const initial=element.querySelector("[data-close-dialog]");
  initial?.focus({preventScroll:true});
 }
 document.querySelectorAll("[data-launcher-dialog]").forEach(btn=>btn.addEventListener("click",()=>openDialog(btn.dataset.launcherDialog)));
