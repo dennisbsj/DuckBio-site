@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" aria-hidden="true">
+<defs><linearGradient id="patch" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#223152"/><stop offset="50%" stop-color="#2a395a"/><stop offset="100%" stop-color="#39476b"/></linearGradient></defs>
+<rect x="361" y="788" width="115" height="74" fill="url(#patch)"/>
+<text x="359" y="842" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-style="italic" font-size="58" fill="#159ef4" letter-spacing="-2">Bio</text>
+</svg>
