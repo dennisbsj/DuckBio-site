@@ -285,14 +285,14 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
 }
 </style>
 </head>
-<body>
+<body data-workspace-mode="preview">
 <div class="bar"><div class="brand"><img src="assets/duckbio-brand-nofill-dark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><div class="bar-tools" role="toolbar" aria-label="Workspace communication and settings">
 <button class="bar-icon-button" type="button" data-communication="Messaging" aria-label="Messaging" title="Messaging"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.3 9.6 9.6 0 0 1-3.4-.6L3 21l1.8-5.6A8.4 8.4 0 1 1 21 11.5Z"/><path d="M8 11.5h8"/></svg></button>
 <button class="bar-icon-button" type="button" data-communication="Mail" aria-label="Mail" title="Mail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3.5 6 8.5 7 8.5-7"/></svg></button>
 <details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button></div></details></div></div>
 <div class="shell">
 <main>
-<div class="main-title"><div><span class="kicker">MY APPS</span><h1>Your DuckBio workspace</h1><p>Click or tap a card below to open that app’s product page.</p></div><span class="count">6 apps</span></div>
+<div class="main-title"><div><span class="kicker">MY APPS</span><h1>Your DuckBio workspace</h1><p>Click or tap a card below to open that app’s product page.</p></div><span class="count" id="workspace-app-count" aria-live="polite" aria-label="Preview: 6 of 6 available apps, not actual purchases" title="Preview only: six example apps are shown. Purchases are not connected yet.">6/6 apps</span></div>
 <div class="grid">
 <a class="app" href="labduck.html" target="_top" aria-label="Open LabDuck product page"><img class="sprite s1 icon" src="assets/icons/transparent.svg" alt=""><span class="launcher-app-category"><b>LAB</b>ORATORY INFORMATION MANAGEMENT SYSTEM</span><strong class="launcher-app-name"><b>Lab</b>Duck</strong><small>Track samples, inventory, batches and laboratory results with role-based review.</small><span class="action">Learn more ↗</span></a>
 <a class="app" href="cytoduck.html" target="_top" aria-label="Open CytoDuck product page"><img class="sprite s5 icon" src="assets/icons/transparent.svg" alt="CytoDuck logo"><span class="launcher-app-category">FLOW <b>CYTO</b>METRY ANALYSIS</span><strong class="launcher-app-name"><b>Cyto</b>Duck</strong><small>Explore FCS data with flexible plots, gating and analysis reports.</small><span class="action">Learn more ↗</span></a>
@@ -369,6 +369,30 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
 (()=>{
 "use strict";
 const get=id=>document.getElementById(id);
+/* Display-only app count. In preview, the six sample apps are treated as
+   available for demonstration, NOT as evidence of any purchase.
+   In live mode, an authorised subscription integration can set data-licensed
+   on individual cards; real app access must still be checked server-side. */
+const appCount=get("workspace-app-count");
+const appCards=[...document.querySelectorAll(".grid > .app")];
+function updateAppCount(){
+ const total=appCards.length;
+ const isPreview=document.body.dataset.workspaceMode!=="live";
+ const purchased=isPreview?total:appCards.filter(card=>card.dataset.licensed==="true").length;
+ appCount.textContent=`${purchased}/${total} apps`;
+ appCount.setAttribute("aria-label",isPreview
+  ?`Preview: ${purchased} of ${total} example apps shown, not actual purchases`
+  :`${purchased} of ${total} available apps purchased`);
+ appCount.title=isPreview
+  ?"Preview only: all example apps are shown; purchases are not connected yet."
+  :`${purchased} of ${total} available apps purchased`;
+}
+const appCountObserver=new MutationObserver(updateAppCount);
+appCountObserver.observe(document.body,{attributes:true,attributeFilter:["data-workspace-mode"]});
+for(const card of appCards){
+ appCountObserver.observe(card,{attributes:true,attributeFilter:["data-licensed"]});
+}
+updateAppCount();
 const settings=get("launcher-settings-menu");
 function openDialog(id){
  const element=get(id);
