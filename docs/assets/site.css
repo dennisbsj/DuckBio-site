@@ -406,7 +406,7 @@ body.homepage-exact .home-mockup-image{
  height:auto;
  max-width:none;
  object-fit:contain;
- margin-top:-5.263158%;
+ margin-top:-5.862458%;
  border:0;
  border-radius:0;
  box-shadow:none;
@@ -428,10 +428,10 @@ body.homepage-exact .home-mockup-hotspot:focus-visible{
 }
 /* Artwork CTA, accounting for 88px cropped off the original 941px image. */
 body.homepage-exact .home-mockup-contact{
- left:5.3%;
- top:70.4%;
- width:12.9%;
- height:8.6%;
+ left:4.4%;
+ top:75.8%;
+ width:10.1%;
+ height:8.7%;
  border-radius:99px;
  z-index:2;
 }
