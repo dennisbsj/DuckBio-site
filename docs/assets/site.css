@@ -862,3 +862,25 @@ img.suite-sprite.logo-ducknote{
 .product-hero img.suite-sprite.logo-ducknote{
   background-image:url("icons/duckbio-20261031/ducknote-lab-office-1024.png");
 }
+
+
+/* Approved 2026-10-31: precise LabDuck laboratory background + barcode scanner,
+   and exact user-selected DuckNote open office artwork. */
+img.suite-sprite.logo-limsduck {
+ background-image:url("icons/duckbio-20261031/labduck-laboratory-224.webp");
+ background-size:100% 100%;
+ background-position:center center;
+ background-repeat:no-repeat;
+}
+.product-hero img.suite-sprite.logo-limsduck {
+ background-image:url("icons/duckbio-20261031/labduck-laboratory-1024.webp");
+}
+img.suite-sprite.logo-ducknote {
+ background-image:url("icons/duckbio-20261031/ducknote-approved-224.webp");
+ background-size:100% 100%;
+ background-position:center center;
+ background-repeat:no-repeat;
+}
+.product-hero img.suite-sprite.logo-ducknote {
+ background-image:url("icons/duckbio-20261031/ducknote-approved-1024.webp");
+}
