@@ -970,3 +970,12 @@ html[data-theme="dark"] .workspace-preview-section .workspace-address{color:#c5e
 html[data-theme="dark"] .workspace-preview-section iframe#workspace-frame{
  background:#091e2f;
 }
+
+/* DuckTrain approved 2026-10-31: DuckBio name printed on locomotive side panel. */
+img.suite-sprite.logo-ducktrain,
+.product-hero img.suite-sprite.logo-ducktrain {
+  background-image:url("icons/duckbio-20261031/ducktrain-duckbio-lettering-1254.jpg");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
