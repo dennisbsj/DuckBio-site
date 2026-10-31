@@ -443,3 +443,26 @@ body.homepage-exact .home-mockup-contact{
  body.homepage-exact .header .nav .nav-apps-menu>summary{color:#f0faff}
  body.homepage-exact .header .nav-apps-panel{max-height:45vh;overflow-y:auto}
 }
+
+
+/* Selected 2026-10-31 logos: LabDuck concept 3 with repaired eye,
+   CytoDuck concept 2. Compact variants for all app cards; full resolution
+   artwork for the product pages. Keep the original display dimensions. */
+img.suite-sprite.logo-limsduck{
+  background-image:url("icons/duckbio-20261031/labduck-224.webp");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
+img.suite-sprite.logo-cytoduck{
+  background-image:url("icons/duckbio-20261031/cytoduck-224.webp");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
+.product-hero img.suite-sprite.logo-limsduck{
+  background-image:url("icons/duckbio-20261031/labduck-1024.webp");
+}
+.product-hero img.suite-sprite.logo-cytoduck{
+  background-image:url("icons/duckbio-20261031/cytoduck-1024.webp");
+}
