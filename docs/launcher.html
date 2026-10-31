@@ -576,6 +576,94 @@ html[data-theme="dark"] .app:focus-visible{
 html[data-theme="dark"] .kicker,
 html[data-theme="dark"] .launcher-app-category{color:#9ff5ef}
 html[data-theme="dark"] .count{background:#164c65;color:#bbfbf4;border-color:#3484a0}
+
+/* DuckBio approved workspace mockup: high-contrast canvas and action cards — 2026-10-31 */
+/* Same dashboard layout and live preview controls; only visual treatments. */
+html:not([data-theme="dark"]),
+html[data-theme="dark"]{background:#051c34}
+html:not([data-theme="dark"]) body,
+html[data-theme="dark"] body{background:#051c34;color:#effaff}
+html:not([data-theme="dark"]) .shell,
+html[data-theme="dark"] .shell{
+ background:radial-gradient(ellipse at 93% 5%,rgba(24,179,192,.21),transparent 40%),linear-gradient(122deg,#071e37,#0a3450 59%,#082a46);
+ color:#effaff;
+}
+html:not([data-theme="dark"]) .bar,
+html[data-theme="dark"] .bar{
+ background:linear-gradient(103deg,#06182f,#0a3352 72%,#07546b);
+ border-bottom:2px solid #38afbd;
+}
+html:not([data-theme="dark"]) .main-title h1,
+html[data-theme="dark"] .main-title h1{
+ color:#fff;
+ font-weight:850;letter-spacing:-.055em;
+}
+html:not([data-theme="dark"]) .main-title p,
+html[data-theme="dark"] .main-title p{color:#c5e3ee}
+html:not([data-theme="dark"]) .kicker,
+html[data-theme="dark"] .kicker{color:#8bf8ed}
+html:not([data-theme="dark"]) .count,
+html[data-theme="dark"] .count{
+ color:#bafff1;background:#104a60;
+ border:1px solid #42b8c4;
+}
+html:not([data-theme="dark"]) .app,
+html[data-theme="dark"] .app{
+ background:radial-gradient(ellipse at 95% 100%,rgba(25,177,197,.12),transparent 55%),linear-gradient(146deg,#103755,#092943);
+ color:#f4feff;border:1px solid #3499b3;
+ border-radius:16px;
+ box-shadow:0 7px 20px rgba(0,11,28,.22);
+}
+html:not([data-theme="dark"]) .app:hover,
+html:not([data-theme="dark"]) .app:focus-visible,
+html[data-theme="dark"] .app:hover,
+html[data-theme="dark"] .app:focus-visible{
+ background:linear-gradient(146deg,#15536e,#0a3857);
+ border-color:#86ffef;
+ box-shadow:0 12px 26px rgba(0,13,28,.32);
+}
+html:not([data-theme="dark"]) .app .launcher-app-name,
+html:not([data-theme="dark"]) .app .launcher-app-name b,
+html[data-theme="dark"] .app .launcher-app-name,
+html[data-theme="dark"] .app .launcher-app-name b{color:#fcffff}
+html:not([data-theme="dark"]) .app .launcher-app-category,
+html[data-theme="dark"] .app .launcher-app-category{color:#9aeff0}
+html:not([data-theme="dark"]) .app small,
+html[data-theme="dark"] .app small{color:#d0e7ee}
+html:not([data-theme="dark"]) .app .action,
+html[data-theme="dark"] .app .action{
+ align-self:flex-end;
+ justify-content:center;
+ border-radius:8px;
+ padding:6px 12px;
+ margin-top:9px;
+ color:#062c3e;
+ font-weight:900;
+ background:#75f5e9;
+ border:1px solid #b0fff5;
+ text-align:center;
+ white-space:nowrap;
+}
+html:not([data-theme="dark"]) .notice,
+html[data-theme="dark"] .notice{
+ color:#c9e2ef;background:#0b2f4d;border:1px solid #3c8ba6;
+}
+html:not([data-theme="dark"]) .bar-icon-button,
+html:not([data-theme="dark"]) .settings-menu>summary,
+html[data-theme="dark"] .bar-icon-button,
+html[data-theme="dark"] .settings-menu>summary{
+ border-color:#4ca6b8;
+ color:#f3fdff;background:#124a63;
+}
+html:not([data-theme="dark"]) .bar-icon-button:hover,
+html[data-theme="dark"] .bar-icon-button:hover,
+html:not([data-theme="dark"]) .settings-menu>summary:hover,
+html[data-theme="dark"] .settings-menu>summary:hover{
+ background:#1d7b94;border-color:#8cfff2;
+}
+@media(max-width:700px){
+ .app .action{font-size:11px;padding:5px 10px}
+}
 </style>
 </head>
 <body data-workspace-mode="preview">
