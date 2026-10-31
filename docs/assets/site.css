@@ -1363,3 +1363,41 @@ html[data-theme="dark"] body.homepage-exact #contact .contact-status{color:#87eb
  }
  body.homepage-exact #applications .app-card .app-icon{width:60px;height:60px}
 }
+
+/* DuckBio homepage brand statement replacing three benefits cards — 2026-10-31 */
+body.homepage-exact .home-benefits-tagline{
+ padding:clamp(31px,4vw,52px) 0;
+}
+body.homepage-exact .home-benefits-motto-wrap{
+ display:flex;align-items:center;justify-content:center;
+ column-gap:clamp(13px,2.8vw,34px);min-width:0;
+}
+body.homepage-exact .home-motto-rule{
+ display:block;flex:1 1 70px;max-width:160px;min-width:10px;height:2px;
+ border-radius:999px;
+ background:linear-gradient(90deg,transparent,#249eaf 90%);
+ opacity:.65;
+}
+body.homepage-exact .home-motto-rule:last-child{
+ transform:rotate(180deg);
+}
+body.homepage-exact .home-benefits-motto{
+ margin:0;flex:0 1 auto;min-width:0;
+ font-size:clamp(23px,3.5vw,47px);line-height:1.2;
+ font-weight:800;letter-spacing:-.04em;text-align:center;
+ color:#102d52;text-wrap:balance;
+}
+body.homepage-exact .home-benefits-motto strong{
+ font-weight:900;color:#008d9e;
+}
+html[data-theme="dark"] body.homepage-exact .home-benefits-motto{color:#f5fdff}
+html[data-theme="dark"] body.homepage-exact .home-benefits-motto strong{color:#80f0ed}
+html[data-theme="dark"] body.homepage-exact .home-motto-rule{
+ background:linear-gradient(90deg,transparent,#70dfe7 90%);
+}
+@media(max-width:500px){
+ body.homepage-exact .home-benefits-tagline{padding:30px 0}
+ body.homepage-exact .home-benefits-motto-wrap{gap:9px}
+ body.homepage-exact .home-motto-rule{flex-basis:20px;min-width:7px}
+ body.homepage-exact .home-benefits-motto{font-size:clamp(22px,5.2vw,28px)}
+}
