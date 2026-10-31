@@ -367,20 +367,79 @@ img.suite-sprite.logo-ducknote{background-image:url("icons/duckbio-20261030/duck
 img.suite-sprite.logo-duckman{background-image:url("icons/duckbio-20261030/duckman.png?v=framed-20261030-2");background-size:100% 100%;background-position:center center}
 img.suite-sprite.logo-ducktrain{background-image:url("icons/duckbio-20261030/ducktrain.png?v=framed-20261030-2");background-size:100% 100%;background-position:center center}
 
-/* Exact approved 1672x941 homepage artwork: no crop, filters, overlays or image alterations. */
-body.homepage-exact .header{display:none}
-body.homepage-exact .home-mockup-exact{position:relative;display:block;width:100%;line-height:0;background:#051e34;overflow:visible}
-body.homepage-exact .home-mockup-image{display:block;width:100%;height:auto;max-width:none;object-fit:fill;border:0;border-radius:0;box-shadow:none;filter:none}
-body.homepage-exact .home-mockup-links{position:absolute;inset:0;pointer-events:none;line-height:normal}
-body.homepage-exact .home-mockup-hotspot{position:absolute;display:block;background:transparent;border:0;border-radius:0;box-shadow:none;cursor:pointer;pointer-events:auto}
-body.homepage-exact .home-mockup-hotspot:focus-visible{outline:3px solid #8ff7f6;outline-offset:2px;border-radius:4px}
-body.homepage-exact .home-mockup-logo{left:4.7%;top:2%;width:13%;height:5.7%}
-body.homepage-exact .home-mockup-home{left:80.5%;top:2.3%;width:5.7%;height:5.3%}
-body.homepage-exact .home-mockup-apps{position:absolute;left:87.5%;top:2.3%;width:7.2%;height:5.3%;pointer-events:auto;z-index:6}
-body.homepage-exact .home-mockup-apps summary{inset:0;list-style:none;width:100%;height:100%}
-body.homepage-exact .home-mockup-apps summary::-webkit-details-marker{display:none}
-body.homepage-exact .home-mockup-apps summary::marker{content:""}
-body.homepage-exact .home-mockup-dropdown{position:absolute;right:0;top:100%;min-width:200px;display:flex;flex-direction:column;background:#102b40;border:1px solid rgba(134,225,238,.55);border-radius:12px;box-shadow:0 16px 42px rgba(0,0,0,.4);padding:10px;line-height:1.5}
-body.homepage-exact .home-mockup-dropdown a{display:block;color:#ecfaff;font-size:13px;font-weight:650;padding:8px 12px;border-radius:7px;text-decoration:none}
-body.homepage-exact .home-mockup-dropdown a:hover,body.homepage-exact .home-mockup-dropdown a:focus-visible{background:#1e536c}
-body.homepage-exact .home-mockup-contact{left:5.3%;top:73.2%;width:12.9%;height:7.8%;border-radius:99px}
+/* DuckBio homepage: genuine, accessible navigation replaces the navigation
+   drawn into the approved 1672 × 941 mockup. The approved original artwork remains
+   byte-for-byte unchanged; only its top 88px header strip is clipped in CSS. */
+body.homepage-exact .header{
+ display:block;
+ position:sticky;
+ top:0;
+ z-index:60;
+ background:#061e32;
+ border-bottom:1px solid rgba(122,219,235,.25);
+ backdrop-filter:none;
+}
+body.homepage-exact .header .head{min-height:74px}
+body.homepage-exact .header .brand{color:#f2fbff}
+body.homepage-exact .header .brand em{color:#39baf0}
+body.homepage-exact .header .nav>a,
+body.homepage-exact .header .nav-apps-menu>summary{color:#f0faff}
+body.homepage-exact .header .nav>a:hover,
+body.homepage-exact .header .nav-apps-menu>summary:hover{color:#8debf1}
+body.homepage-exact .header .menu-btn{color:#f4fcff;border-color:rgba(161,234,248,.4)}
+body.homepage-exact .header .theme-toggle{background:#153c53;color:#e6faff;border-color:rgba(161,234,248,.35)}
+body.homepage-exact .header .nav-apps-panel{background:#102d41;border-color:#35627c}
+body.homepage-exact .header .nav .nav-apps-panel a{color:#e9faff}
+body.homepage-exact .header .nav .nav-apps-panel a:hover{background:#28556b;color:#fff}
+body.homepage-exact .header .nav .nav-apps-panel a:first-child{background:#214b62}
+body.homepage-exact .home-mockup-exact{
+ position:relative;
+ display:block;
+ width:100%;
+ line-height:0;
+ background:#051e34;
+ overflow:hidden;
+}
+body.homepage-exact .home-mockup-image{
+ display:block;
+ width:100%;
+ height:auto;
+ max-width:none;
+ object-fit:contain;
+ margin-top:-5.263158%;
+ border:0;
+ border-radius:0;
+ box-shadow:none;
+ filter:none;
+}
+body.homepage-exact .home-mockup-hotspot{
+ position:absolute;
+ display:block;
+ background:transparent;
+ border:0;
+ border-radius:0;
+ box-shadow:none;
+ cursor:pointer;
+}
+body.homepage-exact .home-mockup-hotspot:focus-visible{
+ outline:3px solid #8ff7f6;
+ outline-offset:2px;
+ border-radius:4px;
+}
+/* Artwork CTA, accounting for 88px cropped off the original 941px image. */
+body.homepage-exact .home-mockup-contact{
+ left:5.3%;
+ top:70.4%;
+ width:12.9%;
+ height:8.6%;
+ border-radius:99px;
+ z-index:2;
+}
+@media(max-width:820px){
+ body.homepage-exact .header .nav{
+  background:#102d41;
+  border-bottom:1px solid rgba(161,234,248,.3);
+ }
+ body.homepage-exact .header .nav .nav-apps-menu>summary{color:#f0faff}
+ body.homepage-exact .header .nav-apps-panel{max-height:45vh;overflow-y:auto}
+}
