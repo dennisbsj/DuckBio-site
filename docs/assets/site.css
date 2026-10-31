@@ -1105,3 +1105,51 @@ html[data-theme="dark"] body.homepage-exact #applications .apps-showcase-spark{c
  body.homepage-exact #applications .apps-showcase-title{font-size:clamp(40px,8vw,56px)}
  body.homepage-exact #applications .apps-showcase-word::after{height:4px;bottom:-8px}
 }
+
+/* Hide only the embedded third hero-description line; decorate Discover the apps. */
+/* This line is baked into the raster hero. Cover that line with the nearby
+   dark-blue background color. The original image asset is not modified. */
+body.homepage-exact .home-mockup-exact::before {
+ content:"";
+ position:absolute;
+ left:5.1%;
+ top:42.85%;
+ width:34.8%;
+ height:4.7%;
+ z-index:1;
+ background:linear-gradient(90deg,#001f34 0%,#011e34 44%,#021f37 76%,#001c33 100%);
+ pointer-events:none;
+}
+/* Small original graphic: three light rays above the heading and a subtle glow. */
+body.homepage-exact #applications .section-head.apps-showcase-heading{
+ position:relative;
+ padding-top:24px;
+}
+body.homepage-exact #applications .apps-showcase-title{
+ position:relative;
+ gap:.19em;
+}
+body.homepage-exact #applications .apps-showcase-lead{
+ white-space:nowrap;
+}
+body.homepage-exact #applications .apps-showcase-rays{
+ position:absolute;
+ top:-45px;
+ left:0;
+ width:94px;
+ height:48px;
+ color:#42e4df;
+ filter:drop-shadow(0 1px 5px rgba(18,218,223,.3));
+ pointer-events:none;
+}
+body.homepage-exact #applications .apps-showcase-word::after{
+ box-shadow:0 3px 15px rgba(29,199,217,.27);
+}
+html[data-theme="dark"] body.homepage-exact #applications .apps-showcase-rays{
+ color:#8bf9ef;
+}
+@media(max-width:640px){
+ body.homepage-exact #applications .section-head.apps-showcase-heading{padding-top:20px}
+ body.homepage-exact #applications .apps-showcase-title{column-gap:.17em}
+ body.homepage-exact #applications .apps-showcase-rays{top:-38px;width:80px;height:41px}
+}
