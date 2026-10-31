@@ -503,6 +503,79 @@ html[data-theme="dark"] .perm-table td{color:#98ecf0}
  .account-fields input{padding:6px 7px}
  .permission-tabs button{font-size:10px;padding:6px}
 }
+
+/* DuckBio unified aqua / ice / indigo workspace palette — 2026-10-31 */
+/* Color changes only. App count, desktop/mobile grid, messaging, Mail,
+   permissions, the scroll-safe dialogs and all interactions stay as-is. */
+html:not([data-theme="dark"]){background:#d4f0f6}
+html:not([data-theme="dark"]) body{background:#d4f0f6;color:#12334e}
+html:not([data-theme="dark"]) .shell{
+ background:radial-gradient(ellipse at 102% 8%,rgba(0,200,208,.16),transparent 42%),linear-gradient(121deg,#dcf7f9,#c6eaf4 63%,#e4f6fc);
+}
+.bar{
+ background:linear-gradient(107deg,#071c3b,#0e3b65 57%,#087082);
+ border-bottom:2px solid #3cb5c9;
+}
+.bar .brand em{color:#77eef0}
+.bar-icon-button,.settings-menu>summary{
+ background:rgba(33,126,155,.38);color:#f5ffff;border-color:#5cadc2;
+}
+.bar-icon-button:hover,.settings-menu>summary:hover{
+ background:#187994;border-color:#81e5e8;
+}
+html:not([data-theme="dark"]) .main-title h1{color:#113456}
+html:not([data-theme="dark"]) .main-title p{color:#456b7e}
+html:not([data-theme="dark"]) .kicker{color:#087c9b}
+html:not([data-theme="dark"]) .app{
+ color:#ecfaff;
+ background:radial-gradient(ellipse at 98% 100%,rgba(0,207,207,.2),transparent 48%),linear-gradient(140deg,#123c59,#092b48);
+ border:1px solid #529aad;box-shadow:0 9px 26px rgba(14,79,117,.15);
+}
+html:not([data-theme="dark"]) .app:hover,
+html:not([data-theme="dark"]) .app:focus-visible{
+ background:linear-gradient(140deg,#165775,#10334f);
+ border-color:#40cfdb;box-shadow:0 15px 31px rgba(4,80,121,.24);
+}
+html:not([data-theme="dark"]) .app .launcher-app-name,
+html:not([data-theme="dark"]) .app .launcher-app-name b{color:#f6fdff}
+html:not([data-theme="dark"]) .app .launcher-app-category{color:#a7f0f0}
+html:not([data-theme="dark"]) .app small{color:#c9e3ed}
+html:not([data-theme="dark"]) .app .action{color:#a0fcf5}
+html:not([data-theme="dark"]) .count{
+ background:#edffff;border:1px solid #7bccd6;color:#12627c;
+}
+html:not([data-theme="dark"]) .notice{
+ background:#e6fbfc;border-color:#9ccfdc;color:#375f75;
+}
+html:not([data-theme="dark"]) .settings-panel{
+ background:linear-gradient(139deg,#fbffff,#e5f7fa);border-color:#80b6c8;
+}
+html:not([data-theme="dark"]) .launcher-dialog{
+ background:linear-gradient(139deg,#f9fdff,#e6f6fc);border-color:#86bece;
+}
+html:not([data-theme="dark"]) .modal-note,
+html:not([data-theme="dark"]) .empty-communication{
+ background:#ddf3f8;border-color:#9bc9d8;
+}
+html[data-theme="dark"] body{background:#09192f}
+html[data-theme="dark"] .shell{
+ background:radial-gradient(ellipse at 102% 5%,rgba(12,163,189,.16),transparent 43%),linear-gradient(135deg,#0a2644,#103c5b);
+}
+html[data-theme="dark"] .bar{
+ background:linear-gradient(112deg,#07152f,#0a3158 58%,#085168);
+ border-color:#378ca3;
+}
+html[data-theme="dark"] .app{
+ background:radial-gradient(ellipse at 99% 102%,rgba(13,185,206,.2),transparent 45%),linear-gradient(151deg,#153e5f,#0b2b4b);
+ border-color:#427f98;
+}
+html[data-theme="dark"] .app:hover,
+html[data-theme="dark"] .app:focus-visible{
+ background:linear-gradient(145deg,#205a76,#0d3356);border-color:#66dce8;
+}
+html[data-theme="dark"] .kicker,
+html[data-theme="dark"] .launcher-app-category{color:#9ff5ef}
+html[data-theme="dark"] .count{background:#164c65;color:#bbfbf4;border-color:#3484a0}
 </style>
 </head>
 <body data-workspace-mode="preview">
