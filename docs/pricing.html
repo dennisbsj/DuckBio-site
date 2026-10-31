@@ -211,6 +211,84 @@ html[data-theme="dark"] .pr-select-all[aria-pressed="true"]{background:#91e9e7;c
  .pr-savings-layout .pr-calc-card{padding:18px}
  .pr-savings-layout .pr-input-grid{grid-template-columns:1fr}
 }
+
+/* Savings section: compact stacked tables LEFT, calculator aligned RIGHT. */
+/* Keep the requested two-column composition over tablet/desktop widths.
+   Only stack on genuinely narrow phone screens; do not use the prior
+   1080px breakpoint, which pushed the calculator below both tables. */
+.pr-savings-layout{
+ display:grid;
+ grid-template-columns:minmax(0,1.1fr) minmax(320px,.9fr);
+ gap:clamp(14px,2vw,26px);
+ align-items:start;
+}
+.pr-savings-layout .pr-tables{
+ display:grid;
+ grid-template-columns:minmax(0,1fr);
+ gap:24px;
+ min-width:0;
+ align-content:start;
+}
+.pr-savings-layout .pr-tables>div{width:100%;min-width:0}
+.pr-savings-layout .pr-tables h3{font-size:19px;line-height:25px;margin:0 0 12px}
+.pr-savings-layout .pr-table-wrap{
+ display:block;width:100%;max-width:100%;
+ overflow-x:auto;
+ border-radius:12px;
+}
+.pr-savings-layout .pr-table{
+ width:100%;
+ min-width:0;
+ table-layout:fixed;
+}
+.pr-savings-layout .pr-table th,
+.pr-savings-layout .pr-table td{
+ padding:10px 7px;
+ font-size:11px;
+ line-height:1.42;
+ overflow-wrap:normal;
+}
+.pr-savings-layout .pr-table th{font-size:9px;line-height:1.35;letter-spacing:.01em}
+.pr-savings-layout .pr-tables>div:first-child .pr-table th:nth-child(1){width:21%}
+.pr-savings-layout .pr-tables>div:first-child .pr-table th:nth-child(2){width:23%}
+.pr-savings-layout .pr-tables>div:first-child .pr-table th:nth-child(3){width:25%}
+.pr-savings-layout .pr-tables>div:first-child .pr-table th:nth-child(4){width:31%}
+.pr-savings-layout .pr-table td [data-price-kind],
+.pr-savings-layout .pr-table .price-early{white-space:nowrap;font-variant-numeric:tabular-nums}
+.pr-savings-layout .pr-savings-calculator{
+ display:block;
+ min-width:0;
+ padding-top:37px; /* aligns calculator card with first table, below its heading */
+}
+.pr-savings-layout .pr-calc-card{
+ width:100%;
+ min-width:0;
+ margin:0;
+ padding:clamp(17px,2vw,24px);
+}
+.pr-savings-layout .pr-input-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:700px) and (max-width:940px){
+ .pr-savings-layout{grid-template-columns:minmax(0,1.05fr) minmax(305px,.95fr);gap:14px}
+ .pr-savings-layout .pr-table th,
+ .pr-savings-layout .pr-table td{padding:8px 5px;font-size:10px}
+ .pr-savings-layout .pr-table th{font-size:8px;letter-spacing:0}
+ .pr-savings-layout .pr-calc-card{padding:16px}
+ .pr-savings-layout .pr-input-grid{gap:8px}
+ .pr-savings-layout .pr-field select,
+ .pr-savings-layout .pr-field input{padding-inline:7px}
+}
+@media(max-width:699px){
+ .pr-savings-layout{grid-template-columns:minmax(0,1fr);gap:22px}
+ .pr-savings-layout .pr-savings-calculator{padding-top:0}
+ .pr-savings-layout .pr-tables{gap:20px}
+ .pr-savings-layout .pr-table{min-width:0}
+}
+@media(max-width:440px){
+ .pr-savings-layout .pr-tables>div:first-child .pr-table{min-width:360px}
+ .pr-savings-layout .pr-table th,.pr-savings-layout .pr-table td{padding:9px 6px;font-size:10px}
+ .pr-savings-layout .pr-calc-card{padding:17px}
+ .pr-savings-layout .pr-input-grid{grid-template-columns:1fr}
+}
 </style></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
 <section class="pr-hero">
   <div class="wrap pr-hero-grid">
@@ -267,11 +345,6 @@ html[data-theme="dark"] .pr-select-all[aria-pressed="true"]{background:#91e9e7;c
   <tr><td>1–4 users</td><td>0%</td></tr><tr><td>5–19 users</td><td>10%</td></tr><tr><td>20–49 users</td><td>20%</td></tr><tr><td>50+ users</td><td>Custom quote</td></tr></tbody></table></div><p class="pr-small">Organisation discounts are based on the number of licensed users and apply automatically for teams of 5–49. For 50+ users, request a custom quote. After bundle savings, only the higher of the organisation or early adopter discount applies.</p></div>
 </div>
 <div class="pr-savings-calculator" id="calculator" aria-label="Pricing calculator">
-<div class="pr-calc-intro"><p class="eyebrow">Pricing calculator</p><h2>Find the right fit for your lab.</h2>
- <p>Choose the number of apps assigned to each user and the size of your team. The calculator includes the applicable bundle and organisation or early adopter discount.</p>
- <p class="pr-step"><b>1</b> Select the number of apps</p><p class="pr-step"><b>2</b> Enter the number of users</p><p class="pr-step"><b>3</b> Review your estimated monthly cost</p>
- <p class="pr-small">Users may have different app combinations. This example assumes the same number of apps per user.</p></div>
- 
 <div class="pr-calc-card">
   <div class="pr-input-grid">
    <div class="pr-field"><label for="pr-app-count">Apps per user</label><select id="pr-app-count"><option value="1">1 app</option><option value="2">2 apps</option><option value="3" selected>3 apps</option><option value="4">4 apps</option><option value="5">5 apps</option><option value="6">All 6 apps</option></select></div>
