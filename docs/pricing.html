@@ -453,6 +453,176 @@ html[data-theme="dark"] .pr-plans-first .pr-app{
  .pr-plans-first .pr-top-intro-card .pr-hero-early-info p:last-child{font-size:11px}
  .pr-plans-first .pr-top-price .pr-early strong{font-size:30px}
 }
+
+/* Pricing compact layout with disclosure tables and aligned calculator — 2026-10-31 */
+/* Compact introduction replaces the former large two-column price hero. */
+body:not(.homepage-exact) .pr-hero.pr-plans-first{
+ padding:clamp(24px,3vw,38px) 0 clamp(35px,4vw,50px);
+}
+.pr-plans-first .pr-compact-header{
+ display:flex;flex-wrap:wrap;align-items:center;
+ justify-content:space-between;gap:12px 30px;
+ margin:0 0 clamp(17px,2vw,28px);
+ padding:0;
+}
+body:not(.homepage-exact) .pr-hero.pr-plans-first .pr-compact-header h1{
+ margin:0;
+ font-size:clamp(29px,3.7vw,46px);
+ color:#f6ffff;
+ letter-spacing:-.045em;
+}
+.pr-launch-strip{
+ display:flex;flex-direction:column;gap:2px;
+ max-width:510px;
+ padding:11px 18px;
+ border-radius:13px;
+ background:linear-gradient(114deg,rgba(11,94,118,.64),rgba(8,69,101,.7));
+ border:1px solid rgba(93,231,229,.58);
+ color:#d6f3f7;
+ font-size:12px;line-height:1.48;
+}
+.pr-launch-strip strong{color:#a6fff2;font-size:13px}
+.pr-plans-first .pr-currency-top{margin:0 0 13px}
+body:not(.homepage-exact) .pr-plans-first .pr-grid{gap:clamp(10px,1.8vw,20px)}
+body:not(.homepage-exact) .pr-plans-first .pr-plan{
+ padding:clamp(19px,2.5vw,27px);
+}
+body:not(.homepage-exact) .pr-plans-first .pr-plan.featured{
+ padding:clamp(18px,2.4vw,26px);
+}
+.pr-plans-first .pr-plan .pr-desc{min-height:0;margin:0 0 12px}
+.pr-plans-first .pr-plan .pr-prices{gap:9px}
+.pr-plans-first .pr-plan .pr-period{margin:6px 0 14px}
+.pr-plans-first .pr-plan ul{gap:6px;margin:0 0 17px}
+.pr-plans-first .pr-after{margin:15px 0 0}
+/* Pricing and discount calculations always share one compact section. */
+body:not(.homepage-exact) #discounts.section{
+ padding:clamp(35px,4vw,54px) 0;
+}
+.pr-compact-discounts-heading{margin-bottom:18px}
+.pr-compact-discounts-heading .eyebrow{margin-bottom:5px}
+body:not(.homepage-exact) #discounts .pr-compact-discounts-heading h2{
+ font-size:clamp(25px,3vw,36px);
+ color:#f5ffff;margin:0;
+}
+.pr-savings-layout{
+ display:grid;
+ grid-template-columns:minmax(0,.92fr) minmax(320px,1.08fr);
+ align-items:stretch;gap:clamp(14px,2vw,24px);
+}
+.pr-rules-column{min-width:0;display:flex;flex-direction:column;gap:12px}
+.pr-discount-summary{
+ border:1px solid #5cacc0;
+ border-radius:16px;
+ background:linear-gradient(139deg,#0b3253,#0c4161);
+ padding:clamp(16px,2vw,23px);
+ box-shadow:0 8px 24px rgba(0,13,32,.18);
+}
+.pr-discount-summary h3{font-size:19px;color:#f7ffff;margin:0 0 11px}
+.pr-discount-summary .pr-rule{
+ display:flex;justify-content:space-between;gap:15px;
+ padding:8px 0;border-bottom:1px solid rgba(124,198,218,.18);
+ color:#d2eaf1;font-size:13px;
+}
+.pr-discount-summary .pr-rule strong{color:#9afaf1;white-space:nowrap}
+.pr-discount-summary>p{
+ font-size:11px;line-height:1.55;color:#c5e3ed;
+ margin:13px 0 0;
+}
+.pr-full-rules{
+ border:1px solid #3b93b0;
+ border-radius:13px;background:#0c3655;
+ color:#eaffff;min-width:0;
+}
+.pr-full-rules summary{
+ padding:12px 17px;cursor:pointer;
+ font-weight:800;font-size:13px;
+ display:flex;align-items:center;justify-content:space-between;
+ list-style:none;color:#b8f8f2;
+}
+.pr-full-rules summary::-webkit-details-marker{display:none}
+.pr-full-rules summary span{font-size:22px;line-height:1;transition:transform .2s}
+.pr-full-rules[open] summary span{transform:rotate(180deg)}
+.pr-full-rules .pr-tables{
+ display:grid;grid-template-columns:1fr;gap:17px;
+ padding:9px 12px 16px;
+}
+.pr-full-rules .pr-tables h3{font-size:15px;line-height:1.4;margin:0 0 6px}
+.pr-full-rules .pr-table-wrap{width:100%;overflow-x:auto}
+.pr-full-rules .pr-table{width:100%;min-width:365px}
+.pr-full-rules .pr-table th,.pr-full-rules .pr-table td{font-size:10px;padding:8px 6px}
+.pr-full-rules .pr-small{font-size:11px}
+.pr-savings-layout .pr-savings-calculator{
+ display:block;
+ padding-top:0;
+ min-width:0;
+}
+.pr-savings-layout .pr-calc-card{
+ margin:0;
+ height:100%;
+ padding:clamp(19px,2.6vw,27px);
+}
+.pr-savings-layout .pr-promo-automatic{
+ padding:10px 13px;margin:13px 0;
+}
+.pr-savings-layout .pr-result{padding-top:14px}
+.pr-savings-layout .pr-result strong.pr-total{margin:6px 0 12px;font-size:clamp(30px,3vw,40px)}
+.pr-savings-layout .pr-breakdown{gap:7px;padding-top:12px}
+.pr-savings-layout .pr-hint{margin:11px 0 0}
+.pr-savings-layout .pr-copy-row{margin-top:13px}
+#discounts .wrap>.pr-small{margin-top:12px}
+body:not(.homepage-exact) .home-benefits-tagline{padding:clamp(16px,2.3vw,26px) 0}
+body:not(.homepage-exact) .home-benefits-motto{font-size:clamp(22px,2.6vw,36px)}
+body:not(.homepage-exact) #choose-apps.section{padding:clamp(33px,4vw,56px) 0}
+.pr-select-toolbar{margin:0 0 15px;gap:12px}
+.pr-select-layout .pr-select-grid{gap:11px}
+.pr-select-layout .pr-select-card{border-radius:12px}
+.pr-select-layout .pr-select-button{
+ padding:12px 11px 7px;
+ gap:5px;
+ min-height:0;
+}
+.pr-select-layout .pr-select-button img{
+ width:55px;height:55px;
+ margin:0 auto 6px;
+}
+.pr-select-layout .pr-select-category{
+ min-height:2.6em;
+ font-size:9px;line-height:1.28;margin:0;
+}
+.pr-select-layout .pr-select-name{min-height:0;font-size:13px}
+.pr-select-layout .pr-select-description{
+ font-size:10px;line-height:1.36;
+ display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+ line-clamp:2;overflow:hidden;
+ flex:0 1 auto;
+}
+.pr-select-layout .pr-select-details{font-size:11px;padding:8px}
+.pr-select-layout .pr-select-review{padding:clamp(16px,2vw,25px)}
+.pr-select-layout .pr-select-review-main h3{margin-top:4px}
+.pr-select-layout .pr-select-review-price{margin-top:13px}
+.pr-select-layout .pr-select-review-price strong{font-size:clamp(22px,2.5vw,31px)}
+.pr-select-layout .pr-select-note{font-size:10px;line-height:1.5}
+@media(max-width:960px){
+ .pr-savings-layout{grid-template-columns:minmax(0,1fr)}
+ .pr-savings-layout .pr-savings-calculator{display:block}
+ .pr-savings-layout .pr-calc-card{height:auto}
+}
+@media(max-width:760px){
+ .pr-plans-first .pr-compact-header{display:block}
+ .pr-launch-strip{margin-top:14px}
+ .pr-select-layout .pr-select-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .pr-select-layout .pr-select-button{min-height:130px}
+}
+@media(max-width:480px){
+ .pr-savings-layout .pr-input-grid{grid-template-columns:1fr}
+ .pr-select-layout .pr-select-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .pr-select-layout .pr-select-category{font-size:8px}
+ .pr-select-layout .pr-select-description{font-size:9px}
+ .pr-select-layout .pr-select-button{padding:11px 8px;gap:4px}
+ .pr-select-layout .pr-select-button img{width:49px;height:49px}
+ .pr-full-rules .pr-table{min-width:370px}
+}
 </style></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
 <section class="pr-hero pr-plans-first" id="plans"><div class="wrap">
  <div class="pr-compact-header">
