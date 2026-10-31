@@ -937,3 +937,13 @@ img.suite-sprite.logo-ducktrain,
   background-size:100% 100%;
   background-repeat:no-repeat;
 }
+
+
+/* Thumbnail / product consistency: DuckMan uses the identical sleeping duck
+   with DuckBio logo overlay on both small cards and the large detail icon. */
+.product-hero img.suite-sprite.logo-duckman {
+  background-image:url("icons/duckbio-20261031/duckman-brand-overlay.svg"),url("icons/duckbio-20261031/duckman-sleeping-original.png");
+  background-size:100% 100%,100% 100%;
+  background-position:center center,center center;
+  background-repeat:no-repeat,no-repeat;
+}
