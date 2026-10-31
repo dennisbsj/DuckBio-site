@@ -2162,3 +2162,79 @@ body.homepage-exact #applications .app-card::after{
   grid-template-columns:repeat(2,minmax(0,1fr));
  }
 }
+
+/* Product hero: one approved logo and reserved genuine demo space (2026-10-31) */
+body.product-detail .product-hero{
+ grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);
+ gap:clamp(26px,5.2vw,72px);
+ align-items:center;
+}
+body.product-detail .product-hero .product-icon.product-icon-featured{
+ width:clamp(155px,18vw,230px);
+ height:clamp(155px,18vw,230px);
+ display:block;
+ margin:15px 0 25px;
+ border:3px solid rgba(114,238,239,.7);
+ border-radius:30px;
+ box-shadow:0 12px 36px rgba(0,11,37,.34);
+ filter:none;
+}
+body.product-detail .product-hero h1{
+ font-size:clamp(42px,5vw,65px);
+ margin-bottom:14px;
+}
+body.product-detail .product-hero .lead{max-width:500px}
+body.product-detail .product-video{
+ min-width:0;
+ align-self:center;
+}
+body.product-detail .product-video-placeholder{
+ position:relative;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;
+ min-height:270px;
+ aspect-ratio:16/9;
+ border-radius:22px;
+ border:2px dashed rgba(112,212,232,.7);
+ background:
+  radial-gradient(ellipse at 50% 48%,rgba(39,176,212,.2),transparent 53%),
+  linear-gradient(139deg,#06172d 0%,#093754 67%,#0c4961);
+ box-shadow:0 14px 34px rgba(0,9,30,.27);
+ padding:30px;
+ color:#f1ffff;
+ text-align:center;
+}
+body.product-detail .product-video-play{
+ display:grid;place-items:center;
+ width:75px;height:75px;
+ border-radius:50%;
+ border:2px solid #79f8ed;
+ font-size:24px;
+ line-height:1;
+ padding-left:4px;
+ color:#96fff1;
+ background:rgba(33,151,183,.15);
+ margin-bottom:23px;
+}
+body.product-detail .product-video-label{
+ text-transform:uppercase;letter-spacing:.16em;
+ font-size:11px;font-weight:850;
+ color:#8bf1f3;margin-bottom:7px;
+}
+body.product-detail .product-video-placeholder strong{
+ font-size:clamp(18px,2vw,24px);
+ font-weight:850;letter-spacing:-.025em;
+}
+body.product-detail .product-video-placeholder small{
+ color:#c4e0ec;font-size:12px;line-height:1.5;
+ max-width:290px;margin-top:7px;
+}
+body.product-detail #features.section{padding:clamp(48px,6vw,74px) 0}
+body.product-detail #features .section-head{margin-bottom:23px}
+@media(max-width:760px){
+ body.product-detail .product-hero{grid-template-columns:1fr;gap:23px}
+ body.product-detail .product-hero .product-icon.product-icon-featured{
+  width:clamp(124px,35vw,175px);height:clamp(124px,35vw,175px);
+  border-radius:23px;margin:12px 0 20px;
+ }
+ body.product-detail .product-video-placeholder{min-height:225px}
+}
