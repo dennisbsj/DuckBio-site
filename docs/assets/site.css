@@ -1061,3 +1061,47 @@ img.suite-sprite.logo-ducktrain,
  background-image:url("icons/duckbio-20261031/ducktrain-no-gloves-1254.png") !important;
  background-size:100% 100%;background-position:center center;background-repeat:no-repeat;
 }
+
+/* Homepage tagline removal and enhanced The apps heading — 2026-10-31 */
+/* The tagline belongs to the approved raster hero. Overlay its flat dark-blue
+   background only in the narrow tagline strip; keep the entire illustration. */
+body.homepage-exact .home-mockup-exact::after{
+ content:"";position:absolute;left:4.66%;top:8.44%;width:23.3%;height:4.8%;
+ background:linear-gradient(90deg,#011e34 0%,#001d33 70%,#032038 100%);
+ pointer-events:none;z-index:1;
+}
+body.homepage-exact #applications .section-head.apps-showcase-heading{
+ margin-bottom:clamp(25px,3.4vw,40px);align-items:center;
+}
+body.homepage-exact #applications .apps-showcase-title{
+ display:inline-flex;align-items:baseline;column-gap:.19em;flex-wrap:wrap;
+ margin:0;font-weight:900;font-size:clamp(42px,5.3vw,74px);
+ line-height:1.05;letter-spacing:-.065em;color:#123b4e;
+}
+body.homepage-exact #applications .apps-showcase-word{
+ display:inline-block;position:relative;color:#099bb0;
+ background:linear-gradient(110deg,#087a99,#21bfcc 58%,#2bd9ce);
+ -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+body.homepage-exact #applications .apps-showcase-word::after{
+ content:"";display:block;position:absolute;height:5px;left:2%;right:0;bottom:-10px;
+ border-radius:50% 44% 58% 36%;transform:rotate(-2deg);
+ background:linear-gradient(90deg,#3cdddf,#1095be);
+ box-shadow:0 3px 12px rgba(24,176,194,.18);
+}
+body.homepage-exact #applications .apps-showcase-spark{
+ display:inline-block;font-size:.44em;line-height:1;color:#2cc9d3;
+ font-weight:400;letter-spacing:0;
+ transform:translate(-.08em,-.75em) rotate(-14deg);
+ filter:drop-shadow(0 2px 4px rgba(15,168,186,.25));
+}
+html[data-theme="dark"] body.homepage-exact #applications .apps-showcase-title{color:#f2fbff}
+html[data-theme="dark"] body.homepage-exact #applications .apps-showcase-word{
+ background:linear-gradient(110deg,#aafcf6,#51e8e8 62%,#24c5da);
+ -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+html[data-theme="dark"] body.homepage-exact #applications .apps-showcase-spark{color:#a4fff5}
+@media(max-width:640px){
+ body.homepage-exact #applications .apps-showcase-title{font-size:clamp(40px,8vw,56px)}
+ body.homepage-exact #applications .apps-showcase-word::after{height:4px;bottom:-8px}
+}
