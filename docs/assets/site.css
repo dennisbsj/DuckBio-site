@@ -684,3 +684,11 @@ img.suite-sprite.logo-ducknote{
   background-position:center center;
   background-repeat:no-repeat;
 }
+
+
+/* Keep the identical DuckNote artwork on the large individual app page. */
+.product-hero img.suite-sprite.logo-ducknote{
+  background-image:url("icons/duckbio-20261031/ducknote-bioduck-original.png");
+  background-size:100% 100%;
+  background-position:center center;
+}
