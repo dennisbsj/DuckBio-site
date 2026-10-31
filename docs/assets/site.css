@@ -1672,3 +1672,47 @@ html[data-theme="dark"] body:not(.homepage-exact) .workspace-preview-section .wo
  body:not(.homepage-exact) .header .nav.open>a,
  body:not(.homepage-exact) .header .nav.open .nav-apps-menu>summary{color:#f0fdff}
 }
+
+/* Pricing page: migrated DuckBio ducks-in-a-row banner — 2026-10-31 */
+/* Reuse the original homepage banner appearance at its new location before
+   the selection grid; no unrelated page or hero styles change. */
+body:not(.homepage-exact) .home-benefits-tagline{
+ background:linear-gradient(104deg,#d7eafa 0%,#e3f3fc 45%,#d1e6fc 100%);
+ color:#122d51;
+ padding:clamp(31px,4vw,52px) 0;
+ border-top:1px solid rgba(255,255,255,.85);
+ border-bottom:2px solid #81cde5;
+}
+body:not(.homepage-exact) .home-benefits-motto-wrap{
+ display:flex;align-items:center;justify-content:center;
+ column-gap:clamp(13px,2.8vw,34px);min-width:0;
+}
+body:not(.homepage-exact) .home-motto-rule{
+ display:block;flex:1 1 70px;max-width:160px;min-width:10px;height:2px;
+ border-radius:999px;
+ background:linear-gradient(90deg,transparent,#249eaf 90%);
+ opacity:.65;
+}
+body:not(.homepage-exact) .home-motto-rule:last-child{transform:rotate(180deg)}
+body:not(.homepage-exact) .home-benefits-motto{
+ margin:0;flex:0 1 auto;min-width:0;
+ font-size:clamp(23px,3.5vw,47px);line-height:1.2;
+ font-weight:800;letter-spacing:-.04em;text-align:center;
+ color:#102d52;text-wrap:balance;
+}
+body:not(.homepage-exact) .home-benefits-motto strong{font-weight:900;color:#008d9e}
+html[data-theme="dark"] body:not(.homepage-exact) .home-benefits-tagline{
+ background:linear-gradient(113deg,#172c57,#203f66 54%,#174e6d);
+ border-color:#2f738e;
+}
+html[data-theme="dark"] body:not(.homepage-exact) .home-benefits-motto{color:#f5fdff}
+html[data-theme="dark"] body:not(.homepage-exact) .home-benefits-motto strong{color:#80f0ed}
+html[data-theme="dark"] body:not(.homepage-exact) .home-motto-rule{
+ background:linear-gradient(90deg,transparent,#70dfe7 90%);
+}
+@media(max-width:500px){
+ body:not(.homepage-exact) .home-benefits-tagline{padding:30px 0}
+ body:not(.homepage-exact) .home-benefits-motto-wrap{gap:9px}
+ body:not(.homepage-exact) .home-motto-rule{flex-basis:20px;min-width:7px}
+ body:not(.homepage-exact) .home-benefits-motto{font-size:clamp(22px,5.2vw,28px)}
+}
