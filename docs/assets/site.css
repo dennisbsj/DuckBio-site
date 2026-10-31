@@ -466,3 +466,168 @@ img.suite-sprite.logo-cytoduck{
 .product-hero img.suite-sprite.logo-cytoduck{
   background-image:url("icons/duckbio-20261031/cytoduck-1024.webp");
 }
+
+/* DuckBio homepage brand-rich color system — 2026-10-31. */
+/* Strictly scoped to the homepage: approved hero pixels and other page themes stay untouched. */
+body.homepage-exact{
+  background:#071d31;
+  color:#ecfaff;
+}
+body.homepage-exact .header{
+  background:linear-gradient(106deg,#061b30 0%,#0a3551 53%,#086582 100%);
+  border-bottom:1px solid rgba(103,231,241,.37);
+  box-shadow:0 7px 30px rgba(1,17,34,.21);
+}
+body.homepage-exact .header .brand{color:#f2fdff}
+body.homepage-exact .header .brand em{color:#5bdcf0}
+body.homepage-exact .header .nav>a,
+body.homepage-exact .header .nav-apps-menu>summary{color:#edfaff}
+body.homepage-exact .header .nav>a:hover,
+body.homepage-exact .header .nav-apps-menu>summary:hover{color:#8ef8f4}
+body.homepage-exact .header .theme-toggle{
+  background:rgba(55,165,195,.19);
+  color:#dcfdff;
+  border-color:rgba(132,234,249,.47);
+}
+body.homepage-exact .header .theme-toggle:hover{background:rgba(61,194,220,.3)}
+body.homepage-exact .header .nav-apps-panel{
+  background:#0b3048;
+  border-color:rgba(117,218,238,.44);
+  box-shadow:0 21px 44px rgba(0,12,25,.38);
+}
+body.homepage-exact .header .nav .nav-apps-panel a{color:#ebfaff}
+body.homepage-exact .header .nav .nav-apps-panel a:hover{background:#194d69;color:#f7ffff}
+body.homepage-exact .header .nav .nav-apps-panel a:first-child{background:#17465e}
+body.homepage-exact .home-mockup-exact{background:#071f37}
+body.homepage-exact #applications.section{
+  background:
+    radial-gradient(ellipse at 86% 1%,rgba(31,207,222,.2),transparent 42%),
+    radial-gradient(ellipse at 2% 76%,rgba(16,137,190,.23),transparent 42%),
+    linear-gradient(155deg,#071c30 0%,#0a314b 53%,#073248 100%);
+  border-top:1px solid rgba(116,229,238,.17);
+  border-bottom:1px solid rgba(114,223,239,.27);
+  color:#ecfaff;
+}
+body.homepage-exact #applications .eyebrow{
+  color:#7cf1ef;
+  letter-spacing:.19em;
+}
+body.homepage-exact #applications .section-head h2{color:#f4fcff}
+body.homepage-exact #applications .section-head p{color:#b9dce7}
+body.homepage-exact #applications .homepage-app-meta,
+body.homepage-exact #applications .homepage-app-meta span{color:#bbdce5}
+body.homepage-exact #applications .homepage-app-meta strong{color:#eaffff}
+body.homepage-exact #applications .homepage-app-meta .text-link{color:#8af0f3}
+body.homepage-exact #applications .homepage-app-meta .text-link:hover{color:#f1ffff}
+body.homepage-exact #applications .app-card{
+  background:linear-gradient(151deg,rgba(21,73,99,.96),rgba(9,41,66,.98));
+  color:#eefbff;
+  border:1px solid rgba(94,209,227,.41);
+  box-shadow:0 14px 35px rgba(0,14,29,.23),inset 0 1px 0 rgba(206,255,255,.065);
+  overflow:hidden;
+  transition:transform .18s,border-color .18s,box-shadow .18s,background .18s;
+}
+body.homepage-exact #applications .app-card::before{
+  content:"";
+  position:absolute;
+  inset:0 0 auto 0;
+  height:2px;
+  background:linear-gradient(90deg,rgba(68,228,227,.86),rgba(90,196,238,.36),transparent 80%);
+  pointer-events:none;
+}
+body.homepage-exact #applications .app-card h3{color:#f6fcff}
+body.homepage-exact #applications .app-card h3 b{color:#b2fbff}
+body.homepage-exact #applications .app-card .app-subtitle{color:#81e8ee}
+body.homepage-exact #applications .app-card p:not(.app-subtitle){color:#c3dce7}
+body.homepage-exact #applications .app-card::after{color:#79edf6}
+body.homepage-exact #applications .app-card:hover,
+body.homepage-exact #applications .app-card:focus-visible{
+  background:linear-gradient(145deg,#1a5872,#103a58);
+  border-color:#72eff0;
+  box-shadow:0 20px 45px rgba(0,15,32,.4),0 0 25px rgba(54,204,226,.13);
+  color:#fff;
+}
+body.homepage-exact #contact.section{
+  background:
+    radial-gradient(ellipse at 75% 2%,rgba(28,179,204,.18),transparent 53%),
+    linear-gradient(144deg,#09293e,#0c3a51 56%,#08273d);
+  border-bottom:1px solid rgba(107,211,227,.22);
+  color:#eafbff;
+}
+body.homepage-exact #contact .eyebrow{color:#75e9ed}
+body.homepage-exact #contact .contact-copy h2{color:#f3fbff}
+body.homepage-exact #contact .contact-copy>p{color:#c2e1e9}
+body.homepage-exact #contact .contact-steps{
+  background:rgba(18,79,105,.64);
+  border:1px solid rgba(104,214,228,.38);
+  color:#e4f8fd;
+}
+body.homepage-exact #contact .contact-steps strong{color:#f3fdff}
+body.homepage-exact #contact .contact-steps p{color:#c6e4ed}
+body.homepage-exact #contact .contact-form-card{
+  background:linear-gradient(155deg,rgba(19,69,93,.95),rgba(11,44,67,.98));
+  border:1px solid rgba(110,224,235,.4);
+  box-shadow:0 20px 55px rgba(0,13,29,.32),inset 0 1px 0 rgba(204,251,255,.08);
+}
+body.homepage-exact #contact .contact-field label{color:#eafaff}
+body.homepage-exact #contact .contact-field input,
+body.homepage-exact #contact .contact-field textarea{
+  background:#0a2b42;
+  color:#f4fdff;
+  border:1px solid rgba(124,201,218,.56);
+}
+body.homepage-exact #contact .contact-field input::placeholder,
+body.homepage-exact #contact .contact-field textarea::placeholder{color:#a5c6d2}
+body.homepage-exact #contact .contact-field input:focus,
+body.homepage-exact #contact .contact-field textarea:focus{
+  border-color:#73efef;
+  outline:2px solid #59cbd8;
+  outline-offset:1px;
+}
+body.homepage-exact #contact .contact-form-card .btn-primary{
+  background:linear-gradient(110deg,#9bf4f0,#65d6ec);
+  color:#063349;
+  border-color:#bbffff;
+  box-shadow:0 6px 18px rgba(59,214,221,.17);
+}
+body.homepage-exact #contact .contact-form-card .btn-primary:hover{
+  background:linear-gradient(110deg,#c2ffff,#8ceefa);
+}
+body.homepage-exact #contact .contact-footnote{color:#b6d4df}
+body.homepage-exact #contact .contact-status{color:#9eecf0}
+body.homepage-exact .footer{
+  background:linear-gradient(160deg,#061a2a,#08283c);
+  border-top:1px solid rgba(87,208,228,.24);
+}
+body.homepage-exact .footer h4{color:#f3fdff}
+body.homepage-exact .footer nav a:hover{color:#87f7f2}
+/* Preserve a functional day/night switch on the homepage: same brand, different depth. */
+html[data-theme="dark"] body.homepage-exact .header{
+  background:linear-gradient(104deg,#03101d,#09283f 53%,#06405c);
+}
+html[data-theme="dark"] body.homepage-exact #applications.section{
+  background:
+    radial-gradient(ellipse at 78% 0%,rgba(25,147,180,.19),transparent 46%),
+    linear-gradient(155deg,#030f1f,#082438 60%,#041c30);
+}
+html[data-theme="dark"] body.homepage-exact #applications .app-card{
+  background:linear-gradient(160deg,#12364a,#081c30);
+}
+html[data-theme="dark"] body.homepage-exact #contact.section{
+  background:linear-gradient(145deg,#061a2b,#092e43 60%,#051927);
+}
+html[data-theme="dark"] body.homepage-exact #contact .contact-form-card{
+  background:linear-gradient(155deg,#0c2c41,#081f31);
+}
+@media(max-width:820px){
+  body.homepage-exact .header .nav.open{
+    background:linear-gradient(155deg,#0a2d45,#0c4560);
+    border-bottom:1px solid rgba(120,228,240,.4);
+    box-shadow:0 16px 30px rgba(0,14,31,.3);
+  }
+  body.homepage-exact .header .nav.open>a,
+  body.homepage-exact .header .nav.open .nav-apps-menu>summary{color:#eefcff}
+}
+@media(prefers-reduced-motion:reduce){
+  body.homepage-exact #applications .app-card{transition:none}
+}
