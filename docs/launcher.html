@@ -37,7 +37,7 @@ html body,html[data-theme="dark"] body{color:#13384c!important;background:#f1f7f
 
 /* Functional preview navigation and safe, in-memory account and permissions dialogs. */
 button{font:inherit}button:focus-visible{outline:3px solid #24b7c7;outline-offset:2px}
-.bar-tools{display:flex;align-items:center;gap:13px}.preview-current-user{font-size:11px;color:#bde8ed}
+.bar-tools{display:flex;align-items:center;gap:13px}
 .settings-panel button{appearance:none;background:transparent;border:0;text-align:left;padding:9px;color:#0c5672;font-weight:750;font-size:12px;cursor:pointer;border-radius:7px}
 .settings-panel button:hover,.settings-panel button:focus-visible{background:#e9f6f9}
 .side-link{border:0;text-align:left;cursor:pointer;width:100%;display:flex;justify-content:space-between;align-items:center;font-weight:800}
@@ -80,7 +80,7 @@ button{font:inherit}button:focus-visible{outline:3px solid #24b7c7;outline-offse
 .empty-communication{padding:28px;background:#f0f8fb;border:1px solid #d4e8ed;border-radius:12px}
 .empty-communication p{color:#557789;font-size:13px}
 @media(max-width:760px){.shell{grid-template-columns:1fr}aside{display:flex;padding:15px;gap:6px}.side-app-list{grid-template-columns:repeat(3,minmax(0,1fr));margin:0}.side-separator{margin:4px 10px}.aside-note{display:none}.launch-menu{position:relative}}
-@media(max-width:480px){.side-app-list{grid-template-columns:repeat(2,minmax(0,1fr))}.account-fields{grid-template-columns:1fr}.account-full{grid-column:auto}.launcher-dialog{width:96vw;padding:15px}.preview-current-user{display:none}}
+@media(max-width:480px){.side-app-list{grid-template-columns:repeat(2,minmax(0,1fr))}.account-fields{grid-template-columns:1fr}.account-full{grid-column:auto}.launcher-dialog{width:96vw;padding:15px}}
 .side-communication .sidebar-chat-icon{display:inline-block;vertical-align:middle;flex-shrink:0;margin-right:8px}.launcher-app-category{display:block;font-size:10px;line-height:1.35;font-weight:500;letter-spacing:0;color:#25819b;text-transform:uppercase;margin:2px 0 6px}.app .launcher-app-name{font-size:14px;font-weight:400;color:#153649;line-height:1.45}.app .launcher-app-name b{font-weight:900;font-size:inherit}.app small{font-size:12px;line-height:1.55;min-height:0;margin:7px 0 12px}.app{min-height:260px}.side-communication{display:flex;align-items:center}
 .launcher-app-category b{font-size:inherit;font-weight:900}
 
@@ -239,7 +239,7 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
 </style>
 </head>
 <body>
-<div class="bar"><div class="brand"><img src="assets/duckbio-brand-nofill-dark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><div class="bar-tools"><span class="preview-current-user" id="preview-current-user">Preview user</span><details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button></div></details></div></div>
+<div class="bar"><div class="brand"><img src="assets/duckbio-brand-nofill-dark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><div class="bar-tools"><details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button></div></details></div></div>
 <div class="shell">
 <aside>
 <div class="label">WORKSPACE</div>
@@ -350,8 +350,6 @@ const accountForm=get("preview-account-form");
 accountForm.addEventListener("submit",event=>{
  event.preventDefault();
  if(!accountForm.reportValidity())return;
- const values=new FormData(accountForm),nickname=String(values.get("nickname")||"").trim(),name=String(values.get("name")||"").trim();
- get("preview-current-user").textContent=nickname||name||"Preview user";
  get("account-status").textContent="Updated in this preview only.";
 });
 document.querySelectorAll("[data-communication]").forEach(button=>button.addEventListener("click",()=>{
