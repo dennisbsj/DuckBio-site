@@ -1043,3 +1043,21 @@ html[data-theme="dark"] .workspace-preview-section .workspace-screenshot-chrome{
  .workspace-preview-section .workspace-screenshot-chrome{border-radius:11px 11px 0 0}
  .workspace-preview-section iframe#workspace-frame{border-radius:0 0 11px 11px}
 }
+
+
+/* DuckBio exact approved glove-free artwork 2026-10-31: shared by all card and product sizes. */
+img.suite-sprite.logo-duckman,
+.product-hero img.suite-sprite.logo-duckman{
+ background-image:url("icons/duckbio-20261031/duckman-no-gloves-duckbio-1254.png") !important;
+ background-size:100% 100%;background-position:center center;background-repeat:no-repeat;
+}
+img.suite-sprite.logo-ducknote,
+.product-hero img.suite-sprite.logo-ducknote{
+ background-image:url("icons/duckbio-20261031/ducknote-no-gloves-1254.png") !important;
+ background-size:100% 100%;background-position:center center;background-repeat:no-repeat;
+}
+img.suite-sprite.logo-ducktrain,
+.product-hero img.suite-sprite.logo-ducktrain{
+ background-image:url("icons/duckbio-20261031/ducktrain-no-gloves-1254.png") !important;
+ background-size:100% 100%;background-position:center center;background-repeat:no-repeat;
+}
