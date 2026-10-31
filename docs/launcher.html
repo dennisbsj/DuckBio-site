@@ -5,6 +5,20 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="description" content="Interactive preview of DuckBio apps and planned workspace.">
 <title>DuckBio Launcher — Interactive Preview</title>
+<script>
+/* Match the containing DuckBio page before rendering to avoid a light-theme flash. */
+(()=>{
+ let mode="light";
+ try{
+  mode=window.parent!==window
+   ?window.parent.document.documentElement.getAttribute("data-theme")
+   :localStorage.getItem("duckbio-theme");
+ }catch(error){
+  try{mode=localStorage.getItem("duckbio-theme")}catch(inner){}
+ }
+ document.documentElement.setAttribute("data-theme",mode==="dark"?"dark":"light");
+})();
+</script>
 <link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: light)" href="assets/duckbio-favicon-v2.svg"><link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: dark)" href="assets/duckbio-favicon-v2-dark.svg">
 <style>
 *{box-sizing:border-box}html{background:#0e2b3b}body{margin:0;color:#13384c;background:#f1f7fa;font:14px/1.52 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{text-decoration:none;color:inherit}a:focus-visible{outline:3px solid #20b9c4;outline-offset:3px}img{max-width:100%;display:block}
@@ -21,9 +35,9 @@ main{padding:clamp(25px,4vw,48px)}.kicker{font-size:11px;letter-spacing:.17em;fo
 @media(max-width:760px){.shell{grid-template-columns:1fr}aside{display:none}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.app{padding:17px;min-height:193px}.icon{width:55px;height:55px}.bar{min-height:61px}.tag{font-size:10px;padding:6px 9px}}
 @media(max-width:400px){.grid{gap:12px}.app{padding:13px;min-height:178px}.app strong{font-size:16px}.app small{font-size:11px;min-height:42px}.main-title{flex-direction:column}.notice{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.app{transition:none}}
-/* The interactive launcher is always LIGHT, independently of the main site theme. */
-html,html[data-theme="dark"]{color-scheme:light!important;background:#f1f7fa!important}
-html body,html[data-theme="dark"] body{color:#13384c!important;background:#f1f7fa!important}
+/* The launcher follows DuckBio's theme; light remains the default. */
+html{color-scheme:light;background:#f1f7fa}
+html body{color:#13384c;background:#f1f7fa}
 .app{cursor:pointer}.app:focus-visible{outline:3px solid #19a5ba;outline-offset:3px}
 .app .action{display:inline-flex;align-items:center;gap:5px}
 .preview-instruction{margin:0 0 22px;display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:12px 16px;border-radius:11px;border:1px solid #94d8db;background:#dcf6f5;color:#145b6c;font-size:13px;font-weight:750}
@@ -291,6 +305,141 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
   background-position:center center;
   background-repeat:no-repeat;
 }
+
+/* Workspace responsive day/night palette — 2026-10-31 */
+html[data-theme="dark"]{color-scheme:dark;background:#071827}
+html[data-theme="dark"] body{
+ color:#e5f2fa;
+ background:#091e2f;
+}
+html[data-theme="dark"] .shell{
+ background:linear-gradient(155deg,#091b2c,#0e283b 70%,#0b2033);
+ color:#e5f2fa;
+}
+html[data-theme="dark"] .bar{
+ background:linear-gradient(104deg,#051420,#0a293d 65%,#0d374b);
+ border-bottom:1px solid #315a70;
+}
+html[data-theme="dark"] .bar .brand,
+html[data-theme="dark"] .bar .brand em{color:#f2fdff}
+html[data-theme="dark"] .bar .brand em{color:#8ae3ea}
+html[data-theme="dark"] .bar-icon-button,
+html[data-theme="dark"] .settings-menu>summary{
+ background:#153d54;color:#e9faff;border-color:#497c91;
+}
+html[data-theme="dark"] .bar-icon-button:hover,
+html[data-theme="dark"] .bar-icon-button:focus-visible,
+html[data-theme="dark"] .settings-menu>summary:hover,
+html[data-theme="dark"] .settings-menu[open]>summary{
+ background:#23617a;color:#fff;
+}
+html[data-theme="dark"] .main-title h1,
+html[data-theme="dark"] .app .launcher-app-name,
+html[data-theme="dark"] .app .launcher-app-name b{
+ color:#f4fbff;
+}
+html[data-theme="dark"] .main-title p,
+html[data-theme="dark"] .app small{color:#b7d3df}
+html[data-theme="dark"] .kicker,
+html[data-theme="dark"] .launcher-app-category{color:#83e6ed}
+html[data-theme="dark"] .app{
+ background:linear-gradient(160deg,#163c55,#0e2c43);
+ border-color:#37657b;
+ box-shadow:0 10px 30px rgba(0,8,20,.18);
+ color:#edfaff;
+}
+html[data-theme="dark"] .app:hover,
+html[data-theme="dark"] .app:focus-visible{
+ border-color:#6bd4e4;
+ background:linear-gradient(160deg,#205069,#123c54);
+ box-shadow:0 17px 34px rgba(0,8,20,.28);
+}
+html[data-theme="dark"] .app .action{color:#8be5f4}
+html[data-theme="dark"] .count{
+ background:#19465d;
+ color:#c7f6f8;
+ border:1px solid #3e8194;
+}
+html[data-theme="dark"] .notice{
+ background:#123447;
+ border-color:#356377;
+ color:#bad9e6;
+}
+html[data-theme="dark"] .settings-panel{
+ background:#143247;
+ color:#ebfaff;
+ border-color:#4b7990;
+ box-shadow:0 18px 42px #020d19a8;
+}
+html[data-theme="dark"] .settings-panel strong{color:#f2fbff}
+html[data-theme="dark"] .settings-panel a,
+html[data-theme="dark"] .settings-panel button{color:#e6f8fc}
+html[data-theme="dark"] .settings-panel a:hover,
+html[data-theme="dark"] .settings-panel button:hover,
+html[data-theme="dark"] .settings-panel a:focus-visible,
+html[data-theme="dark"] .settings-panel button:focus-visible{
+ background:#24536c;
+ color:#fff;
+}
+html[data-theme="dark"] .launcher-dialog{
+ background:linear-gradient(150deg,#16384d,#0c2638);
+ color:#e7f8fd;
+ border-color:#54869a;
+ box-shadow:0 30px 95px #010c1bdd;
+}
+html[data-theme="dark"] .launcher-dialog::backdrop{background:rgba(1,9,19,.78)}
+html[data-theme="dark"] .modal-head h2,
+html[data-theme="dark"] .perm-pane h3,
+html[data-theme="dark"] .empty-communication strong{color:#f6fcff}
+html[data-theme="dark"] .modal-eyebrow{color:#8de9ed}
+html[data-theme="dark"] .modal-close{
+ color:#edfaff;background:#28536a;
+}
+html[data-theme="dark"] .modal-close:hover{background:#34728b}
+html[data-theme="dark"] .modal-note,
+html[data-theme="dark"] .empty-communication{
+ background:#173f54;
+ border:1px solid #3f6e81;
+ color:#c6e2eb;
+}
+html[data-theme="dark"] .empty-communication p,
+html[data-theme="dark"] .perm-caption,
+html[data-theme="dark"] .perm-org-disclaimer{color:#b6d2df}
+html[data-theme="dark"] .account-fields label,
+html[data-theme="dark"] .perm-org-label{color:#dcf1f7}
+html[data-theme="dark"] .account-fields input,
+html[data-theme="dark"] .account-fields textarea,
+html[data-theme="dark"] .perm-org-select{
+ background:#091f30;
+ color:#f2fcff;
+ border-color:#568194;
+}
+html[data-theme="dark"] .account-fields input::placeholder,
+html[data-theme="dark"] .account-fields textarea::placeholder{color:#a3c0ce}
+html[data-theme="dark"] .modal-btn.secondary{
+ background:#20465b;color:#eff9ff;border-color:#58859a;
+}
+html[data-theme="dark"] .modal-btn.primary{
+ background:#74e0e4;color:#092e3f;border-color:#a0f4f3;
+}
+html[data-theme="dark"] .modal-actions #account-status{color:#91edf2}
+html[data-theme="dark"] .permission-tabs{border-color:#436c80}
+html[data-theme="dark"] .permission-tabs button{color:#b4d2df}
+html[data-theme="dark"] .permission-tabs button[aria-selected="true"]{
+ color:#a0f7f1;border-color:#5fdee3;
+}
+html[data-theme="dark"] .permission-list li{border-color:#386174}
+html[data-theme="dark"] .permission-list li span,
+html[data-theme="dark"] .perm-org-summary{color:#bce5eb}
+html[data-theme="dark"] .perm-table caption{color:#b7d5df}
+html[data-theme="dark"] .perm-table thead{background:#1b475c}
+html[data-theme="dark"] .perm-table th,
+html[data-theme="dark"] .perm-table td{border-bottom-color:#365c72}
+html[data-theme="dark"] .perm-table th{color:#edf9fc}
+html[data-theme="dark"] .perm-table td{color:#98ecf0}
+@media(prefers-reduced-motion:reduce){
+ html[data-theme="dark"] .app{transition:none}
+}
 </style>
 </head>
 <body data-workspace-mode="preview">
@@ -377,6 +526,31 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
 (()=>{
 "use strict";
 const get=id=>document.getElementById(id);
+/* Keep the embedded workspace in sync with the main site's theme switch.
+   Direct visits to launcher.html use the same saved DuckBio preference. */
+function syncWorkspaceTheme(){
+ let mode=null;
+ try{
+  mode=window.parent!==window
+   ?window.parent.document.documentElement.getAttribute("data-theme")
+   :localStorage.getItem("duckbio-theme");
+ }catch(error){
+  try{mode=localStorage.getItem("duckbio-theme")}catch(inner){}
+ }
+ document.documentElement.setAttribute("data-theme",mode==="dark"?"dark":"light");
+}
+if(window.parent!==window){
+ try{
+  new MutationObserver(syncWorkspaceTheme).observe(
+   window.parent.document.documentElement,
+   {attributes:true,attributeFilter:["data-theme"]}
+  );
+ }catch(error){ /* Parent may be cross-origin in a standalone embed. */ }
+}
+window.addEventListener("storage",event=>{
+ if(event.key==="duckbio-theme")syncWorkspaceTheme();
+});
+syncWorkspaceTheme();
 /* Display-only app count. In preview, the six sample apps are treated as
    available for demonstration, NOT as evidence of any purchase.
    In live mode, an authorised subscription integration can set data-licensed
