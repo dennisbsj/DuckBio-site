@@ -988,3 +988,58 @@ img.suite-sprite.logo-ducktrain,
   background-position:center center;
   background-repeat:no-repeat;
 }
+
+/* Workspace embedded-view separators — 2026-10-31 */
+/* Separate the actual embedded application from the site's header and footer
+   without changing its navigation, content, iframe behavior or app layout. */
+.workspace-page-toolbar{border-bottom:1px solid #b6d0da}
+.workspace-preview-section.section.soft{
+ position:relative;
+ padding:28px 0 38px;
+ background:linear-gradient(140deg,#dceaf0,#eaf3f7 50%,#d6e7ee);
+ border-top:1px solid #accdd7;
+ border-bottom:1px solid #a1c9d5;
+}
+.workspace-preview-section::before,.workspace-preview-section::after{
+ content:"";position:absolute;left:0;right:0;display:block;height:4px;
+ background:linear-gradient(90deg,#11546e,#4ac6d0 48%,#0f789b);
+ pointer-events:none;
+}
+.workspace-preview-section::before{top:0}
+.workspace-preview-section::after{bottom:0}
+.workspace-preview-section>.workspace-preview-wrap{
+ width:calc(100% - clamp(24px,4.5vw,76px));
+ max-width:1500px;margin-inline:auto;
+}
+.workspace-preview-section .workspace-screenshot{
+ background:#e9f4f7;
+ border:1px solid #92bfc9;border-radius:15px;overflow:visible;
+ box-shadow:0 12px 40px rgba(15,62,87,.18),0 2px 5px rgba(12,53,79,.06);
+}
+.workspace-preview-section .workspace-screenshot-chrome{
+ background:#f2f8fa;border-radius:14px 14px 0 0;border-bottom:1px solid #c6dce4;
+}
+.workspace-preview-section iframe#workspace-frame{border-radius:0 0 14px 14px}
+html[data-theme="dark"] .workspace-page-toolbar{border-bottom-color:#376a81}
+html[data-theme="dark"] .workspace-preview-section.section.soft{
+ background:linear-gradient(145deg,#071b2d,#12354a 55%,#0a2638);
+ border-top-color:#32677d;border-bottom-color:#376b80;
+}
+html[data-theme="dark"] .workspace-preview-section::before,
+html[data-theme="dark"] .workspace-preview-section::after{
+ background:linear-gradient(90deg,#12394f,#56d2da 48%,#196d84);
+}
+html[data-theme="dark"] .workspace-preview-section .workspace-screenshot{
+ background:#102d40;border-color:#4c8092;
+ box-shadow:0 15px 42px rgba(0,9,21,.47);
+}
+html[data-theme="dark"] .workspace-preview-section .workspace-screenshot-chrome{
+ background:#173b50;border-bottom-color:#396f82;color:#d5eff5;
+}
+@media(max-width:650px){
+ .workspace-preview-section.section.soft{padding:16px 0 26px}
+ .workspace-preview-section>.workspace-preview-wrap{width:calc(100% - 24px)}
+ .workspace-preview-section .workspace-screenshot{border-radius:12px}
+ .workspace-preview-section .workspace-screenshot-chrome{border-radius:11px 11px 0 0}
+ .workspace-preview-section iframe#workspace-frame{border-radius:0 0 11px 11px}
+}
