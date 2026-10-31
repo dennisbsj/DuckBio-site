@@ -1101,3 +1101,12 @@ html[data-theme="dark"] .workspace-portal .workspace-preview-section .workspace-
  .workspace-portal .workspace-portal-back{font-size:10px;padding:8px 9px;min-height:39px;max-width:130px;text-align:center;line-height:1.3}
  .workspace-portal .theme-toggle{flex:0 0 39px;width:39px;height:39px}
 }
+
+/* Final approved DuckTrain locomotive: exact DuckBio DB logo + company name on the train. */
+img.suite-sprite.logo-ducktrain,
+.product-hero img.suite-sprite.logo-ducktrain {
+  background-image:url("icons/duckbio-20261031/ducktrain-official-duckbio-complete.png");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
