@@ -176,10 +176,29 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
  background-size:100% 100%,100% 100%;
  background-repeat:no-repeat,no-repeat;
 }
+
+/* Workspace settings: compact menu, larger Mail icon, stable no-jump dialogs. */
+.side-communication .sidebar-mail-icon{
+  display:block;flex:0 0 22px;width:22px;height:22px;
+  margin-right:8px;stroke-width:1.85;
+}
+.settings-panel{width:210px;padding:10px;gap:1px}
+.settings-panel strong{padding:6px 9px}
+.settings-panel button{padding:11px 9px;min-height:39px}
+.launcher-dialog[open]{
+  position:fixed;
+  inset:clamp(18px,4vh,40px) 0 auto;
+  margin-inline:auto;
+  max-height:min(650px,78vh);
+  overscroll-behavior:contain;
+}
+@media(max-width:480px){
+  .launcher-dialog[open]{top:14px;max-height:min(590px,78vh)}
+}
 </style>
 </head>
 <body>
-<div class="bar"><div class="brand"><img src="assets/duckbio-brand-nofill-dark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><div class="bar-tools"><span class="preview-current-user" id="preview-current-user">Preview user</span><details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button><a href="pricing.html" target="_top">Subscriptions &amp; pricing</a><a href="support.html" target="_top">Help &amp; support</a><p>Preview only — no live account or permissions are changed.</p></div></details></div></div>
+<div class="bar"><div class="brand"><img src="assets/duckbio-brand-nofill-dark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><div class="bar-tools"><span class="preview-current-user" id="preview-current-user">Preview user</span><details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button></div></details></div></div>
 <div class="shell">
 <aside>
 <div class="label">WORKSPACE</div>
@@ -187,7 +206,7 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
 <nav class="side-app-list" id="workspace-app-links" aria-label="App links"><a href="labduck.html" target="_top">LabDuck</a><a href="cytoduck.html" target="_top">CytoDuck</a><a href="duckpipe.html" target="_top">DuckPipe</a><a href="eel.html" target="_top">DuckNote</a><a href="duckman.html" target="_top">DuckMan</a><a href="mantrain.html" target="_top">DuckTrain</a></nav>
 <div class="side-separator"></div><div class="label">COMMUNICATION</div>
 <button class="side-communication" type="button" data-communication="Messaging"><svg class="sidebar-chat-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.3 9.6 9.6 0 0 1-3.4-.6L3 21l1.8-5.6A8.4 8.4 0 1 1 21 11.5Z"/><path d="M8 11.5h8"/></svg><span>Messaging</span></button>
-<button class="side-communication" type="button" data-communication="Mail">✉ &nbsp; Mail</button>
+<button class="side-communication" type="button" data-communication="Mail"><svg class="sidebar-chat-icon sidebar-mail-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3.5 6 8.5 7 8.5-7"/></svg><span>Mail</span></button>
 <p class="aside-note">Interactive preview only. App links open public pages; communication and account administration are not live.</p>
 </aside>
 <main>
@@ -203,7 +222,7 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
 <div class="notice">Preview only. These links open public product pages, not authenticated apps. Access controls, billing and workspace accounts will be connected separately when implemented.</div>
 </main></div>
 
-<dialog class="launcher-dialog" id="account-dialog" aria-labelledby="account-heading">
+<dialog class="launcher-dialog" id="account-dialog" tabindex="-1" aria-labelledby="account-heading">
  <div class="modal-head"><div><p class="modal-eyebrow">Profile preview</p><h2 id="account-heading">Account settings</h2></div><button type="button" class="modal-close" data-close-dialog aria-label="Close account settings">×</button></div>
  <p class="modal-note">Changes are temporary and only affect this preview. No account details are sent or saved to DuckBio.</p>
  <form id="preview-account-form" class="account-fields" autocomplete="off">
@@ -217,7 +236,7 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
  <div class="modal-actions account-full"><span id="account-status" role="status"></span><button type="button" class="modal-btn secondary" data-close-dialog>Cancel</button><button class="modal-btn primary" type="submit">Save preview</button></div>
  </form>
 </dialog>
-<dialog class="launcher-dialog permissions-modal" id="permissions-dialog" aria-labelledby="permissions-heading">
+<dialog class="launcher-dialog permissions-modal" id="permissions-dialog" tabindex="-1" aria-labelledby="permissions-heading">
  <div class="modal-head"><div><p class="modal-eyebrow">Access preview</p><h2 id="permissions-heading">Permissions</h2></div><button type="button" class="modal-close" data-close-dialog aria-label="Close permissions">×</button></div>
  <p class="modal-note">Illustrative permissions only. These are not your real permissions or an active authorisation system.</p>
  <div role="tablist" class="permission-tabs" aria-label="Permissions views">
@@ -240,7 +259,7 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
  </tbody></table></div>
  </div>
 </dialog>
-<dialog class="launcher-dialog" id="communication-dialog" aria-labelledby="communication-heading">
+<dialog class="launcher-dialog" id="communication-dialog" tabindex="-1" aria-labelledby="communication-heading">
  <div class="modal-head"><div><p class="modal-eyebrow">Communication preview</p><h2 id="communication-heading">Communication</h2></div><button type="button" class="modal-close" data-close-dialog aria-label="Close communication preview">×</button></div>
  <div class="empty-communication"><strong id="communication-label">Messaging</strong><p>Messaging and Mail are planned features. No real messages can be sent or received from this preview.</p></div>
  <div class="modal-actions"><button type="button" class="modal-btn primary" data-close-dialog>Close</button></div>
@@ -263,7 +282,7 @@ function openDialog(id){
  settings.open=false;
  element.showModal();
  const initial=element.querySelector("input,button");
- initial?.focus();
+ initial?.focus({preventScroll:true});
 }
 document.querySelectorAll("[data-launcher-dialog]").forEach(btn=>btn.addEventListener("click",()=>openDialog(btn.dataset.launcherDialog)));
 document.querySelectorAll("[data-close-dialog]").forEach(btn=>btn.addEventListener("click",()=>btn.closest("dialog")?.close()));
