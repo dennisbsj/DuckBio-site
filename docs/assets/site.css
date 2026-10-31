@@ -652,3 +652,25 @@ img.suite-sprite.logo-duckman{
 .product-hero img.suite-sprite.logo-duckman{
   background-image:url("icons/duckbio-20261031/duckman-1024.webp");
 }
+
+
+/* Consistent DuckNote and DuckMan office ducks, 2026-10-31.
+   Keep all existing icon dimensions; load 224px art on cards and 1024px art on product detail pages. */
+img.suite-sprite.logo-ducknote{
+  background-image:url("icons/duckbio-20261031/ducknote-224.webp");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
+img.suite-sprite.logo-duckman{
+  background-image:url("icons/duckbio-20261031/duckman-224.webp");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
+.product-hero img.suite-sprite.logo-ducknote{
+  background-image:url("icons/duckbio-20261031/ducknote-1024.webp");
+}
+.product-hero img.suite-sprite.logo-duckman{
+  background-image:url("icons/duckbio-20261031/duckman-1024.webp");
+}
