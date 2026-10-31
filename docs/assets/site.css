@@ -849,3 +849,16 @@ img.suite-sprite.logo-duckman{
   background-repeat:no-repeat,no-repeat;
 }
 /* Product pages retain the existing 292px logo container. */
+
+
+/* Approved DuckNote: laboratory in background; original duck and foreground retained;
+   barcode scanner added to desk. Small previews and full-resolution detail artwork. */
+img.suite-sprite.logo-ducknote{
+  background-image:url("icons/duckbio-20261031/ducknote-lab-office-224.webp");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
+.product-hero img.suite-sprite.logo-ducknote{
+  background-image:url("icons/duckbio-20261031/ducknote-lab-office-1024.png");
+}
