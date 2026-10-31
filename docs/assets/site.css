@@ -508,7 +508,7 @@ body.homepage-exact #applications.section{
   border-bottom:1px solid rgba(114,223,239,.27);
   color:#ecfaff;
 }
-body.homepage-exact #applications .eyebrow{
+body.homepage-exact #applications .section-head .eyebrow{
   color:#7cf1ef;
   letter-spacing:.19em;
 }
@@ -554,7 +554,7 @@ body.homepage-exact #contact.section{
   border-bottom:1px solid rgba(107,211,227,.22);
   color:#eafbff;
 }
-body.homepage-exact #contact .eyebrow{color:#75e9ed}
+body.homepage-exact #contact .contact-copy .eyebrow{color:#75e9ed}
 body.homepage-exact #contact .contact-copy h2{color:#f3fbff}
 body.homepage-exact #contact .contact-copy>p{color:#c2e1e9}
 body.homepage-exact #contact .contact-steps{
