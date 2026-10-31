@@ -926,3 +926,14 @@ img.suite-sprite.logo-methduck{
 .product-hero img.suite-sprite.logo-methduck{
   background-image:url("icons/duckbio-20261031/duckpipe-duckbio-mug-1024.webp");
 }
+
+
+/* DuckTrain: user-approved locomotive duck artwork 2026-10-31.
+   Use exactly the same image in all cards, Workspace and product pages. */
+img.suite-sprite.logo-ducktrain,
+.product-hero img.suite-sprite.logo-ducktrain {
+  background-image:url("icons/duckbio-20261031/ducktrain-approved-locomotive-1254.png");
+  background-position:center center;
+  background-size:100% 100%;
+  background-repeat:no-repeat;
+}
