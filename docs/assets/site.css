@@ -947,3 +947,26 @@ img.suite-sprite.logo-ducktrain,
   background-position:center center,center center;
   background-repeat:no-repeat,no-repeat;
 }
+
+/* Workspace preview synchronized to the main site day/night palette — 2026-10-31 */
+html[data-theme="dark"] .workspace-page-toolbar{
+ background:linear-gradient(120deg,#0e2b40,#143d51);
+ border-color:#365e71;
+}
+html[data-theme="dark"] .workspace-toolbar-content h1{color:#effbff}
+html[data-theme="dark"] .workspace-toolbar-content p{color:#b8d7e1}
+html[data-theme="dark"] .workspace-preview-section{
+ background:linear-gradient(145deg,#091d2e,#102d40);
+}
+html[data-theme="dark"] .workspace-preview-section .workspace-screenshot{
+ background:#081b2b;
+}
+html[data-theme="dark"] .workspace-preview-section .workspace-screenshot-chrome{
+ background:#143549;
+ color:#c0e2e8;
+ border-color:#356075;
+}
+html[data-theme="dark"] .workspace-preview-section .workspace-address{color:#c5e5eb}
+html[data-theme="dark"] .workspace-preview-section iframe#workspace-frame{
+ background:#091e2f;
+}
