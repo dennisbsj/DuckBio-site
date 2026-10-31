@@ -426,12 +426,21 @@ function showMemberRights(){
 }
 memberSelect.addEventListener("change",showMemberRights);
 showMemberRights();
-/* Let the parent page size the iframe to content so the full app descriptions remain visible. */
+/* Report only intrinsic workspace content height, not document scrollHeight.
+   scrollHeight includes the iframe viewport and previously made its height grow
+   on each parent resize, pushing the bottom of the page downward indefinitely. */
 let lastReportedHeight=0;
 function reportWorkspaceHeight(){
  if(window.parent===window)return;
- const height=Math.ceil(Math.max(document.body.scrollHeight,document.documentElement.scrollHeight));
- if(height<200||Math.abs(height-lastReportedHeight)<2)return;
+ const shell=document.querySelector(".shell");
+ const bar=document.querySelector(".bar");
+ if(!shell||!bar)return;
+ // Layout bounds are independent of the iframe viewport height.
+ const height=Math.ceil(Math.max(
+  shell.getBoundingClientRect().bottom+window.scrollY,
+  bar.getBoundingClientRect().bottom+window.scrollY
+ ));
+ if(!Number.isFinite(height)||height<200||height>20000||Math.abs(height-lastReportedHeight)<2)return;
  lastReportedHeight=height;
  window.parent.postMessage({type:"duckbio-workspace-height",height},window.location.origin);
 }
