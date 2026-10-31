@@ -893,3 +893,13 @@ img.suite-sprite.logo-limsduck,
   background-position:center center;
   background-repeat:no-repeat;
 }
+
+/* Workspace iframe fallback: reserve the whole app grid before JS measurements. */
+.workspace-preview-section iframe#workspace-frame{height:790px;min-height:0}
+.workspace-preview-section{padding-bottom:0}
+@media(max-width:760px){
+ .workspace-preview-section iframe#workspace-frame{height:1020px;min-height:0}
+}
+@media(max-width:360px){
+ .workspace-preview-section iframe#workspace-frame{height:1580px;min-height:0}
+}
