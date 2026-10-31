@@ -631,3 +631,24 @@ html[data-theme="dark"] body.homepage-exact #contact .contact-form-card{
 @media(prefers-reduced-motion:reduce){
   body.homepage-exact #applications .app-card{transition:none}
 }
+
+
+/* Approved 2026-10-31 full-frame DuckNote and closed-office DuckMan */
+img.suite-sprite.logo-ducknote{
+  background-image:url("icons/duckbio-20261031/ducknote-224.webp");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
+img.suite-sprite.logo-duckman{
+  background-image:url("icons/duckbio-20261031/duckman-224.webp");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
+.product-hero img.suite-sprite.logo-ducknote{
+  background-image:url("icons/duckbio-20261031/ducknote-1024.webp");
+}
+.product-hero img.suite-sprite.logo-duckman{
+  background-image:url("icons/duckbio-20261031/duckman-1024.webp");
+}
