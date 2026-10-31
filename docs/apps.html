@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#123c55"><meta name="description" content="Explore all six DuckBio apps in an interactive, screenshot-style preview of the central workspace."><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="strict-origin-when-cross-origin"><title>Workspace preview | DuckBio</title><script>try{document.documentElement.dataset.theme=localStorage.getItem("duckbio-theme")==="dark"?"dark":"light"}catch(e){document.documentElement.dataset.theme="light"}</script><link rel="stylesheet" href="assets/site.css?v=labduck-white-lab-20261031-1"><script src="assets/site.js?v=duckbio-night-20261029-2" defer></script><link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: light)" href="assets/duckbio-favicon-v2.svg"><link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: dark)" href="assets/duckbio-favicon-v2-dark.svg"></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#123c55"><meta name="description" content="Explore all six DuckBio apps in an interactive, screenshot-style preview of the central workspace."><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="strict-origin-when-cross-origin"><title>Workspace preview | DuckBio</title><script>try{document.documentElement.dataset.theme=localStorage.getItem("duckbio-theme")==="dark"?"dark":"light"}catch(e){document.documentElement.dataset.theme="light"}</script><link rel="stylesheet" href="assets/site.css?v=workspace-topbar-height-20261031-1"><script src="assets/site.js?v=duckbio-night-20261029-2" defer></script><link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: light)" href="assets/duckbio-favicon-v2.svg"><link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: dark)" href="assets/duckbio-favicon-v2-dark.svg"></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
 <section class="workspace-page-toolbar" aria-label="Workspace preview information"><div class="wrap">
  <div class="workspace-toolbar-content"><h1>Workspace</h1><p>Interactive preview — select an app, use Messaging or Mail, or open account settings.</p></div>
  </div></section>
@@ -10,28 +10,36 @@
     <span class="workspace-address">DuckBio &nbsp; / &nbsp; Workspace &nbsp; / &nbsp; My Apps</span>
     
    </div>
-   <iframe id="workspace-frame" src="launcher.html?v=workspace-clean-toolbar-20261031-1" title="Interactive Workspace preview: all six app descriptions, communication tools, account settings and permissions" loading="eager" scrolling="no"></iframe>
+   <iframe id="workspace-frame" src="launcher.html?v=topbar-fullheight-20261031-1" title="Interactive Workspace preview: all six app descriptions, communication tools, account settings and permissions" loading="eager" scrolling="no"></iframe>
  </div>
- <div class="workspace-below">
-  <p><strong>Try the workspace controls.</strong> The Apps button expands or hides links, Communication opens preview windows, and Settings offers account and permission views.</p>
- </div>
- <p class="workspace-note">This public preview uses temporary profile edits and example permissions only. It does not store real account information, grant access, send messages or change any actual DuckBio account.</p>
+
 </div></section>
 </main><script>
 (()=>{
  "use strict";
  const frame=document.getElementById("workspace-frame");
  if(!frame)return;
- // Size from the launcher's intrinsic content, never from the current iframe
- // viewport or the mobile browser's changing address-bar viewport height.
- const fallbackHeight=390;
+ // Keep the intrinsic full-height workspace visible: never force a 390px
+ // fallback over CSS, or the footer will cover the bottom row of app cards.
  let contentHeight=0;
  function sizeFrame(){
-  const target=Math.ceil(Math.max(fallbackHeight,contentHeight));
-  // Avoid an iframe resize/ResizeObserver feedback loop on every message.
+  if(!contentHeight)return; // CSS reserves sufficient space before the child loads.
+  const target=Math.ceil(Math.max(300,contentHeight+2));
   if(Math.abs(frame.getBoundingClientRect().height-target)>1){
    frame.style.height=target+"px";
   }
+ }
+ function measureChild(){
+  // Same-origin direct measurement supplements postMessage on mobile browsers.
+  try{
+   const doc=frame.contentDocument;
+   const shell=doc?.querySelector(".shell");
+   const bar=doc?.querySelector(".bar");
+   if(!shell||!bar)return;
+   const measured=Math.ceil(Math.max(shell.getBoundingClientRect().bottom,
+                                   bar.getBoundingClientRect().bottom)+2);
+   if(measured>=200&&measured<=20000){contentHeight=measured;sizeFrame()}
+  }catch(e){ /* postMessage remains the fallback */ }
  }
  window.addEventListener("message",event=>{
   if(event.source!==frame.contentWindow||event.origin!==window.location.origin)return;
@@ -41,10 +49,7 @@
   contentHeight=Math.ceil(proposed);
   sizeFrame();
  });
- frame.addEventListener("load",()=>{
-  contentHeight=0;
-  sizeFrame();
- });
- sizeFrame();
+ frame.addEventListener("load",()=>{measureChild();requestAnimationFrame(measureChild)});
+ window.addEventListener("resize",()=>requestAnimationFrame(measureChild));
 })();
 </script><footer class="footer"><div class="wrap"><div class="footer-grid"><div><a class="brand" href="index.html"><img class="brand-mark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><p>Specialised scientific software for laboratory teams, research and structured workflows.</p></div><div><h4>Products</h4><nav aria-label="Products"><a href="apps.html">App workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></nav></div><div><h4>DuckBio</h4><nav aria-label="Company"><a href="index.html#contact">Contact</a><a href="pricing.html">Pricing</a><a href="apps.html">App workspace</a><a href="support.html">Support</a></nav></div><div><h4>Legal</h4><nav aria-label="Legal information"><a href="terms.html">Terms (draft)</a><a href="privacy.html">Privacy (draft)</a><a href="cookies.html">Cookies (draft)</a><a href="subscriptions.html">Subscriptions (draft)</a><a href="refunds.html">Refunds (draft)</a></nav></div></div><div class="footer-bottom"><span>© <span data-year>2026</span> DuckBio</span><span>Preview site · Authentication, trial and payments not yet launched</span></div></div></footer></body></html>
