@@ -674,3 +674,13 @@ img.suite-sprite.logo-duckman{
 .product-hero img.suite-sprite.logo-duckman{
   background-image:url("icons/duckbio-20261031/duckman-1024.webp");
 }
+
+
+/* DuckNote approved attachment 2026-10-31: exact illustration, with "bioduck"
+   on the laptop. Preserve the existing icon element dimensions sitewide. */
+img.suite-sprite.logo-ducknote{
+  background-image:url("icons/duckbio-20261031/ducknote-bioduck-original.png");
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+}
