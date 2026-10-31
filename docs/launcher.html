@@ -202,6 +202,28 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
   background-size:100% 100%;
   background-position:center center;
 }
+
+/* Shared messaging/mail icon dimensions and organisation permission preview. */
+.side-communication .sidebar-chat-icon,
+.side-communication .sidebar-mail-icon{
+  display:block;
+  width:22px;height:22px;flex:0 0 22px;
+  margin-right:8px;
+}
+.permission-tabs{flex-wrap:wrap}
+.permission-tabs button{min-height:40px}
+.perm-org-label{display:block;color:#245268;font-size:12px;font-weight:800;margin:0 0 7px}
+.perm-org-select{display:block;width:100%;max-width:425px;min-height:43px;background:#fff;
+ border:1px solid #a6cbd5;border-radius:9px;color:#184258;padding:10px 12px;font:inherit;font-size:13px}
+.perm-org-select:focus-visible{outline:3px solid #24b7c7;outline-offset:2px}
+.perm-org-summary{font-weight:800;color:#175c73;margin:13px 0 11px;font-size:13px}
+.perm-org-table th:first-child{text-align:left}
+.perm-org-disclaimer{color:#5d7b8c;font-size:12px;line-height:1.5;margin:12px 0 0}
+@media(max-width:480px){
+  .permission-tabs{gap:3px}
+  .permission-tabs button{font-size:11px;padding:9px 8px}
+  .perm-org-select{font-size:12px}
+}
 </style>
 </head>
 <body>
@@ -212,7 +234,7 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
 <button type="button" class="side-link" id="workspace-apps-toggle" aria-expanded="true" aria-controls="workspace-app-links">▦ &nbsp; Apps <span aria-hidden="true">▾</span></button>
 <nav class="side-app-list" id="workspace-app-links" aria-label="App links"><a href="labduck.html" target="_top">LabDuck</a><a href="cytoduck.html" target="_top">CytoDuck</a><a href="duckpipe.html" target="_top">DuckPipe</a><a href="eel.html" target="_top">DuckNote</a><a href="duckman.html" target="_top">DuckMan</a><a href="mantrain.html" target="_top">DuckTrain</a></nav>
 <div class="side-separator"></div><div class="label">COMMUNICATION</div>
-<button class="side-communication" type="button" data-communication="Messaging"><svg class="sidebar-chat-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.3 9.6 9.6 0 0 1-3.4-.6L3 21l1.8-5.6A8.4 8.4 0 1 1 21 11.5Z"/><path d="M8 11.5h8"/></svg><span>Messaging</span></button>
+<button class="side-communication" type="button" data-communication="Messaging"><svg class="sidebar-chat-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.3 9.6 9.6 0 0 1-3.4-.6L3 21l1.8-5.6A8.4 8.4 0 1 1 21 11.5Z"/><path d="M8 11.5h8"/></svg><span>Messaging</span></button>
 <button class="side-communication" type="button" data-communication="Mail"><svg class="sidebar-chat-icon sidebar-mail-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3.5 6 8.5 7 8.5-7"/></svg><span>Mail</span></button>
 <p class="aside-note">Interactive preview only. App links open public pages; communication and account administration are not live.</p>
 </aside>
@@ -249,6 +271,7 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
  <div role="tablist" class="permission-tabs" aria-label="Permissions views">
   <button type="button" role="tab" id="perm-my-tab" aria-controls="perm-my" aria-selected="true" tabindex="0" data-perm-tab="my">My permissions</button>
   <button type="button" role="tab" id="perm-matrix-tab" aria-controls="perm-matrix" aria-selected="false" tabindex="-1" data-perm-tab="matrix">Permission matrix</button>
+  <button type="button" role="tab" id="perm-org-tab" aria-controls="perm-org" aria-selected="false" tabindex="-1" data-perm-tab="org">Organisation members</button>
  </div>
  <div role="tabpanel" id="perm-my" aria-labelledby="perm-my-tab" class="perm-pane">
  <h3>Example app access</h3><p class="perm-caption">The preview shows an illustrative member role, not data from a signed-in account.</p>
@@ -264,6 +287,23 @@ aside .aside-note{font-size:10px;line-height:1.4;padding:10px 8px 0}
  <tr><th scope="row">DuckMan</th><td>✓</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
  <tr><th scope="row">DuckTrain</th><td>✓</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
  </tbody></table></div>
+ </div>
+ <div role="tabpanel" id="perm-org" aria-labelledby="perm-org-tab" class="perm-pane" hidden>
+  <h3>Other members' permissions</h3>
+  <p class="perm-caption">Select an example member to view their app permissions. These are fictional profiles, not actual people or organisation records.</p>
+  <label class="perm-org-label" for="perm-member-select">Organisation member</label>
+  <select id="perm-member-select" class="perm-org-select" aria-describedby="perm-member-info">
+   <option value="scientist">Example member A — Scientist</option>
+   <option value="reviewer">Example member B — Quality reviewer</option>
+   <option value="admin">Example member C — Organisation admin</option>
+  </select>
+  <p id="perm-member-info" class="perm-org-summary" aria-live="polite">Example member A — Scientist · Research team</p>
+  <div class="matrix-scroll"><table class="perm-table perm-org-table">
+   <caption id="perm-org-caption">Example member A's app permissions</caption>
+   <thead><tr><th scope="col">App</th><th scope="col">View</th><th scope="col">Create</th><th scope="col">Edit</th><th scope="col">Approve</th><th scope="col">Admin</th></tr></thead>
+   <tbody id="perm-org-rows"></tbody>
+  </table></div>
+  <p class="perm-org-disclaimer">Read-only demonstration. Viewing real colleagues' rights will require signed-in organisation membership and access checks.</p>
  </div>
 </dialog>
 <dialog class="launcher-dialog" id="communication-dialog" tabindex="-1" aria-labelledby="communication-heading">
@@ -317,6 +357,7 @@ function setTab(value){
  }
  get("perm-my").hidden=value!=="my";
  get("perm-matrix").hidden=value!=="matrix";
+ get("perm-org").hidden=value!=="org";
 }
 tabs.forEach((tab,index)=>{
  tab.addEventListener("click",()=>setTab(tab.dataset.permTab));
@@ -328,6 +369,51 @@ tabs.forEach((tab,index)=>{
  });
 });
 setTab("my");
+/* Fictional, read-only organisation members for the interactive preview.
+   Real permissions must only come from an authorised server-side endpoint. */
+const previewApps=["LabDuck","CytoDuck","DuckPipe","DuckNote","DuckMan","DuckTrain"];
+const exampleMembers={
+ scientist:{
+  label:"Example member A — Scientist",department:"Research team",
+  rights:[
+   [1,1,1,0,0],[1,1,1,0,0],[1,1,1,0,0],
+   [1,1,1,0,0],[1,0,0,0,0],[1,0,0,0,0]
+  ]
+ },
+ reviewer:{
+  label:"Example member B — Quality reviewer",department:"Quality team",
+  rights:[
+   [1,0,0,1,0],[1,0,0,0,0],[1,0,0,1,0],
+   [1,0,0,1,0],[1,0,0,1,0],[1,0,0,1,0]
+  ]
+ },
+ admin:{
+  label:"Example member C — Organisation admin",department:"Organisation administration",
+  rights:previewApps.map(()=>[1,1,1,1,1])
+ }
+};
+const memberSelect=get("perm-member-select");
+function showMemberRights(){
+ const member=exampleMembers[memberSelect.value];
+ if(!member)return;
+ get("perm-member-info").textContent=member.label+" · "+member.department;
+ get("perm-org-caption").textContent=member.label+" — app permissions (example)";
+ const tbody=get("perm-org-rows");
+ const rows=previewApps.map((app,i)=>{
+  const tr=document.createElement("tr"),th=document.createElement("th");
+  th.scope="row";th.textContent=app;tr.append(th);
+  for(const allowed of member.rights[i]){
+   const td=document.createElement("td");
+   td.textContent=allowed?"✓":"—";
+   td.setAttribute("aria-label",allowed?"Allowed":"Not allowed");
+   tr.append(td);
+  }
+  return tr;
+ });
+ tbody.replaceChildren(...rows);
+}
+memberSelect.addEventListener("change",showMemberRights);
+showMemberRights();
 /* Let the parent page size the iframe to content so the full app descriptions remain visible. */
 let lastReportedHeight=0;
 function reportWorkspaceHeight(){
