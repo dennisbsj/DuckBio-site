@@ -153,6 +153,17 @@ html[data-theme="dark"] .pr-select-layout .pr-select-button .pr-select-name{colo
 .pr-select-category{font-size:10px;line-height:1.35;letter-spacing:0;text-transform:uppercase;color:#168aa6;font-weight:500;display:block;text-align:center;margin:1px 2px 6px}.pr-select-layout .pr-select-button{min-height:217px}.pr-select-layout .pr-select-button .pr-select-name{font-weight:400}.pr-select-layout .pr-select-button .pr-select-name b{font-weight:900;font-size:inherit}
 .pr-select-category b{font-size:inherit;font-weight:900}
 
+
+/* App selection bulk actions. */
+.pr-select-toolbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:-9px 0 23px}
+.pr-select-all{appearance:none;min-height:42px;border:1px solid #278ba3;color:#09536d;
+ background:#e4f6f8;border-radius:999px;padding:9px 19px;font-weight:850;cursor:pointer;font:inherit;font-size:13px}
+.pr-select-all:hover,.pr-select-all:focus-visible{background:#bceaf0;border-color:#0b7891}
+.pr-select-all[aria-pressed="true"]{background:#17617d;color:#fff;border-color:#17617d}
+#pr-select-selection-count{font-size:12px;font-weight:750;color:var(--muted)}
+html[data-theme="dark"] .pr-select-all{background:#164459;border-color:#65c3d3;color:#e5faff}
+html[data-theme="dark"] .pr-select-all[aria-pressed="true"]{background:#91e9e7;color:#0b3444}
+@media(max-width:560px){.pr-select-toolbar{margin:-4px 0 18px;gap:11px}}
 </style></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
 <section class="pr-hero">
   <div class="wrap pr-hero-grid">
@@ -169,15 +180,21 @@ html[data-theme="dark"] .pr-select-layout .pr-select-button .pr-select-name{colo
     </div>
   </div>
 </section>
+<section class="section soft" id="launch-offer"><div class="wrap"><div class="pr-offer">
+ <div><p class="eyebrow">Early adopter offer · 1 January – 31 March 2027</p><h2>Your first year, 20% less.</h2>
+ <p>Start a new subscription during the launch period and retain the introductory discount for your first 12 months. One app from <strong data-eur-apps="1" data-price-kind="early">24 €</strong>, or all six from <strong data-eur-apps="6" data-price-kind="early">100,80 €</strong> per user per month.</p></div>
+ 
+</div></div></section>
+
 <section class="section" id="plans"><div class="wrap">
  <div class="pr-heading"><p class="eyebrow">Choose your setup</p><h2>Start small. Build your suite.</h2><p>Use a single specialist tool or combine several apps around your scientific workflows.</p></div>
  <div class="pr-currency-top"><div class="pr-currency-toggle" role="group" aria-label="Choose display currency"><button type="button" data-currency="DKK" aria-pressed="false">DKK</button><button type="button" data-currency="EUR" aria-pressed="true">EUR</button><button type="button" data-currency="USD" aria-pressed="false">USD</button></div></div>
  <div class="pr-grid">
 <article class="pr-plan"><h3>Single</h3><p class="pr-desc">Start with one app and add more when you need them.</p><div class="pr-prices"><div class="pr-normal"><span>Normal price</span><del data-eur-apps="1" data-price-kind="normal">30 €</del></div><div class="pr-early"><span class="pr-early-label">Early adopter</span><strong data-eur-apps="1" data-price-kind="early">24 €</strong><span class="pr-save">Save 20%</span></div></div><div class="pr-period">per user / month · one app</div><ul><li>Choose the individual apps you need</li><li>Access to each selected app</li><li>Scale to more apps whenever needed</li></ul><a class="btn btn-outline" href="#choose-apps">Choose app →</a></article>
 <article class="pr-plan"><h3>Mixed</h3><p class="pr-desc">Combine two to five apps.</p><div class="pr-prices"><div class="pr-normal"><span class="pr-normal-label">Normal price, from <span class="pr-bundle-save" data-bundle-save="2">Additional saving: 20%</span></span><del data-eur-apps="2" data-price-kind="normal">48 €</del></div><div class="pr-early"><span class="pr-early-label">Early adopter</span><strong data-eur-apps="2" data-price-kind="early">38,40 €</strong><span class="pr-save">Save 20%</span></div></div><div class="pr-period">per user / month · starting with two apps</div><ul><li>Choose any combination of 2–5 apps</li><li>Bundle discounts on combinations of 2–5 apps</li><li>Different users can choose different apps</li></ul><a class="btn btn-outline" href="#choose-apps">Choose apps →</a></article>
-<article class="pr-plan featured"><span class="pr-flag">ALL SIX APPS</span><h3>Bundle</h3><p class="pr-desc">All six apps together at one bundle price.</p><div class="pr-prices"><div class="pr-normal"><span class="pr-normal-label">Normal price <span class="pr-bundle-save" data-bundle-save="6">Additional saving: 25%</span></span><del data-eur-apps="6" data-price-kind="normal">135 €</del></div><div class="pr-early"><span class="pr-early-label">Early adopter</span><strong data-eur-apps="6" data-price-kind="early">108 €</strong><span class="pr-save">Save 20%</span></div></div><div class="pr-period">per user / month · all six apps</div><ul><li>Access to all six DuckBio apps</li><li>Bundle savings included</li><li>Save 20% more with the early adopter offer</li></ul><a class="btn btn-secondary" href="#choose-apps">Select bundle →</a></article>
+<article class="pr-plan featured"><span class="pr-flag">ALL SIX APPS</span><h3>Bundle</h3><p class="pr-desc">All six apps together at one bundle price.</p><div class="pr-prices"><div class="pr-normal"><span class="pr-normal-label">Normal price <span class="pr-bundle-save" data-bundle-save="6">Additional saving: 30%</span></span><del data-eur-apps="6" data-price-kind="normal">126 €</del></div><div class="pr-early"><span class="pr-early-label">Early adopter</span><strong data-eur-apps="6" data-price-kind="early">100,80 €</strong><span class="pr-save">Save 20%</span></div></div><div class="pr-period">per user / month · all six apps</div><ul><li>Access to all six DuckBio apps</li><li>Bundle savings included</li><li>Save 20% more with the early adopter offer</li></ul><a class="btn btn-secondary" href="#choose-apps">Select bundle →</a></article>
 </div>
-<p class="pr-after">Choosing all six apps saves <span data-eur-savings="all">45 €</span> per user per month compared with six individual subscriptions, before any early adopter discount.</p>
+<p class="pr-after">Choosing all six apps saves <span data-eur-savings="all">54 €</span> per user per month compared with six individual subscriptions, before any early adopter discount.</p>
  <div class="pr-apps" aria-label="DuckBio apps">
    <a class="pr-app" href="labduck.html" aria-label="Explore LabDuck"><img class="suite-sprite logo-limsduck" src="assets/icons/transparent.svg" alt="">LabDuck<span class="pr-app-arrow" aria-hidden="true">↗</span></a>
    <a class="pr-app" href="cytoduck.html" aria-label="Explore CytoDuck"><img class="suite-sprite logo-cytoduck" src="assets/icons/transparent.svg" alt="">CytoDuck<span class="pr-app-arrow" aria-hidden="true">↗</span></a>
@@ -187,11 +204,7 @@ html[data-theme="dark"] .pr-select-layout .pr-select-button .pr-select-name{colo
    <a class="pr-app" href="mantrain.html" aria-label="Explore DuckTrain"><img class="suite-sprite logo-ducktrain" src="assets/icons/transparent.svg" alt="">DuckTrain<span class="pr-app-arrow" aria-hidden="true">↗</span></a>
  </div>
 </div></section>
-<section class="section soft" id="launch-offer"><div class="wrap"><div class="pr-offer">
- <div><p class="eyebrow">Early adopter offer · 1 January – 31 March 2027</p><h2>Your first year, 20% less.</h2>
- <p>Start a new subscription during the launch period and retain the introductory discount for your first 12 months. One app from <strong data-eur-apps="1" data-price-kind="early">24 €</strong>, or all six from <strong data-eur-apps="6" data-price-kind="early">108 €</strong> per user per month.</p></div>
- 
-</div></div></section>
+
 <section class="section" id="calculator"><div class="wrap pr-calc-grid">
  <div class="pr-calc-intro"><p class="eyebrow">Pricing calculator</p><h2>Find the right fit for your lab.</h2>
  <p>Choose the number of apps assigned to each user and the size of your team. The calculator includes the applicable bundle and organisation or early adopter discount.</p>
@@ -225,13 +238,14 @@ html[data-theme="dark"] .pr-select-layout .pr-select-button .pr-select-name{colo
   <tr><td>3 apps</td><td data-bundle-apps="3">20%</td><td><del data-eur-apps="3" data-price-kind="normal">72 €</del></td><td class="price-early" data-eur-apps="3" data-price-kind="early">57,60 €</td></tr>
   <tr><td>4 apps</td><td data-bundle-apps="4">20%</td><td><del data-eur-apps="4" data-price-kind="normal">96 €</del></td><td class="price-early" data-eur-apps="4" data-price-kind="early">76,80 €</td></tr>
   <tr><td>5 apps</td><td data-bundle-apps="5">20%</td><td><del data-eur-apps="5" data-price-kind="normal">120 €</del></td><td class="price-early" data-eur-apps="5" data-price-kind="early">96 €</td></tr>
-  <tr><td>6 apps</td><td data-bundle-apps="6">25%</td><td><del data-eur-apps="6" data-price-kind="normal">135 €</del></td><td class="price-early" data-eur-apps="6" data-price-kind="early">108 €</td></tr></tbody></table></div></div>
+  <tr><td>6 apps</td><td data-bundle-apps="6">25%</td><td><del data-eur-apps="6" data-price-kind="normal">126 €</del></td><td class="price-early" data-eur-apps="6" data-price-kind="early">100,80 €</td></tr></tbody></table></div></div>
   <div><h3>Organisation discounts</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Number of users</th><th>Extra discount</th></tr></thead><tbody>
   <tr><td>1–4 users</td><td>0%</td></tr><tr><td>5–19 users</td><td>10%</td></tr><tr><td>20–49 users</td><td>20%</td></tr><tr><td>50+ users</td><td>Custom quote</td></tr></tbody></table></div><p class="pr-small">Organisation discounts are based on the number of licensed users and apply automatically for teams of 5–49. For 50+ users, request a custom quote. After bundle savings, only the higher of the organisation or early adopter discount applies.</p></div>
 </div><p class="pr-small">All prices are provisional and exclude VAT. EUR is the sole reference price currency. DKK and USD are converted from EUR at published indicative exchange rates and displayed to two decimal places. Early adopter savings are exactly 20% of EUR prices. Custom pricing for organisations with 50+ users is determined separately.</p>
 </div></section>
 <section class="section" id="choose-apps"><div class="wrap">
  <div class="pr-heading"><p class="eyebrow">Build your subscription</p><h2>Choose your apps.</h2><p>Click the apps you want to include. Your selection and monthly price update automatically.</p></div>
+ <div class="pr-select-toolbar"><button type="button" id="pr-select-all" class="pr-select-all" aria-pressed="false">Select all apps</button><span id="pr-select-selection-count" role="status" aria-live="polite">0 of 6 apps selected</span></div>
  <div class="pr-select-layout">
  <div class="pr-select-grid" role="group" aria-label="Choose DuckBio apps">
  <div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="labduck" data-app-name="LabDuck" aria-pressed="false" aria-label="Select LabDuck"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-limsduck" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category"><b>LAB</b>ORATORY INFORMATION MANAGEMENT SYSTEM</span><span class="pr-select-name"><b>Lab</b>Duck</span><span class="pr-select-description">Track samples, inventory, batches and laboratory results with role-based review.</span></button><a class="pr-select-details" href="labduck.html" aria-label="Learn more about LabDuck">Learn more →</a></div>
@@ -259,7 +273,7 @@ html[data-theme="dark"] .pr-select-layout .pr-select-button .pr-select-name{colo
 const find=(id)=>document.getElementById(id);
 
 
-const eurNormal=[0,30,48,72,96,120,135];
+const eurNormal=[0,30,48,72,96,120,126];
 const earlyDiscount=0.20;
 const fxPerEUR={EUR:1,DKK:7.47384,USD:1.11952}; // Reference rates 30 October 2026
 const currencyButtons=[...document.querySelectorAll("[data-currency]")];
@@ -369,6 +383,11 @@ let selectionEstimate=null;
 const selectedLabel=(count)=>count===1?"Single":count===6?"Bundle":count>=2?"Mixed":"No apps selected";
 function renderSelection(){
  const count=selectedAppIds.size;
+ const allSelected=count===appSelections.length;
+ const selectAllButton=find("pr-select-all");
+ selectAllButton.textContent=allSelected?"Deselect all apps":"Select all apps";
+ selectAllButton.setAttribute("aria-pressed",String(allSelected));
+ find("pr-select-selection-count").textContent=count+" of "+appSelections.length+" apps selected";
  appSelections.forEach(button=>{
   const selected=selectedAppIds.has(button.dataset.selectApp);
   button.setAttribute("aria-pressed",String(selected));
@@ -396,6 +415,11 @@ function renderSelection(){
   (custom?" · 50+ users require custom pricing.":" · Excl. VAT.");
  selectionEstimate={apps:count,users,custom,baseEUR:unitEUR(1)*count*users,suiteEUR:priceEUR,finalEUR:totalEUR,useEarly,orgRate:organisationRate};
 }
+find("pr-select-all").addEventListener("click",()=>{
+ if(selectedAppIds.size===appSelections.length)selectedAppIds.clear();
+ else appSelections.forEach(button=>selectedAppIds.add(button.dataset.selectApp));
+ renderSelection();
+});
 appSelections.forEach(button=>button.addEventListener("click",()=>{
  if(selectedAppIds.has(button.dataset.selectApp))selectedAppIds.delete(button.dataset.selectApp);
  else selectedAppIds.add(button.dataset.selectApp);
