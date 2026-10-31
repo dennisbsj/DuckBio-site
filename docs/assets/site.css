@@ -2030,3 +2030,128 @@ html[data-theme="dark"] body:not(.homepage-exact) .home-benefits-tagline{
   border-radius:9px;
  }
 }
+
+/* DuckBio mockup finishing details: app artwork, 3-by-2 cards — 2026-10-31 */
+body.product-detail .product-hero h1 em{
+ color:#77f9ed;
+ font-style:normal;
+}
+body.product-detail .product-art-panel{
+ position:relative;
+ isolation:isolate;
+ min-height:clamp(265px,29vw,385px);
+ display:grid;place-items:center;
+ overflow:hidden;
+ border:1px solid #37a8c4;
+ border-radius:28px;
+ background:
+  radial-gradient(circle at 52% 54%,rgba(72,230,231,.22),transparent 43%),
+  radial-gradient(ellipse at 88% 10%,rgba(17,173,219,.3),transparent 55%),
+  linear-gradient(130deg,#092848,#0a3d62 67%,#065b76);
+ box-shadow:0 22px 54px rgba(0,7,30,.34),inset 0 1px 0 rgba(164,243,246,.11);
+}
+body.product-detail .product-art-panel::before{
+ content:"";
+ position:absolute;inset:12px;border-radius:22px;
+ border:1px solid rgba(105,227,235,.14);
+ z-index:-1;
+}
+body.product-detail .product-art-orbit{
+ position:absolute;display:block;z-index:-1;pointer-events:none;
+ border:1px solid rgba(126,226,239,.29);
+ border-radius:50%;
+ transform:rotate(-18deg);
+}
+body.product-detail .product-art-orbit-one{
+ width:80%;aspect-ratio:1;top:-36%;left:-32%;
+}
+body.product-detail .product-art-orbit-two{
+ width:120%;aspect-ratio:1;right:-62%;bottom:-87%;
+ box-shadow:0 0 0 29px rgba(70,214,236,.038),0 0 0 61px rgba(70,214,236,.025);
+}
+body.product-detail .product-art-image{
+ width:clamp(180px,21vw,250px);
+ height:clamp(180px,21vw,250px);
+ border-radius:27px;
+ box-shadow:0 17px 35px rgba(0,12,28,.3);
+ border:3px solid rgba(174,251,249,.67);
+ z-index:1;
+}
+body.product-detail .product-art-caption{
+ position:absolute;bottom:22px;left:0;right:0;
+ text-align:center;
+ font-size:10px;letter-spacing:.16em;
+ font-weight:800;color:#a8eaf3;
+}
+body.product-detail .product-hero .hero-actions .btn{
+ border-radius:999px;min-width:135px;
+}
+body.product-detail #features .feature-card{
+ transition:transform .18s,box-shadow .18s,border-color .18s;
+}
+body.product-detail #features .feature-card:hover{
+ transform:translateY(-3px);
+ box-shadow:0 13px 27px rgba(0,13,33,.24);
+ border-color:#7cf7e9;
+}
+body.product-detail #features .feature-card h3{color:#faffff}
+body.product-detail #features .feature-card p{color:#cde9f1}
+body.homepage-exact #applications .grid.grid3{
+ grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:clamp(14px,1.6vw,20px);
+}
+body.homepage-exact #applications .app-card,
+body.homepage-exact #applications .app-card:nth-child(3n+2),
+body.homepage-exact #applications .app-card:nth-child(3n+3){
+ grid-template-columns:70px minmax(0,1fr);
+ column-gap:12px;
+ min-height:171px;
+ padding:18px 15px;
+ border:1px solid #269eb6;
+ box-shadow:0 8px 22px rgba(8,54,82,.22);
+}
+body.homepage-exact #applications .app-card .app-icon{
+ width:66px;height:66px;border-radius:13px;
+}
+body.homepage-exact #applications .app-card .app-subtitle{
+ font-size:9px;line-height:1.35;
+}
+body.homepage-exact #applications .app-card h3{font-size:17px}
+body.homepage-exact #applications .app-card p:not(.app-subtitle){
+ font-size:11px;line-height:1.44;padding-right:8px;
+}
+body.homepage-exact #applications .app-card::after{
+ right:11px;bottom:10px;font-size:18px;
+}
+@media(max-width:1030px){
+ body.homepage-exact #applications .grid.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}
+ body.homepage-exact #applications .app-card,
+ body.homepage-exact #applications .app-card:nth-child(3n+2),
+ body.homepage-exact #applications .app-card:nth-child(3n+3){
+  grid-template-columns:80px minmax(0,1fr);
+  min-height:180px;
+ }
+ body.homepage-exact #applications .app-card .app-icon{width:76px;height:76px}
+ body.homepage-exact #applications .app-card .app-subtitle{font-size:10px}
+ body.homepage-exact #applications .app-card p:not(.app-subtitle){font-size:12px}
+}
+@media(max-width:680px){
+ body.homepage-exact #applications .grid.grid3{grid-template-columns:1fr}
+ body.homepage-exact #applications .app-card,
+ body.homepage-exact #applications .app-card:nth-child(3n+2),
+ body.homepage-exact #applications .app-card:nth-child(3n+3){
+  grid-template-columns:75px minmax(0,1fr);
+  min-height:156px;padding:17px 14px;
+ }
+ body.homepage-exact #applications .app-card .app-icon{width:72px;height:72px}
+ body.product-detail .product-art-panel{min-height:265px}
+ body.product-detail .product-art-image{width:172px;height:172px;border-radius:22px}
+}
+@media(max-width:390px){
+ body.homepage-exact #applications .app-card,
+ body.homepage-exact #applications .app-card:nth-child(3n+2),
+ body.homepage-exact #applications .app-card:nth-child(3n+3){
+  grid-template-columns:60px minmax(0,1fr);column-gap:11px;min-height:150px;
+ }
+ body.homepage-exact #applications .app-card .app-icon{width:58px;height:58px}
+}
