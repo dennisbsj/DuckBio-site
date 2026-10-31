@@ -692,3 +692,144 @@ img.suite-sprite.logo-ducknote{
   background-size:100% 100%;
   background-position:center center;
 }
+
+/* DuckBio homepage sectional contrast — ocean / ice / lagoon — 2026-10-31 */
+/* Retain the exact approved hero art and current navy/cyan brand. Change only
+   the visual contrast of the existing application and contact sections. */
+body.homepage-exact #applications.section{
+  background:
+    radial-gradient(ellipse at 84% 8%,rgba(125,220,227,.23),transparent 41%),
+    radial-gradient(ellipse at 0% 80%,rgba(180,223,231,.33),transparent 43%),
+    linear-gradient(145deg,#eaf5f7 0%,#dceef3 57%,#d1e7ee 100%);
+  color:#173a4c;
+  border-top:1px solid #bbdbe3;
+  border-bottom:2px solid #83c7d3;
+}
+body.homepage-exact #applications .section-head .eyebrow{
+  color:#116a83;
+}
+body.homepage-exact #applications .section-head h2{
+  color:#10344c;
+}
+body.homepage-exact #applications .section-head p{
+  color:#446b7c;
+}
+body.homepage-exact #applications .homepage-app-meta,
+body.homepage-exact #applications .homepage-app-meta span{color:#486c7c}
+body.homepage-exact #applications .homepage-app-meta strong{color:#123c51}
+body.homepage-exact #applications .homepage-app-meta .text-link{color:#086d8d}
+body.homepage-exact #applications .homepage-app-meta .text-link:hover{color:#034b6b}
+body.homepage-exact #applications .app-card{
+  background:linear-gradient(150deg,#153e57 0%,#0b2b43 100%);
+  border:1px solid rgba(20,104,131,.46);
+  color:#eefbff;
+  box-shadow:0 14px 30px rgba(20,67,91,.17),inset 0 1px 0 rgba(215,251,255,.09);
+}
+body.homepage-exact #applications .app-card:nth-child(3n+2){
+  background:linear-gradient(150deg,#1a5266 0%,#10364e 100%);
+}
+body.homepage-exact #applications .app-card:nth-child(3n+3){
+  background:linear-gradient(145deg,#174b67 0%,#102f50 100%);
+}
+body.homepage-exact #applications .app-card h3{color:#fff}
+body.homepage-exact #applications .app-card h3 b{color:#a3f2f4}
+body.homepage-exact #applications .app-card .app-subtitle{color:#92e7ed}
+body.homepage-exact #applications .app-card p:not(.app-subtitle){color:#c6e3ec}
+body.homepage-exact #applications .app-card::after{color:#91f6f3}
+body.homepage-exact #applications .app-card:hover,
+body.homepage-exact #applications .app-card:focus-visible{
+  background:linear-gradient(148deg,#24687e,#114158);
+  color:#fff;
+  border-color:#4dbccc;
+  box-shadow:0 18px 38px rgba(10,58,83,.27),0 0 0 1px rgba(109,224,237,.12);
+}
+body.homepage-exact #contact.section{
+  background:
+    radial-gradient(ellipse at 90% 5%,rgba(94,218,215,.18),transparent 46%),
+    linear-gradient(133deg,#0a3147 0%,#0e536a 54%,#136a78 100%);
+  color:#f0feff;
+  border-top:1px solid rgba(122,227,231,.36);
+  border-bottom:1px solid #153c53;
+}
+body.homepage-exact #contact .contact-copy .eyebrow{color:#9af5ec}
+body.homepage-exact #contact .contact-copy h2{color:#f6ffff}
+body.homepage-exact #contact .contact-copy>p{color:#d1ebf0}
+body.homepage-exact #contact .contact-steps{
+  background:rgba(6,38,60,.46);
+  border:1px solid rgba(177,232,234,.42);
+  color:#ebf9fc;
+}
+body.homepage-exact #contact .contact-steps strong{color:#fff}
+body.homepage-exact #contact .contact-steps p{color:#d2e9ef}
+body.homepage-exact #contact .contact-form-card{
+  background:linear-gradient(155deg,#f9fefe 0%,#eaf6f8 100%);
+  border:1px solid rgba(229,255,255,.89);
+  box-shadow:0 24px 57px rgba(0,20,33,.27);
+  color:#173a4b;
+}
+body.homepage-exact #contact .contact-field label{color:#173c4c}
+body.homepage-exact #contact .contact-field input,
+body.homepage-exact #contact .contact-field textarea{
+  background:#fff;
+  color:#193d4f;
+  border:1px solid #a4c9d3;
+}
+body.homepage-exact #contact .contact-field input::placeholder,
+body.homepage-exact #contact .contact-field textarea::placeholder{color:#658796}
+body.homepage-exact #contact .contact-footnote{color:#527583}
+body.homepage-exact #contact .contact-status{color:#116c7c}
+body.homepage-exact #contact .contact-form-card .btn-primary{
+  background:linear-gradient(110deg,#1d849a,#107291);
+  color:#fff;
+  border-color:#0f7490;
+  box-shadow:0 7px 18px rgba(8,86,113,.15);
+}
+body.homepage-exact #contact .contact-form-card .btn-primary:hover{
+  background:linear-gradient(110deg,#14708a,#095c77);
+}
+/* The optional dark mode keeps section separation rather than flattening it. */
+html[data-theme="dark"] body.homepage-exact #applications.section{
+  background:
+    radial-gradient(ellipse at 82% 2%,rgba(71,192,201,.2),transparent 44%),
+    linear-gradient(145deg,#16485d,#216477 63%,#1a536a);
+  color:#effcff;
+  border-color:#397d8c;
+}
+html[data-theme="dark"] body.homepage-exact #applications .section-head .eyebrow{color:#a2f3ef}
+html[data-theme="dark"] body.homepage-exact #applications .section-head h2{color:#fff}
+html[data-theme="dark"] body.homepage-exact #applications .section-head p,
+html[data-theme="dark"] body.homepage-exact #applications .homepage-app-meta,
+html[data-theme="dark"] body.homepage-exact #applications .homepage-app-meta span{color:#d2edf1}
+html[data-theme="dark"] body.homepage-exact #applications .homepage-app-meta strong{color:#fff}
+html[data-theme="dark"] body.homepage-exact #applications .homepage-app-meta .text-link{color:#a3f9f0}
+html[data-theme="dark"] body.homepage-exact #applications .app-card,
+html[data-theme="dark"] body.homepage-exact #applications .app-card:nth-child(3n+2),
+html[data-theme="dark"] body.homepage-exact #applications .app-card:nth-child(3n+3){
+  background:linear-gradient(153deg,#0d3349,#081e34);
+  border-color:rgba(154,223,232,.43);
+}
+html[data-theme="dark"] body.homepage-exact #applications .app-card:hover{
+  background:linear-gradient(150deg,#15506b,#0b344c);
+}
+html[data-theme="dark"] body.homepage-exact #contact.section{
+  background:linear-gradient(130deg,#051b2b,#0a3446 61%,#0b4551);
+}
+html[data-theme="dark"] body.homepage-exact #contact .contact-form-card{
+  background:linear-gradient(155deg,#12374a,#092c3c);
+  border-color:#4b8b9b;
+  color:#edfaff;
+}
+html[data-theme="dark"] body.homepage-exact #contact .contact-field label{color:#edfaff}
+html[data-theme="dark"] body.homepage-exact #contact .contact-field input,
+html[data-theme="dark"] body.homepage-exact #contact .contact-field textarea{
+  background:#091f2d;
+  color:#edfaff;
+  border-color:#4c7b8b;
+}
+html[data-theme="dark"] body.homepage-exact #contact .contact-field input::placeholder,
+html[data-theme="dark"] body.homepage-exact #contact .contact-field textarea::placeholder{color:#a6c3d0}
+html[data-theme="dark"] body.homepage-exact #contact .contact-footnote{color:#bbd5dd}
+html[data-theme="dark"] body.homepage-exact #contact .contact-status{color:#91e8ed}
+html[data-theme="dark"] body.homepage-exact #contact .contact-form-card .btn-primary{
+  background:linear-gradient(110deg,#85e8e4,#4ec4d7);color:#0b3245;border-color:#b0f8f4;
+}
