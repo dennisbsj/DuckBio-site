@@ -1,5 +1,5 @@
 import {DatabaseSync} from 'node:sqlite';
-import {createHash,randomBytes} from 'node:crypto';
+import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import {existsSync,mkdirSync,realpathSync,chmodSync,readFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -40,7 +40,8 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     'CREATE TABLE IF NOT EXISTS receipts(reference TEXT PRIMARY KEY,org TEXT NOT NULL,digest TEXT NOT NULL,recorded_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS session_organizations(session_id TEXT PRIMARY KEY,account TEXT NOT NULL,org TEXT NOT NULL,selected_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS permission_overrides(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,permission TEXT NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),PRIMARY KEY(org,account,app,permission),FOREIGN KEY(org,account,app) REFERENCES assignments(org,account,app) ON DELETE CASCADE)',
-    'CREATE TABLE IF NOT EXISTS organization_invites(token_hash TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),issued_by TEXT NOT NULL,email TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),expires_at INTEGER NOT NULL,UNIQUE(org,email))'
+    'CREATE TABLE IF NOT EXISTS organization_invites(token_hash TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),issued_by TEXT NOT NULL,email TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),expires_at INTEGER NOT NULL,UNIQUE(org,email))',
+    'CREATE TABLE IF NOT EXISTS subscription_drafts(id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),status TEXT NOT NULL CHECK(status IN (\'draft\',\'canceled\')),created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)'
   ].join(';')+';');
   for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))chmodSync(databasePath+suffix,0o600);
   const tx=work=>{db.exec('BEGIN IMMEDIATE');try{const result=work();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
@@ -131,6 +132,31 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
           else db.prepare('DELETE FROM assignments WHERE org=? AND account=? AND app=?').run(organizationId,member.accountId,app.id);
         }
         return view(organizationId,db.prepare('SELECT * FROM members WHERE org=? AND account=?').get(organizationId,member.accountId));
+      });
+    },
+    listSubscriptionDrafts(organizationId,actorId){
+      requireAdmin(organizationId,actorId);
+      return db.prepare('SELECT * FROM subscription_drafts WHERE org=? ORDER BY created_at DESC,id').all(organizationId)
+        .map(x=>({id:x.id,plan:x.plan,apps:JSON.parse(x.apps),seats:x.seats,status:x.status,createdAt:x.created_at,updatedAt:x.updated_at}));
+    },
+    createSubscriptionDraft({organizationId,actorId,plan,apps,seats}){
+      if(!['Single','Mixed','Bundle'].includes(plan)||!Array.isArray(apps)||!Number.isSafeInteger(seats)||seats<1||seats>10000||new Set(apps).size!==apps.length||apps.some(id=>!byId.has(id)))fail('invalid_subscription');
+      if((plan==='Single'&&apps.length!==1)||(plan==='Mixed'&&(apps.length<2||apps.length>5))||(plan==='Bundle'&&apps.length!==APPLICATIONS.length))fail('invalid_subscription');
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        const id=randomUUID(),now=clock(),selected=[...apps].sort();
+        db.prepare('INSERT INTO subscription_drafts VALUES(?,?,?,?,?,?,?,?)').run(id,organizationId,plan,JSON.stringify(selected),seats,'draft',now,now);
+        return {id,plan,apps:selected,seats,status:'draft',createdAt:now,updatedAt:now};
+      });
+    },
+    cancelSubscriptionDraft({organizationId,actorId,draftId}){
+      if(!safeId(draftId))fail('invalid_subscription');
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        const existing=db.prepare('SELECT status FROM subscription_drafts WHERE id=? AND org=?').get(draftId,organizationId);
+        if(!existing)fail('subscription_not_found');
+        if(existing.status!=='canceled')db.prepare('UPDATE subscription_drafts SET status=\'canceled\',updated_at=? WHERE id=? AND org=?').run(clock(),draftId,organizationId);
+        return {id:draftId,status:'canceled'};
       });
     },
     removeMember({organizationId,actorId,accountId}){

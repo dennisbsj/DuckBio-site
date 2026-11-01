@@ -129,3 +129,19 @@ test('removing a user revokes only this org, while other organization membership
  assert.deepEqual(store.organizationsFor('researcher').map(x=>x.id),['two']);
  assert.equal(store.overview('one','admin1').apps.find(a=>a.id==='goflo').assigned,0);
 });
+
+test('subscription drafts are tenant scoped and cannot ever grant seats',t=>{
+ const {store}=fixture(t);
+ store.setupOrganization({organizationId:'two',name:'Two',owner:{accountId:'admin2',name:'Admin Two',nickname:'T',email:'two@example.test'}});
+ assert.throws(()=>store.createSubscriptionDraft({organizationId:'one',actorId:'admin1',plan:'Single',apps:['eel','goflo'],seats:2}),/invalid_subscription/);
+ assert.throws(()=>store.createSubscriptionDraft({organizationId:'one',actorId:'admin2',plan:'Single',apps:['eel'],seats:2}),/access_denied/);
+ const draft=store.createSubscriptionDraft({organizationId:'one',actorId:'admin1',plan:'Mixed',apps:['eel','goflo'],seats:10});
+ assert.equal(draft.status,'draft');
+ assert.equal(store.listSubscriptionDrafts('one','admin1').length,1);
+ assert.deepEqual(store.listSubscriptionDrafts('two','admin2'),[]);
+ assert.throws(()=>store.cancelSubscriptionDraft({organizationId:'two',actorId:'admin2',draftId:draft.id}),/subscription_not_found/);
+ assert.equal(store.cancelSubscriptionDraft({organizationId:'one',actorId:'admin1',draftId:draft.id}).status,'canceled');
+ assert.equal(store.cancelSubscriptionDraft({organizationId:'one',actorId:'admin1',draftId:draft.id}).status,'canceled');
+ assert.deepEqual(store.overview('one','admin1').apps.map(a=>a.purchased),[0,0,0,0,0,0]);
+ assert.deepEqual(store.overview('one','admin1').apps.map(a=>a.assigned),[0,0,0,0,0,0]);
+});

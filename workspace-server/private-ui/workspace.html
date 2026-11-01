@@ -99,14 +99,20 @@
       <h2>Subscriptions</h2>
       <p>Purchased and assigned app seats are shown below. Checkout, changes to paid subscriptions, and cancellations require the verified billing integration; no account is charged from this screen.</p>
       <div id="subscription-seats" class="seats"></div>
-      <div class="actions"><button type="button" id="open-buy" class="primary">Buy users</button></div>
+      <div class="actions"><button type="button" id="open-buy" class="primary">Prepare subscription</button></div>
+      <h3>Subscription requests</h3><p>Drafts are not purchased subscriptions.</p><div id="subscription-drafts"></div>
     </section>
     <section id="buy-panel" class="panel" hidden>
       <h2>Buy users</h2>
       <p>Select additional users for one or more apps. This is an estimate only: checkout is not connected, and reviewing it will not purchase or assign licences.</p>
+      <div class="fields">
+        <label>Plan<select id="draft-plan"><option value="Single">Single (1 app)</option><option value="Mixed">Mixed (2–5 apps)</option><option value="Bundle">Bundle (all six apps)</option></select></label>
+        <label>Users for each selected app<input id="draft-seats" type="number" min="1" max="10000" step="1" value="1"></label>
+      </div>
+      <h3>Select applications</h3>
       <div id="buy-fields" class="roles"></div>
       <p id="buy-summary" role="status"></p>
-      <div class="actions"><button type="button" id="review-buy" class="primary">Review selection</button><button type="button" id="cancel-buy">Close</button></div>
+      <div class="actions"><button type="button" id="review-buy">Review selection</button><button type="button" id="save-draft" class="primary">Save subscription draft</button><button type="button" id="cancel-buy">Close</button></div>
     </section>
     </div>
     <div id="tab-matrix" hidden>

@@ -172,3 +172,19 @@ test('org admin can invite new central account, activated only once, without app
  assert.notEqual(f.identityStore.getUser(newAccount.id),null,'central identity persists after leaving org');
  assert.equal((await admin.call('/api/suite/organization/user/remove',{organizationId:'org-a',accountId:owner.id})).status,409,'last admin cannot be removed');
 });
+
+test('subscription draft HTTP API is CSRF protected, org locked and cannot mint seats',async t=>{
+ const f=await fixture(t),admin=f.browser();await admin.preflight();
+ const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
+ f.organizationStore.setupOrganization({organizationId:'org-a',name:'Lab A',owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:'owner@example.test'}});
+ const request={organizationId:'org-a',plan:'Mixed',apps:['eel','goflo'],seats:10};
+ assert.equal((await admin.call('/api/suite/organization/subscription/draft',request)).status,403);
+ assert.equal((await admin.call('/api/suite/organization/select',{organizationId:'org-a'})).status,200);
+ assert.equal((await admin.call('/api/suite/organization/subscription/draft',request,'POST',false)).status,403);
+ const saved=await admin.call('/api/suite/organization/subscription/draft',request);
+ assert.equal(saved.status,201);const draft=(await saved.json()).draft;
+ assert.equal((await (await admin.call('/api/suite/organization/subscriptions',{organizationId:'org-a'})).json()).drafts.length,1);
+ assert.equal((await admin.call('/api/suite/organization/subscription/cancel',{organizationId:'org-b',draftId:draft.id})).status,403);
+ assert.equal((await admin.call('/api/suite/organization/subscription/cancel',{organizationId:'org-a',draftId:draft.id})).status,200);
+ assert.deepEqual(f.organizationStore.overview('org-a',owner.id).apps.map(x=>x.purchased),[0,0,0,0,0,0]);
+});

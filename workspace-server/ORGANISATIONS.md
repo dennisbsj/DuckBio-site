@@ -22,3 +22,7 @@ The organization administrator can create a seven-day, one-use invitation to the
 The **Remove** control removes the user's membership and all their Workspace app-role/permission assignments in that organization. It does not delete central identity or any other organization's memberships or application data. The final organization administrator cannot be removed. Session-bound organization checks fail closed if membership is removed.
 
 This is isolated preproduction source; no mail or billing integration, production account cutover, actual app role enforcement or deployment has occurred. All invite links are bearer credentials: deliver them privately and avoid posting in tickets or public chat.
+
+## Subscription drafts
+
+The admin's Subscriptions tab shows paid/assigned per-app seat counts from private SQLite, and allows a selected-organization admin to create and cancel **unpaid subscription drafts** for valid Single (one app), Mixed (two–five apps) or Bundle (six apps) selections with a common positive seat quantity. These draft records are durable and tenant-isolated. They are not invoices, Stripe subscriptions, orders, or granted licences; creating/canceling one never calls `applyVerifiedSeatPurchase` or updates seat counters. To buy or change a paid subscription, a signed, idempotent Stripe checkout/webhook and billing reconciliation integration is still required, followed by staging tests. **Do not call the draft flow a completed purchase.**
