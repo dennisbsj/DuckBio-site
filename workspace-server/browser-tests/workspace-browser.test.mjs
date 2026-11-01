@@ -124,10 +124,10 @@ test('admin can search and filter a real permission matrix, then persist and rev
  await toggle.waitFor();
  assert.equal(await toggle.isChecked(),false);
  await toggle.check();
- await page.waitForFunction(()=>document.getElementById('matrix-info')?.textContent.startsWith('Saved document.review'));
+ await page.waitForFunction(()=>document.getElementById('matrix-info')?.textContent.includes('Saved document.review (enabled)'));
  assert(org.effectivePermissions({organizationId:'lab-a',accountId:worker.id,appId:'eel'}).includes('document.review'));
  await page.getByRole('checkbox',{name:'Lab worker DuckNote document.review'}).uncheck();
- await page.waitForFunction(()=>document.getElementById('matrix-info')?.textContent.startsWith('Saved document.review'));
+ await page.waitForFunction(()=>document.getElementById('matrix-info')?.textContent.includes('Saved document.review (disabled)'));
  assert(!org.effectivePermissions({organizationId:'lab-a',accountId:worker.id,appId:'eel'}).includes('document.review'));
  await page.locator('#matrix-search').fill('no-such-user');
  assert.equal(await page.locator('#matrix-body tr').count(),0);
