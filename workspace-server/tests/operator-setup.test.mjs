@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
-import path from 'node:path';import os from 'node:os';
+import path from 'node:path';import os from 'node:os';import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {createIdentityStore} from '../shared-auth/identity-store.mjs';
@@ -17,7 +17,7 @@ test('offline organization setup binds exact pre-existing active central adminis
  const user=await identity.createUser({email:'member@example.test',displayName:'Member',password:'Synthetic password 12345'});
  identity.close();
  const args=['--identity-db',identityPath,'--organization-db',orgPath,'--id','lab-1','--name','Synthetic Lab','--owner-id',owner.id,'--nickname','Admin'];
- const cmd=extra=>spawnSync(process.execPath,['./setup-organization.mjs',...(extra||args)],{cwd:path.resolve('workspace-server'),encoding:'utf8'});
+ const cmd=extra=>spawnSync(process.execPath,['./setup-organization.mjs',...(extra||args)],{cwd:fileURLToPath(new URL('../',import.meta.url)),encoding:'utf8'});
  const denied=cmd(args.map(x=>x===owner.id?user.id:x));
  assert.equal(denied.status,1);assert.match(denied.stderr,/verified_admin_required/);
  const ok=cmd();assert.equal(ok.status,0,ok.stderr);assert.deepEqual(JSON.parse(ok.stdout),{ok:true,organizationId:'lab-1'});
