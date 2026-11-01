@@ -145,3 +145,30 @@ test('permission matrix API requires the selected organization and rejects unrel
  assert(f.organizationStore.effectivePermissions({organizationId:'org-a',accountId:scientist.id,appId:'eel'}).includes('document.review'));
  assert.equal((await admin.call('/api/suite/organization/matrix',{organizationId:'org-b'})).status,403);
 });
+
+test('org admin can invite new central account, activated only once, without app grants',async t=>{
+ const f=await fixture(t),admin=f.browser(),guest=f.browser();
+ await admin.preflight();await guest.preflight();
+ const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
+ f.organizationStore.setupOrganization({organizationId:'org-a',name:'Alpha lab',owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:'owner@example.test'}});
+ assert.equal((await admin.call('/api/suite/organization/invite',{organizationId:'org-a',name:'New scientist',nickname:'New',email:'new@example.test'})).status,403,'select org before inviting');
+ await admin.call('/api/suite/organization/select',{organizationId:'org-a'});
+ assert.equal((await admin.call('/api/suite/organization/invite',{organizationId:'org-a',name:'Scientist',nickname:'Sci',email:'new@example.test'},'POST',false)).status,403,'CSRF');
+ const invitationResponse=await admin.call('/api/suite/organization/invite',{organizationId:'org-a',name:'Scientist',nickname:'Sci',email:'new@example.test'});
+ assert.equal(invitationResponse.status,201);
+ const invite=await invitationResponse.json(),token=new URL(invite.invitationUrl).searchParams.get('invite');
+ const preview=await (await guest.call('/api/suite/organization/invite/preview?token='+token)).json();
+ assert.equal(preview.invitation.email,'new@example.test');
+ assert.equal((await guest.call('/api/suite/organization/invite/accept',{token,password:'Long example password 12345'},'POST',false)).status,403);
+ const accepted=await guest.call('/api/suite/organization/invite/accept',{token,password:'Long example password 12345'});
+ assert.equal(accepted.status,201,await accepted.text().catch(()=>'')); 
+ const newAccount=f.identityStore.findUserByEmail('new@example.test');
+ assert.equal(newAccount.role,'member');
+ assert.equal(f.organizationStore.organizationsFor(newAccount.id)[0].id,'org-a');
+ assert.deepEqual(f.organizationStore.overview('org-a',owner.id).users.find(u=>u.accountId===newAccount.id).roles,{});
+ assert.equal((await guest.call('/api/suite/organization/invite/accept',{token})).status,403,'one-use token');
+ assert.equal((await admin.call('/api/suite/organization/user/remove',{organizationId:'org-a',accountId:newAccount.id})).status,200);
+ assert.equal(f.organizationStore.organizationsFor(newAccount.id).length,0);
+ assert.notEqual(f.identityStore.getUser(newAccount.id),null,'central identity persists after leaving org');
+ assert.equal((await admin.call('/api/suite/organization/user/remove',{organizationId:'org-a',accountId:owner.id})).status,409,'last admin cannot be removed');
+});

@@ -31,6 +31,16 @@
     <p>This organization will remain selected for the entire login session. Sign out to choose a different one.</p>
     <div id="organization-options" class="roles"></div>
   </section>
+  <section id="invite-accept-panel" class="panel" hidden>
+    <h2>Join an organization</h2>
+    <p id="invite-description"></p>
+    <form id="invite-accept-form" class="fields">
+      <label>Invited email<input id="invite-email-display" type="email" readonly></label>
+      <label>Choose a password (new accounts only)<input id="invite-password" type="password" minlength="12" autocomplete="new-password"></label>
+      <button type="submit" class="primary">Activate invitation</button>
+      <button type="button" id="invite-existing-login">I already have a DuckBio account</button>
+    </form>
+  </section>
   <div id="portal" hidden>
     <nav class="workspace-tabs" aria-label="Administration sections">
       <button type="button" class="active" data-tab="users" aria-selected="true">User administration</button>
@@ -40,7 +50,7 @@
     <div id="tab-users">
     <section class="panel toolbar">
       <label>Current organization<select id="organizations" aria-label="Current organization" disabled></select></label><small>To change organization, sign out and sign in again.</small>
-      <div class="actions"><button type="button" id="create" class="primary">Create account access</button><button type="button" id="buy">Buy users</button></div>
+      <div class="actions"><button type="button" id="create" class="primary">Add existing account</button><button type="button" id="invite" class="primary">Invite user</button><button type="button" id="buy">Buy users</button></div>
     </section>
     <section class="panel">
       <h2 id="organization-name">Organization</h2>
@@ -66,6 +76,22 @@
         <div id="role-fields" class="roles"></div>
         <div class="actions"><button type="submit" class="primary">Save permissions</button><button type="button" id="cancel-edit">Cancel</button></div>
       </form>
+    </section>
+    <section id="invite-panel" class="panel" hidden>
+      <h2>Invite a user</h2>
+      <p>Invite a new or existing DuckBio account to this organization. No app licence is assigned until an administrator selects an app role after acceptance.</p>
+      <form id="invite-form" class="fields">
+        <label>Name<input id="invite-name" maxlength="120" required></label>
+        <label>Nickname<input id="invite-nickname" maxlength="120" required></label>
+        <label>Email<input id="invite-email" type="email" maxlength="254" required></label>
+        <label class="inline"><input id="invite-admin" type="checkbox"> Organization administrator</label>
+        <div class="actions"><button type="submit" class="primary">Create invitation</button><button type="button" id="close-invite">Cancel</button></div>
+      </form>
+      <div id="invite-result" hidden>
+        <p>Share this one-time activation link securely with the invited person. It expires after seven days.</p>
+        <label>Invitation link<input id="invitation-link" readonly></label>
+        <button type="button" id="copy-invitation">Copy link</button>
+      </div>
     </section>
     </div>
     <div id="tab-subscriptions" hidden>

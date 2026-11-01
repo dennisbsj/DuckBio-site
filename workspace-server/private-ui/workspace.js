@@ -1,6 +1,6 @@
 // Private same-origin Workspace UI. Server owns roles, license counts and identity.
 const $=id=>document.getElementById(id);
-const state={csrf:'',orgs:[],selected:null,overview:null,matrix:null,busy:false};
+const state={csrf:'',orgs:[],selected:null,overview:null,matrix:null,busy:false,inviteToken:null,inviteDetails:null};
 const errorMessage=(status)=>status===401?'Sign in again.':status===403?'Your role does not allow this action.':status===409?'There are not enough app licences, or the data changed. Reload the organization.':status===400?'Check the account, email and app roles.':'The private Workspace service is unavailable.';
 function status(message){$('status').textContent=message;}
 function el(tag,text,cls){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
@@ -11,7 +11,7 @@ async function request(route,data){
  if(!res.ok)throw Object.assign(new Error(errorMessage(res.status)),{status:res.status});
  return body;
 }
-function showPortal(visible){$('portal').hidden=!visible;$('sign-in').hidden=visible;$('organization-choice').hidden=true;$('logout').hidden=!visible;}
+function showPortal(visible){$('portal').hidden=!visible;$('sign-in').hidden=visible;$('organization-choice').hidden=true;$('invite-accept-panel').hidden=true;$('logout').hidden=!visible;}
 async function csrf(){
  const response=await fetch('/api/suite/auth/session',{credentials:'same-origin',cache:'no-store'});
  const body=await response.json();
@@ -34,8 +34,14 @@ function renderMembers(){
   name.append(el('strong',user.name),el('small',user.email));
   roles.textContent=Object.entries(user.roles).map(([id,role])=>state.overview.apps.find(a=>a.id===id)?.name+' ('+role+')').join(', ')||'No access';
   controls.append(button('Edit permissions',()=>edit(user)));
+  controls.append(button('Remove',()=>removeUser(user)));
   row.append(name,el('td',user.nickname),el('td',user.admin?'Organization admin':'User'),roles,controls);root.append(row);
  }
+}
+async function removeUser(user){
+ if(!window.confirm('Remove '+user.name+' from '+state.overview.organization.name+'? This does not delete their DuckBio account or any other organization memberships.'))return;
+ try{await request('/api/suite/organization/user/remove',{organizationId:state.selected,accountId:user.accountId});await overview(state.selected);status('Removed '+user.name+' from this organization.');}
+ catch(e){status(e.message);}
 }
 function roleFields(user){
  const root=$('role-fields');root.replaceChildren();
@@ -49,7 +55,7 @@ function roleFields(user){
  }
 }
 function edit(user){
- $('buy-panel').hidden=true;$('edit-panel').hidden=false;
+ $('buy-panel').hidden=true;$('invite-panel').hidden=true;$('edit-panel').hidden=false;
  $('edit-title').textContent=user?'Edit user permissions':'Create account access';
  $('account-id').readOnly=Boolean(user);
  for(const [id,value] of [['account-id',user?.accountId||''],['name',user?.name||''],['nickname',user?.nickname||''],['member-email',user?.email||'']])$(id).value=value;
@@ -59,7 +65,7 @@ function edit(user){
 async function overview(orgId){
  const view=await request('/api/suite/organization/overview',{organizationId:orgId});
  state.overview=view;$('organization-name').textContent=view.organization.name;
- renderSeats();renderMembers();$('edit-panel').hidden=true;$('buy-panel').hidden=true;
+ renderSeats();renderMembers();$('edit-panel').hidden=true;$('buy-panel').hidden=true;$('invite-panel').hidden=true;
  state.matrix=null;
  status('Workspace data loaded from the private server.');
 }
@@ -71,7 +77,7 @@ async function chooseOrganization(orgId){
   $('organizations').replaceChildren();
   const option=el('option',chosen.selectedOrganization.name);option.value=chosen.selectedOrganization.id;
   $('organizations').append(option);
-  $('organization-choice').hidden=true;
+  $('organization-choice').hidden=true;$('invite-accept-panel').hidden=true;
   if(!chosen.selectedOrganization.admin){
    $('portal').hidden=true;$('sign-in').hidden=true;$('logout').hidden=false;
    status('Signed in. You do not have organization administrator rights.');return;
@@ -85,7 +91,7 @@ async function load(){
   const data=await request('/api/suite/organizations');
   state.orgs=data.organizations||[];
   $('logout').hidden=false;
-  $('sign-in').hidden=true;
+  $('sign-in').hidden=true;$('invite-accept-panel').hidden=true;
   $('portal').hidden=true;
   if(data.selectedOrganization){
    state.selected=data.selectedOrganization.id;
@@ -113,7 +119,13 @@ $('login-form').addEventListener('submit',async event=>{
  try{
   await csrf();
   await request('/api/suite/account/login',{email:$('email').value.trim(),password:$('password').value});
-  $('password').value='';await load();
+  $('password').value='';
+  if(state.inviteToken){
+   await request('/api/suite/organization/invite/accept',{token:state.inviteToken});
+   state.inviteToken=null;state.inviteDetails=null;
+   history.replaceState(null,'','/workspace');
+  }
+  await load();
  }catch(e){status(e.message);}finally{state.busy=false;}
 });
 $('logout').addEventListener('click',async()=>{try{await request('/api/suite/account/logout',{});state.overview=null;state.selected=null;showPortal(false);status('Signed out. Sign in again to choose an organization.');}catch(e){status(e.message);}});
@@ -215,4 +227,59 @@ $('matrix-search').addEventListener('input',renderMatrix);
 $('matrix-app').addEventListener('change',renderMatrix);
 $('matrix-sort').addEventListener('change',renderMatrix);
 
-load().catch(e=>status(e.message));
+
+$('invite').addEventListener('click',()=>{
+ showTab('users');$('edit-panel').hidden=true;
+ $('invite-panel').hidden=false;$('invite-result').hidden=true;
+ $('invite-form').reset();$('invite-panel').scrollIntoView({behavior:'smooth',block:'start'});
+});
+$('close-invite').addEventListener('click',()=>{$('invite-panel').hidden=true;});
+$('invite-form').addEventListener('submit',async event=>{
+ event.preventDefault();
+ if(state.busy||!event.currentTarget.reportValidity())return;
+ state.busy=true;
+ try{
+  const result=await request('/api/suite/organization/invite',{
+   organizationId:state.selected,name:$('invite-name').value.trim(),nickname:$('invite-nickname').value.trim(),
+   email:$('invite-email').value.trim(),admin:$('invite-admin').checked});
+  $('invitation-link').value=result.invitationUrl;
+  $('invite-result').hidden=false;status('Invitation created. Share the link securely with the invited person.');
+ }catch(e){status(e.message);}finally{state.busy=false;}
+});
+$('copy-invitation').addEventListener('click',async()=>{
+ try{await navigator.clipboard.writeText($('invitation-link').value);status('Invitation link copied.');}
+ catch{status('Copy the invitation link manually from the field.');}
+});
+$('invite-existing-login').addEventListener('click',()=>{
+ showPortal(false);status('Sign in with the invited email address to join this organization.');
+});
+$('invite-accept-form').addEventListener('submit',async e=>{
+ e.preventDefault();
+ if(!e.currentTarget.reportValidity()||state.busy||!state.inviteToken)return;
+ state.busy=true;
+ try{
+  await csrf();
+  await request('/api/suite/organization/invite/accept',{token:state.inviteToken,password:$('invite-password').value});
+  state.inviteToken=null;state.inviteDetails=null;
+  $('invite-password').value='';history.replaceState(null,'','/workspace');
+  await load();status('Organization invitation accepted.');
+ }catch(e){status(e.message);}finally{state.busy=false;}
+});
+async function start(){
+ const token=new URLSearchParams(location.search).get('invite');
+ if(!token){await load();return;}
+ state.inviteToken=token;
+ await csrf();
+ try{
+  const result=await request('/api/suite/organization/invite/preview?token='+encodeURIComponent(token));
+  state.inviteDetails=result.invitation;
+  $('invite-description').textContent='You are invited to join '+result.invitation.organizationName+'.';
+  $('invite-email-display').value=result.invitation.email;
+  $('sign-in').hidden=true;$('portal').hidden=true;$('organization-choice').hidden=true;
+  $('invite-accept-panel').hidden=false;
+  $('logout').hidden=true;
+  status('Use a new password to activate, or sign in with your existing DuckBio account.');
+ }catch(e){showPortal(false);status('This invitation is unavailable or expired.');}
+}
+
+start().catch(e=>status(e.message));
