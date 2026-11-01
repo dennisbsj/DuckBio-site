@@ -745,6 +745,47 @@ body:not(.homepage-exact) .pr-hero.pr-plans-first .pr-compact-header h1 .pr-head
  #choose-apps .pr-select-savings{padding:12px 13px;margin:10px 0}
  .pr-hero .pr-compact-header h1 .pr-heading-rays{right:-.31em;top:-.36em}
 }
+
+/* Pricing 2026-11-01: display savings as highlighted inline text, not a card. */
+#choose-apps .pr-select-review-price .pr-select-savings{
+ display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px;row-gap:2px;
+ margin:12px 0 14px;padding:0;
+ border:0;border-radius:0;box-shadow:none;
+ background:none;line-height:1.35;
+}
+#choose-apps .pr-select-review-price .pr-select-savings-label{
+ font-size:clamp(13px,1.1vw,16px);
+ font-weight:800;letter-spacing:0;text-transform:none;color:#6cf1e9;
+}
+#choose-apps .pr-select-review-price .pr-select-savings strong#pr-select-savings-amount{
+ font-size:clamp(20px,2.25vw,28px);line-height:1.2;
+ font-weight:900;letter-spacing:-.025em;color:#8affed;
+}
+#choose-apps .pr-select-review-price .pr-select-savings-detail{
+ flex:1 1 100%;font-size:11px;font-weight:600;line-height:1.4;color:#a5e9e7;
+}
+html:not([data-theme="dark"]) body:not(.homepage-exact) #choose-apps .pr-select-savings-label,
+html:not([data-theme="dark"]) body:not(.homepage-exact) #choose-apps .pr-select-savings strong#pr-select-savings-amount{color:#007f91}
+html:not([data-theme="dark"]) body:not(.homepage-exact) #choose-apps .pr-select-savings-detail{color:#237284}
+/* Restore the short scientific descriptions below each app name. */
+#choose-apps .pr-select-layout .pr-select-category{
+ display:block;min-height:2.7em;
+ max-width:100%;margin:5px auto 0;
+ text-align:center;font-weight:600;
+ font-size:clamp(10px,.83vw,12px);
+ line-height:1.35;letter-spacing:0;
+ text-transform:none;text-wrap:balance;word-break:normal;overflow-wrap:break-word;
+}
+#choose-apps .pr-select-layout .pr-select-name{min-height:0}
+@media(max-width:760px){
+ #choose-apps .pr-select-layout .pr-select-category{
+  font-size:10px;line-height:1.28;margin-top:4px;min-height:3.8em;
+ }
+ #choose-apps .pr-select-review-price .pr-select-savings{margin:10px 0 12px}
+}
+@media(max-width:370px){
+ #choose-apps .pr-select-layout .pr-select-category{min-height:2.7em}
+}
 </style></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
 <section class="pr-hero pr-plans-first" id="plans"><div class="wrap">
  <div class="pr-compact-header">
@@ -766,12 +807,12 @@ body:not(.homepage-exact) .pr-hero.pr-plans-first .pr-compact-header h1 .pr-head
  <div class="pr-select-toolbar"><button type="button" id="pr-select-all" class="pr-select-all" aria-pressed="false">Select all apps</button><span id="pr-select-selection-count" role="status" aria-live="polite">0 of 6 apps selected</span><span class="pr-toolbar-discount" id="pr-toolbar-discount" hidden></span></div>
  <div class="pr-select-layout">
  <div class="pr-select-grid" role="group" aria-label="Choose DuckBio apps">
- <div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="labduck" data-app-name="LabDuck" aria-pressed="false" aria-label="Select LabDuck"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-limsduck" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category"><b>LAB</b>ORATORY INFORMATION MANAGEMENT SYSTEM</span><span class="pr-select-name"><b>Lab</b>Duck</span></button><a class="pr-select-details" href="labduck.html" aria-label="Learn more about LabDuck">Learn more →</a></div>
-<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="cytoduck" data-app-name="CytoDuck" aria-pressed="false" aria-label="Select CytoDuck"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-cytoduck" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category">FLOW <b>CYTO</b>METRY ANALYSIS</span><span class="pr-select-name"><b>Cyto</b>Duck</span></button><a class="pr-select-details" href="cytoduck.html" aria-label="Learn more about CytoDuck">Learn more →</a></div>
-<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="duckpipe" data-app-name="DuckPipe" aria-pressed="false" aria-label="Select DuckPipe"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-methduck" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category">METHOD VALIDATION <b>PIPE</b>LINE MANAGEMENT</span><span class="pr-select-name">Duck<b>Pipe</b></span></button><a class="pr-select-details" href="duckpipe.html" aria-label="Learn more about DuckPipe">Learn more →</a></div>
-<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="ducknote" data-app-name="DuckNote" aria-pressed="false" aria-label="Select DuckNote"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-ducknote" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category">ELECTRONIC LAB <b>NOTE</b>BOOK</span><span class="pr-select-name">Duck<b>Note</b></span></button><a class="pr-select-details" href="eel.html" aria-label="Learn more about DuckNote">Learn more →</a></div>
-<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="duckman" data-app-name="DuckMan" aria-pressed="false" aria-label="Select DuckMan"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-duckman" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category"><b>DUCK</b>UMENT MANAGEMENT</span><span class="pr-select-name">Duck<b>Man</b></span></button><a class="pr-select-details" href="duckman.html" aria-label="Learn more about DuckMan">Learn more →</a></div>
-<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="ducktrain" data-app-name="DuckTrain" aria-pressed="false" aria-label="Select DuckTrain"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-ducktrain" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category"><b>TRAIN</b>ING &amp; QUALIFICATION MANAGEMENT</span><span class="pr-select-name">Duck<b>Train</b></span></button><a class="pr-select-details" href="mantrain.html" aria-label="Learn more about DuckTrain">Learn more →</a></div>
+ <div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="labduck" data-app-name="LabDuck" aria-pressed="false" aria-label="Select LabDuck"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-limsduck" src="assets/icons/transparent.svg" alt=""><span class="pr-select-name"><b>Lab</b>Duck</span><span class="pr-select-category">Laboratory information management system</span></button><a class="pr-select-details" href="labduck.html" aria-label="Learn more about LabDuck">Learn more →</a></div>
+<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="cytoduck" data-app-name="CytoDuck" aria-pressed="false" aria-label="Select CytoDuck"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-cytoduck" src="assets/icons/transparent.svg" alt=""><span class="pr-select-name"><b>Cyto</b>Duck</span><span class="pr-select-category">Flow cytometry analysis</span></button><a class="pr-select-details" href="cytoduck.html" aria-label="Learn more about CytoDuck">Learn more →</a></div>
+<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="duckpipe" data-app-name="DuckPipe" aria-pressed="false" aria-label="Select DuckPipe"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-methduck" src="assets/icons/transparent.svg" alt=""><span class="pr-select-name">Duck<b>Pipe</b></span><span class="pr-select-category">Method validation pipeline management</span></button><a class="pr-select-details" href="duckpipe.html" aria-label="Learn more about DuckPipe">Learn more →</a></div>
+<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="ducknote" data-app-name="DuckNote" aria-pressed="false" aria-label="Select DuckNote"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-ducknote" src="assets/icons/transparent.svg" alt=""><span class="pr-select-name">Duck<b>Note</b></span><span class="pr-select-category">Electronic lab notebook</span></button><a class="pr-select-details" href="eel.html" aria-label="Learn more about DuckNote">Learn more →</a></div>
+<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="duckman" data-app-name="DuckMan" aria-pressed="false" aria-label="Select DuckMan"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-duckman" src="assets/icons/transparent.svg" alt=""><span class="pr-select-name">Duck<b>Man</b></span><span class="pr-select-category">Duckument management</span></button><a class="pr-select-details" href="duckman.html" aria-label="Learn more about DuckMan">Learn more →</a></div>
+<div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="ducktrain" data-app-name="DuckTrain" aria-pressed="false" aria-label="Select DuckTrain"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-ducktrain" src="assets/icons/transparent.svg" alt=""><span class="pr-select-name">Duck<b>Train</b></span><span class="pr-select-category">Training &amp; qualification management</span></button><a class="pr-select-details" href="mantrain.html" aria-label="Learn more about DuckTrain">Learn more →</a></div>
  </div>
  <div class="pr-select-review" id="calculator">
   <div class="pr-select-review-main"><p class="eyebrow">Your estimate</p><h3 id="pr-select-title">No apps selected</h3><p id="pr-select-names">Select one or more apps above to calculate your subscription.</p>
@@ -782,11 +823,11 @@ body:not(.homepage-exact) .pr-hero.pr-plans-first .pr-compact-header h1 .pr-head
 <span class="pr-select-kicker">Estimated monthly price</span>
 <strong id="pr-select-total">Choose an app</strong>
 <p id="pr-select-breakdown">Prices exclude VAT.</p>
-<div class="pr-select-savings" id="pr-select-savings" hidden>
- <span class="pr-select-savings-label">YOUR MONTHLY SAVINGS</span>
+<p class="pr-select-savings" id="pr-select-savings" hidden>
+ <span class="pr-select-savings-label">Monthly savings:</span>
  <strong id="pr-select-savings-amount"></strong>
  <span class="pr-select-savings-detail" id="pr-select-savings-detail"></span>
-</div>
+</p>
 <div class="pr-select-actions"><button class="btn btn-secondary" type="button" id="pr-select-copy" disabled>Export estimate .xlsx</button></div>
 <p class="pr-select-note" id="pr-select-note">Estimate only. Checkout is not live; no payment or subscription is created. <a href="support.html#pricing-and-subscriptions">Subscription FAQs</a></p>
 <span class="pr-copy-status" role="status" id="pr-select-status"></span>
