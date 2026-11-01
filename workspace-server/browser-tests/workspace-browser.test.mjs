@@ -34,7 +34,7 @@ async function fixture(t) {
  // Register cleanup before service/browser creation, including constructor failures.
  t.after(async()=>{await browser?.close();server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));identity.close();auth.close();org.close();rmSync(temp,{recursive:true,force:true});assert.deepEqual(errors,[],'uncaught browser errors');});
  const assetRoot=fileURLToPath(new URL('../private-ui/',import.meta.url));
- service=createAccountService({origin,issuer:origin,clients:registrations,identityStore:identity,organizationStore:org,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
+ service=createAccountService({origin,issuer:'https://login.example.invalid',clients:registrations,identityStore:identity,organizationStore:org,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:1280,height:800}});
  const page=await context.newPage();
