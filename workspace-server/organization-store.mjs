@@ -1,5 +1,5 @@
 import {DatabaseSync} from 'node:sqlite';
-import {createHash} from 'node:crypto';
+import {createHash,randomBytes} from 'node:crypto';
 import {existsSync,mkdirSync,realpathSync,chmodSync,readFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -7,6 +7,8 @@ import {fileURLToPath} from 'node:url';
 const policy=JSON.parse(readFileSync(fileURLToPath(new URL('../suite-permissions.json',import.meta.url)),'utf8'));
 export const APPLICATIONS=Object.freeze([['limsman','LabDuck','LIMSMan'],['goflo','CytoDuck','GoFlo'],['methpipe','DuckPipe','MethPipe'],['eel','DuckNote','EEL'],['duckman','DuckMan','DuckMan'],['mantrain','DuckTrain','ManTrain']].map(([id,name,key])=>Object.freeze({id,name,roles:Object.freeze(Object.keys(policy.apps[key].roles)),rolePermissions:Object.freeze(policy.apps[key].roles),permissions:Object.freeze([...new Set(Object.values(policy.apps[key].roles).flat().filter(p=>p!=='*'))].sort())})));
 const byId=new Map(APPLICATIONS.map(x=>[x.id,x]));
+const inviteHash=x=>createHash('sha256').update(x).digest('hex');
+const safeToken=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{43}$/.test(x);
 const safeId=x=>typeof x==='string'&&/^[\w.:-]{1,128}$/.test(x);
 const safeText=(x,max=120)=>typeof x==='string'&&x.trim().length>0&&x.length<=max&&!/[\u0000-\u001f\u007f]/.test(x);
 const safeEmail=x=>typeof x==='string'&&x.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x);
@@ -37,7 +39,8 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     'CREATE TABLE IF NOT EXISTS assignments(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,role TEXT NOT NULL,PRIMARY KEY(org,account,app),FOREIGN KEY(org,account) REFERENCES members(org,account) ON DELETE CASCADE)',
     'CREATE TABLE IF NOT EXISTS receipts(reference TEXT PRIMARY KEY,org TEXT NOT NULL,digest TEXT NOT NULL,recorded_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS session_organizations(session_id TEXT PRIMARY KEY,account TEXT NOT NULL,org TEXT NOT NULL,selected_at INTEGER NOT NULL)',
-    'CREATE TABLE IF NOT EXISTS permission_overrides(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,permission TEXT NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),PRIMARY KEY(org,account,app,permission),FOREIGN KEY(org,account,app) REFERENCES assignments(org,account,app) ON DELETE CASCADE)'
+    'CREATE TABLE IF NOT EXISTS permission_overrides(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,permission TEXT NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),PRIMARY KEY(org,account,app,permission),FOREIGN KEY(org,account,app) REFERENCES assignments(org,account,app) ON DELETE CASCADE)',
+    'CREATE TABLE IF NOT EXISTS organization_invites(token_hash TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),issued_by TEXT NOT NULL,email TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),expires_at INTEGER NOT NULL,UNIQUE(org,email))'
   ].join(';')+';');
   for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))chmodSync(databasePath+suffix,0o600);
   const tx=work=>{db.exec('BEGIN IMMEDIATE');try{const result=work();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
@@ -128,6 +131,48 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
           else db.prepare('DELETE FROM assignments WHERE org=? AND account=? AND app=?').run(organizationId,member.accountId,app.id);
         }
         return view(organizationId,db.prepare('SELECT * FROM members WHERE org=? AND account=?').get(organizationId,member.accountId));
+      });
+    },
+    removeMember({organizationId,actorId,accountId}){
+      if(!safeId(accountId))fail('invalid_member');
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        const row=db.prepare('SELECT admin FROM members WHERE org=? AND account=?').get(organizationId,accountId);
+        if(!row)fail('member_not_found');
+        if(row.admin && db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1').get(organizationId).n===1)fail('last_organization_admin');
+        db.prepare('DELETE FROM members WHERE org=? AND account=?').run(organizationId,accountId);
+        return {removed:true,accountId};
+      });
+    },
+    issueInvitation({organizationId,actorId,email,name,nickname,admin=false}){
+      if(!safeEmail(email)||!safeText(name)||!safeText(nickname)||typeof admin!=='boolean')fail('invalid_invitation');
+      const normalized=email.trim().toLowerCase();
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        if(db.prepare('SELECT 1 FROM members WHERE org=? AND email=?').get(organizationId,normalized))fail('member_exists');
+        db.prepare('DELETE FROM organization_invites WHERE expires_at<=?').run(clock());
+        if(db.prepare('SELECT 1 FROM organization_invites WHERE org=? AND email=?').get(organizationId,normalized))fail('invitation_exists');
+        const token=randomBytes(32).toString('base64url'),expiresAt=clock()+7*24*60*60*1000;
+        db.prepare('INSERT INTO organization_invites VALUES(?,?,?,?,?,?,?,?)').run(inviteHash(token),organizationId,actorId,normalized,name.trim(),nickname.trim(),admin?1:0,expiresAt);
+        return {token,expiresAt};
+      });
+    },
+    previewInvitation(token){
+      if(!safeToken(token))return null;
+      const row=db.prepare('SELECT i.*,o.name AS organization_name FROM organization_invites i JOIN organizations o ON o.id=i.org JOIN members m ON m.org=i.org AND m.account=i.issued_by AND m.admin=1 WHERE i.token_hash=? AND i.expires_at>?').get(inviteHash(token),clock());
+      return row?{organizationId:row.org,organizationName:row.organization_name,email:row.email,name:row.name,nickname:row.nickname,admin:Boolean(row.admin),expiresAt:row.expires_at}:null;
+    },
+    acceptInvitation({token,accountId,email}){
+      if(!safeToken(token)||!safeId(accountId)||!safeEmail(email))fail('invalid_invitation');
+      return tx(()=>{
+        const invitation=this.previewInvitation(token);
+        if(!invitation||invitation.email!==email.trim().toLowerCase())fail('invalid_invitation');
+        if(db.prepare('SELECT 1 FROM members WHERE org=? AND account=?').get(invitation.organizationId,accountId))fail('member_exists');
+        if(db.prepare('SELECT 1 FROM members WHERE org=? AND email=?').get(invitation.organizationId,invitation.email))fail('member_exists');
+        const removed=db.prepare('DELETE FROM organization_invites WHERE token_hash=? AND expires_at>? RETURNING token_hash').get(inviteHash(token),clock());
+        if(!removed)fail('invalid_invitation');
+        db.prepare('INSERT INTO members(org,account,name,nickname,email,admin) VALUES(?,?,?,?,?,?)').run(invitation.organizationId,accountId,invitation.name,invitation.nickname,invitation.email,invitation.admin?1:0);
+        return {organizationId:invitation.organizationId,accountId,admin:invitation.admin};
       });
     },
     matrix(organizationId,actorId){
