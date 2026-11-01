@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="referrer" content="no-referrer">
+  <title>Workspace user administration | DuckBio</title>
+  <link rel="stylesheet" href="/workspace.css">
+  <script src="/workspace.js" type="module"></script>
+</head>
+<body>
+<header class="top"><div class="brand"><span class="duck">◆</span><b>DuckBio</b><span>Workspace</span></div><button type="button" id="logout" hidden>Sign out</button></header>
+<main>
+  <section class="hero">
+    <span class="eyebrow">PRIVATE WORKSPACE</span>
+    <h1>User administration</h1>
+    <p>Manage organization users, application roles and purchased seats. App access is controlled by the private server.</p>
+    <p id="status" role="status" aria-live="polite">Checking account session…</p>
+  </section>
+  <section id="sign-in" class="panel" hidden>
+    <h2>Sign in</h2>
+    <form id="login-form" class="fields">
+      <label>Email<input type="email" id="email" autocomplete="username" maxlength="254" required></label>
+      <label>Password<input type="password" id="password" autocomplete="current-password" required></label>
+      <button type="submit" class="primary">Sign in</button>
+    </form>
+  </section>
+  <div id="portal" hidden>
+    <section class="panel toolbar">
+      <label>Organization<select id="organizations" aria-label="Choose organization"></select></label>
+      <div class="actions"><button type="button" id="create" class="primary">Create account access</button><button type="button" id="buy">Buy users</button></div>
+    </section>
+    <section class="panel">
+      <h2 id="organization-name">Organization</h2>
+      <p>Licences are assigned independently for each app. The numbers below come from the private server.</p>
+      <div id="seats" class="seats" aria-label="Per-app licence counts"></div>
+    </section>
+    <section class="panel">
+      <h2>Users and app permissions</h2>
+      <div class="table-scroll"><table><thead><tr><th>User</th><th>Nickname</th><th>Organization role</th><th>App permissions</th><th>Actions</th></tr></thead><tbody id="members"></tbody></table></div>
+    </section>
+    <section id="edit-panel" class="panel" hidden>
+      <h2 id="edit-title">Assign app access</h2>
+      <p id="edit-help">An existing verified DuckBio account ID is required. This form does not create a password or automatically link native app accounts.</p>
+      <form id="member-form">
+        <div class="fields">
+          <label>Existing account ID<input id="account-id" name="accountId" maxlength="128" required></label>
+          <label>Name<input id="name" name="name" maxlength="120" required></label>
+          <label>Nickname<input id="nickname" name="nickname" maxlength="120" required></label>
+          <label>Email<input id="member-email" name="email" type="email" maxlength="254" required></label>
+          <label class="inline"><input id="org-admin" name="admin" type="checkbox"> Organization administrator</label>
+        </div>
+        <h3>Individual application permissions</h3>
+        <div id="role-fields" class="roles"></div>
+        <div class="actions"><button type="submit" class="primary">Save permissions</button><button type="button" id="cancel-edit">Cancel</button></div>
+      </form>
+    </section>
+    <section id="buy-panel" class="panel" hidden>
+      <h2>Buy users</h2>
+      <p>Select additional users for one or more apps. This is an estimate only: checkout is not connected, and reviewing it will not purchase or assign licences.</p>
+      <div id="buy-fields" class="roles"></div>
+      <p id="buy-summary" role="status"></p>
+      <div class="actions"><button type="button" id="review-buy" class="primary">Review selection</button><button type="button" id="cancel-buy">Close</button></div>
+    </section>
+  </div>
+</main>
+</body>
+</html>
