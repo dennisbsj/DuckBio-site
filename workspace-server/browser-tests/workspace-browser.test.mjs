@@ -29,13 +29,16 @@ async function fixture(t) {
  const server=http.createServer(async(req,res)=>{if(!await service.handle(req,res)){res.statusCode=404;res.end();}});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const origin='http://127.0.0.1:'+server.address().port;
+ let browser;
+ const errors=[];
+ // Register cleanup before service/browser creation, including constructor failures.
+ t.after(async()=>{await browser?.close();server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));identity.close();auth.close();org.close();rmSync(temp,{recursive:true,force:true});assert.deepEqual(errors,[],'uncaught browser errors');});
  const assetRoot=fileURLToPath(new URL('../private-ui/',import.meta.url));
  service=createAccountService({origin,issuer:origin,clients:registrations,identityStore:identity,organizationStore:org,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
- const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+ browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:1280,height:800}});
  const page=await context.newPage();
- const errors=[];page.on('pageerror',e=>errors.push(String(e)));
- t.after(async()=>{await browser.close();server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));identity.close();auth.close();org.close();rmSync(temp,{recursive:true,force:true});assert.deepEqual(errors,[],'uncaught browser errors');});
+ page.on('pageerror',e=>errors.push(String(e)));
  await page.goto(origin+'/workspace');
  await page.locator('#sign-in:not([hidden])').waitFor();
  return {page,origin,org,owner,worker,context};
