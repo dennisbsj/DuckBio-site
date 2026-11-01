@@ -220,6 +220,24 @@ test('app-role invitations reserve seats before acceptance and cannot exceed lic
  assert.equal(f.organizationStore.accessFor({organizationId:'org-a',accountId:account.id,appId:'eel'}).role,'scientist');
  assert.equal(f.organizationStore.overview('org-a',owner.id).apps.find(x=>x.id==='eel').reserved,0);
 });
+test('organization audit read API is CSRF protected and cannot expose a different tenant',async t=>{
+ const f=await fixture(t),admin=f.browser(),outsider=f.browser();
+ await admin.preflight();await outsider.preflight();
+ const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
+ f.organizationStore.setupOrganization({organizationId:'org-a',name:'Alpha lab',owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:'owner@example.test'}});
+ f.organizationStore.setupOrganization({organizationId:'org-b',name:'Beta lab',owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:'owner@example.test'}});
+ assert.equal((await admin.call('/api/suite/organization/audit',{organizationId:'org-a'})).status,403);
+ await admin.call('/api/suite/organization/select',{organizationId:'org-a'});
+ assert.equal((await admin.call('/api/suite/organization/audit',{organizationId:'org-a'},'POST',false)).status,403);
+ assert.equal((await outsider.call('/api/suite/organization/audit',{organizationId:'org-a'})).status,401);
+ assert.equal((await admin.call('/api/suite/organization/audit',{organizationId:'org-b'})).status,403);
+ const invite=await admin.call('/api/suite/organization/invite',{organizationId:'org-a',name:'Scientist',nickname:'Sci',email:'scientist@example.test'});
+ const token=new URL((await invite.json()).invitationUrl).searchParams.get('invite');
+ const events=(await (await admin.call('/api/suite/organization/audit',{organizationId:'org-a'})).json()).events;
+ assert(events.some(event=>event.action==='invitation.issued'&&event.subject==='scientist@example.test'));
+ assert(!JSON.stringify(events).includes(token));
+ assert(!events.some(event=>event.subject==='org-b'));
+});
 test('subscription draft HTTP API is CSRF protected, org locked and cannot mint seats',async t=>{
  const f=await fixture(t),admin=f.browser();await admin.preflight();
  const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;

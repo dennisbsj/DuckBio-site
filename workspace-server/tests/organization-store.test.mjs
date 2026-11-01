@@ -156,6 +156,27 @@ test('invited app roles reserve paid seats atomically and transfer them on accep
  assert.equal(store.previewInvitation(again.token),null);
  assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,0);
 });
+test('audit trail records committed changes within one organization and never includes bearer tokens',t=>{
+ const {store}=fixture(t);
+ store.setupOrganization({organizationId:'two',name:'Another lab',owner:{accountId:'admin2',name:'Admin Two',nickname:'Two',email:'two@example.test'}});
+ buy(store,'audited-seat','Single',['eel']);
+ const invitation=store.issueInvitation({organizationId:'one',actorId:'admin1',name:'Scientist',nickname:'Sci',email:'scientist@example.test',roles:{eel:'scientist'}});
+ assert.throws(()=>store.auditLog('one','admin2'),/access_denied/);
+ assert.throws(()=>store.issueInvitation({organizationId:'one',actorId:'admin1',name:'Bad',nickname:'B',email:'bad@example.test',roles:{goflo:'Analyst'}}),/app_seats_exhausted/);
+ assert.equal(store.auditLog('one','admin1').filter(x=>x.action==='invitation.issued').length,1,'failed operations leave no audit entry');
+ store.acceptInvitation({token:invitation.token,accountId:'person',email:'scientist@example.test'});
+ store.setPermission({organizationId:'one',actorId:'admin1',accountId:'person',appId:'eel',permission:'document.review',enabled:true});
+ store.saveMember({organizationId:'one',actorId:'admin1',member:member('person',{eel:'reviewer'},{email:'scientist@example.test'})});
+ store.removeMember({organizationId:'one',actorId:'admin1',accountId:'person'});
+ const events=store.auditLog('one','admin1');
+ assert(events.some(e=>e.action==='invitation.issued'&&e.actorId==='admin1'));
+ assert(events.some(e=>e.action==='invitation.accepted'&&e.actorId==='person'));
+ assert(events.some(e=>e.action==='permission.updated'&&e.details.permission==='document.review'));
+ assert(events.some(e=>e.action==='member.updated'));
+ assert(events.some(e=>e.action==='member.removed'));
+ assert(!JSON.stringify(events).includes(invitation.token),'audit never stores bearer invitation token');
+ assert(!store.auditLog('two','admin2').some(e=>e.subject==='person'),'audit is tenant scoped');
+});
 test('removing a user revokes only this org, while other organization membership persists',t=>{
  const {store}=fixture(t);
  store.setupOrganization({organizationId:'two',name:'Other lab',owner:{accountId:'admin2',name:'Admin Two',nickname:'Two',email:'two@example.test'}});
