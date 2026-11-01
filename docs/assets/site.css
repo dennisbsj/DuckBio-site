@@ -2524,3 +2524,22 @@ html:not([data-theme="dark"]) body:not(.homepage-exact) .footer nav a,
 html:not([data-theme="dark"]) body:not(.homepage-exact) .footer small,
 html:not([data-theme="dark"]) body:not(.homepage-exact) .footer .footer-bottom{color:#b7d7e5}
 html:not([data-theme="dark"]) body:not(.homepage-exact) .footer nav a:hover{color:#84fcf1}
+
+/* Homepage Apps dropdown: legible links on the light day-mode menu (2026-11-01). */
+html:not([data-theme="dark"]) body.homepage-exact .header .nav-apps-panel{
+ background:#f6fcff;
+ border-color:#abd6e2;
+ box-shadow:0 14px 36px rgba(7,54,78,.2);
+}
+html:not([data-theme="dark"]) body.homepage-exact .header .nav .nav-apps-panel a{
+ color:#14394f;
+}
+html:not([data-theme="dark"]) body.homepage-exact .header .nav .nav-apps-panel a:first-child{
+ background:#e6f4fa;
+ color:#14394f;
+}
+html:not([data-theme="dark"]) body.homepage-exact .header .nav .nav-apps-panel a:hover,
+html:not([data-theme="dark"]) body.homepage-exact .header .nav .nav-apps-panel a:focus-visible{
+ background:#d4f5f7;
+ color:#006d89;
+}
