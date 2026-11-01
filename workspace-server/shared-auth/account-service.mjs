@@ -8,7 +8,7 @@ import { OrganizationError } from '../organization-store.mjs';
 const APP_NAMES = Object.freeze({ goflo: 'GoFlo', eel: 'EEL', methpipe: 'MethPipe', mantrain: 'ManTrain', duckman: 'DuckMan', limsman: 'LIMSMan' });
 const STATIC_APPS = new Set(['goflo', 'methpipe', 'mantrain']);
 const NATIVE_ORIGINS = Object.freeze(Object.fromEntries(Object.keys(APP_NAMES).map(id => [id, `https://${id}.celluloidconsulting.net`])));
-const FILES = new Set(['index.html', 'login.css', 'app.js', 'app-registry.mjs', 'auth-client.mjs', 'config.mjs', 'admin.html', 'admin.js', 'admin.css', ...Object.keys(APP_NAMES).map(id => `assets/${id}.svg`), 'assets/favicon.svg']);
+const FILES = new Set(['index.html', 'login.css', 'app.js', 'app-registry.mjs', 'auth-client.mjs', 'config.mjs', 'admin.html', 'admin.js', 'admin.css', 'workspace.html', 'workspace.css', 'workspace.js', ...Object.keys(APP_NAMES).map(id => `assets/${id}.svg`), 'assets/favicon.svg']);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
 class ServiceError extends Error { constructor(status, code) { super(code); this.status = status; this.code = code; } }
 const safeId = value => typeof value === 'string' && value.length > 0 && value.length <= 128 && !/[\u0000-\u0020\u007f]/.test(value);
@@ -74,6 +74,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     let file = pathname.replace(/^\//, '');
     if (['/', '/login/', '/login', '/setup', '/setup/', '/invite', '/invite/'].includes(pathname)) file = 'index.html';
     else if (['/account', '/account/', '/account/index.html'].includes(pathname)) file = 'admin.html';
+    else if (['/workspace','/workspace/','/workspace/index.html'].includes(pathname)) file = 'workspace.html';
     else if (file.startsWith('login/')) file = file.slice(6);
     if (!FILES.has(file)) return false;
     try {
