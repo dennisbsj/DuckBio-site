@@ -1,0 +1,32 @@
+name: Private Workspace real-browser QA
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-server/private-ui/**'
+      - 'workspace-server/browser-tests/**'
+      - 'workspace-server/shared-auth/account-service.mjs'
+      - '.github/workflows/workspace-browser.yml'
+  pull_request:
+    paths:
+      - 'workspace-server/private-ui/**'
+      - 'workspace-server/browser-tests/**'
+      - 'workspace-server/shared-auth/account-service.mjs'
+      - '.github/workflows/workspace-browser.yml'
+permissions:
+  contents: read
+jobs:
+  chromium:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-save --no-package-lock playwright@1.56.1
+        working-directory: workspace-server
+      - run: npx playwright install --with-deps chromium
+        working-directory: workspace-server
+      - run: node --test browser-tests/workspace-browser.test.mjs
+        working-directory: workspace-server
