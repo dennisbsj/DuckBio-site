@@ -1,6 +1,6 @@
 
 /* DuckBio Workspace user administration — preview only. */
-.ua-launch{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:35px;padding:7px 12px;border:1px solid #82d3de;border-radius:10px;background:#235b70;color:#f4feff;font:800 12px/1.3 inherit;cursor:pointer}
+.ua-launch{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:35px;padding:7px 12px;border:1px solid #82d3de;border-radius:10px;background:#235b70;color:#f4feff;font-size:12px;font-weight:800;line-height:1.3;cursor:pointer}
 .ua-launch:hover{background:#32788b}.ua-launch:focus-visible{outline:3px solid #6ae7ed;outline-offset:2px}
 .ua-dialog{width:min(92vw,880px);max-height:calc(100vh - 30px)}
 .ua-dialog[open]{inset:var(--launcher-visible-top,12px) 0 auto!important;margin-inline:auto!important;max-height:min(810px,var(--launcher-visible-height,calc(100vh - 30px)))!important;overflow:auto}
@@ -30,7 +30,7 @@
 .ua-tag.admin{background:#e8e5fa;color:#4d3b90}
 .ua-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
 .ua-field{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px;font-weight:800;color:#285568}
-.ua-field input,.ua-field select,.ua-licence-row input{width:100%;min-height:41px;border:1px solid #a9c9d6;border-radius:8px;background:#fff;color:#183e50;padding:9px 10px;font:500 13px/1.4 inherit}
+.ua-field input,.ua-field select,.ua-licence-row input{width:100%;min-height:41px;border:1px solid #a9c9d6;border-radius:8px;background:#fff;color:#183e50;padding:9px 10px;font-size:13px;font-weight:500;line-height:1.4;font-family:inherit}
 .ua-field select{cursor:pointer}
 .ua-field input:focus-visible,.ua-field select:focus-visible,.ua-licence-row input:focus-visible{outline:3px solid #57ced5;outline-offset:1px}
 .ua-field select:disabled{background:#f0f4f6;color:#617f8b}
