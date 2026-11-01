@@ -32,6 +32,12 @@
     <div id="organization-options" class="roles"></div>
   </section>
   <div id="portal" hidden>
+    <nav class="workspace-tabs" aria-label="Administration sections">
+      <button type="button" class="active" data-tab="users" aria-selected="true">User administration</button>
+      <button type="button" data-tab="subscriptions" aria-selected="false">Subscriptions</button>
+      <button type="button" data-tab="matrix" aria-selected="false">Permission matrix</button>
+    </nav>
+    <div id="tab-users">
     <section class="panel toolbar">
       <label>Current organization<select id="organizations" aria-label="Current organization" disabled></select></label><small>To change organization, sign out and sign in again.</small>
       <div class="actions"><button type="button" id="create" class="primary">Create account access</button><button type="button" id="buy">Buy users</button></div>
@@ -61,6 +67,14 @@
         <div class="actions"><button type="submit" class="primary">Save permissions</button><button type="button" id="cancel-edit">Cancel</button></div>
       </form>
     </section>
+    </div>
+    <div id="tab-subscriptions" hidden>
+    <section class="panel">
+      <h2>Subscriptions</h2>
+      <p>Purchased and assigned app seats are shown below. Checkout, changes to paid subscriptions, and cancellations require the verified billing integration; no account is charged from this screen.</p>
+      <div id="subscription-seats" class="seats"></div>
+      <div class="actions"><button type="button" id="open-buy" class="primary">Buy users</button></div>
+    </section>
     <section id="buy-panel" class="panel" hidden>
       <h2>Buy users</h2>
       <p>Select additional users for one or more apps. This is an estimate only: checkout is not connected, and reviewing it will not purchase or assign licences.</p>
@@ -68,6 +82,20 @@
       <p id="buy-summary" role="status"></p>
       <div class="actions"><button type="button" id="review-buy" class="primary">Review selection</button><button type="button" id="cancel-buy">Close</button></div>
     </section>
+    </div>
+    <div id="tab-matrix" hidden>
+      <section class="panel">
+        <h2>Permission matrix</h2>
+        <p>Check or uncheck permissions for users with an assigned app role. This matrix records Workspace policy overrides; individual app enforcement requires separate integration.</p>
+        <div class="matrix-tools">
+          <label>Search users<input id="matrix-search" type="search" placeholder="Name, nickname or email"></label>
+          <label>Filter app<select id="matrix-app"><option value="">All apps</option></select></label>
+          <label>Sort users<select id="matrix-sort"><option value="name">Name (A–Z)</option><option value="email">Email (A–Z)</option><option value="app">App name (A–Z)</option></select></label>
+        </div>
+        <div class="table-scroll"><table id="matrix-table"><thead id="matrix-head"></thead><tbody id="matrix-body"></tbody></table></div>
+        <p id="matrix-info" role="status"></p>
+      </section>
+    </div>
   </div>
 </main>
 </body>
