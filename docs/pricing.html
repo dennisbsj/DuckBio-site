@@ -623,6 +623,44 @@ body:not(.homepage-exact) #choose-apps.section{padding:clamp(33px,4vw,56px) 0}
  .pr-select-layout .pr-select-button img{width:49px;height:49px}
  .pr-full-rules .pr-table{min-width:370px}
 }
+
+/* One-estimate Pricing layout: compact plans and app selection. */
+body:not(.homepage-exact) .pr-hero.pr-plans-first{padding:22px 0 28px}
+.pr-plans-first .pr-compact-header{margin-bottom:6px}
+.pr-plans-first .pr-currency-top{margin:0 0 10px}
+body:not(.homepage-exact) .pr-plans-first .pr-plan,body:not(.homepage-exact) .pr-plans-first .pr-plan.featured{padding:18px;min-height:0}
+.pr-plans-first .pr-plan .pr-desc{min-height:0;margin:0 0 10px}
+.pr-plans-first .pr-plan .pr-prices{min-height:0;margin:0 0 9px;gap:3px}
+.pr-plans-first .pr-plan .pr-early strong{font-size:clamp(26px,3vw,36px)}
+.pr-plans-first .pr-plan .pr-period{margin:0 0 12px}
+.pr-plans-first .pr-plan .btn{margin-top:auto}
+body:not(.homepage-exact) #choose-apps.section{padding:26px 0 38px}
+.pr-select-layout .pr-select-grid{align-self:start;grid-auto-rows:auto}
+.pr-select-layout .pr-select-card{height:auto}
+.pr-select-layout .pr-select-button{height:auto;min-height:98px;padding:10px 8px 4px;gap:4px}
+.pr-select-layout .pr-select-button img{width:50px;height:50px;margin:0 auto 2px}
+.pr-select-layout .pr-select-category{display:none}
+.pr-select-layout .pr-select-details{padding:6px 5px 9px}
+.pr-select-layout .pr-select-review{height:auto;align-self:start}
+.pr-select-layout .pr-select-review-price{margin-top:8px}
+#pr-select-breakdown{line-height:1.55;overflow-wrap:anywhere}
+.pr-consolidated-discounts{margin-top:22px}
+.pr-consolidated-discounts .pr-consolidated-intro{padding:12px 16px 2px;margin:0;color:#d2f4f7;font-size:12px;line-height:1.65}
+.pr-consolidated-discounts .pr-tables{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;padding:10px 15px}
+.pr-consolidated-discounts .pr-table{min-width:0}
+.pr-consolidated-discounts .pr-table th,.pr-consolidated-discounts .pr-table td{font-size:12px;padding:9px 8px}
+.pr-consolidated-discounts>.pr-small{padding:0 15px 15px;color:#d1e6ed}
+@media(max-width:760px){
+ .pr-select-layout .pr-select-grid{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:none;grid-auto-rows:auto;align-self:start}
+ .pr-select-layout .pr-select-card{height:auto}
+ .pr-select-layout .pr-select-button{min-height:88px;padding:10px 4px 4px;gap:4px}
+ .pr-select-layout .pr-select-button img{width:44px;height:44px}
+ .pr-select-layout .pr-select-check{width:19px;height:19px;top:6px;right:6px}
+ .pr-select-layout .pr-select-name{font-size:12px}
+ .pr-select-layout .pr-select-details{font-size:10px;padding:4px 2px 8px}
+ .pr-consolidated-discounts .pr-tables{grid-template-columns:1fr}
+}
+@media(max-width:370px){.pr-select-layout .pr-select-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
 <section class="pr-hero pr-plans-first" id="plans"><div class="wrap">
  <div class="pr-compact-header">
@@ -631,66 +669,17 @@ body:not(.homepage-exact) #choose-apps.section{padding:clamp(33px,4vw,56px) 0}
 </div>
 <div class="pr-currency-top"><div class="pr-currency-toggle" role="group" aria-label="Choose display currency"><button type="button" data-currency="DKK" aria-pressed="false">DKK</button><button type="button" data-currency="EUR" aria-pressed="true">EUR</button><button type="button" data-currency="USD" aria-pressed="false">USD</button></div></div>
  <div class="pr-grid">
-<article class="pr-plan"><h3>Single</h3><p class="pr-desc">One app. Add more anytime.</p><div class="pr-prices"><div class="pr-early"><span class="pr-early-label">Monthly price</span><strong data-eur-apps="1" data-price-kind="current">35 €</strong></div></div><div class="pr-period">per user / month · one app</div><ul><li>Choose any app</li><li>Add more when you need them</li></ul><a class="btn btn-outline" href="#choose-apps">Choose app →</a></article>
-<article class="pr-plan"><h3>Mixed</h3><p class="pr-desc">Combine two to five apps.</p><div class="pr-prices"><div class="pr-normal"><span class="pr-normal-label">Individual app total <span class="pr-bundle-save" data-bundle-save="2">Save 20%</span></span><del data-eur-apps="2" data-price-kind="undiscounted">70 €</del></div><div class="pr-early"><span class="pr-early-label">Monthly price</span><strong data-eur-apps="2" data-price-kind="current">56 €</strong></div></div><div class="pr-period">per user / month · starting with two apps</div><ul><li>Choose any 2–5 apps</li><li>Custom app combinations for each user</li></ul><a class="btn btn-outline" href="#choose-apps">Choose apps →</a></article>
-<article class="pr-plan featured"><span class="pr-flag">ALL SIX APPS</span><h3>Bundle</h3><p class="pr-desc">All six apps together at one bundle price.</p><div class="pr-prices"><div class="pr-normal"><span class="pr-normal-label">Individual app total <span class="pr-bundle-save" data-bundle-save="6">Save 25%</span></span><del data-eur-apps="6" data-price-kind="undiscounted">210 €</del></div><div class="pr-early"><span class="pr-early-label">Monthly price</span><strong data-eur-apps="6" data-price-kind="current">157.50 €</strong></div></div><div class="pr-period">per user / month · all six apps</div><ul><li>Access to all six apps</li><li>One discounted bundle price</li></ul><a class="btn btn-secondary" href="#choose-apps">Select bundle →</a></article>
+<article class="pr-plan"><h3>Single</h3><p class="pr-desc">One app of your choice.</p><div class="pr-prices"><div class="pr-early"><strong data-eur-apps="1" data-price-kind="current">35 €</strong></div></div><div class="pr-period">per user / month</div><a class="btn btn-outline" href="#choose-apps">Choose app →</a></article>
+<article class="pr-plan"><h3>Mixed</h3><p class="pr-desc">Any two to five apps.</p><div class="pr-prices"><div class="pr-normal"><span class="pr-normal-label"><span class="pr-bundle-save" data-bundle-save="2">Save 20%</span></span><del data-eur-apps="2" data-price-kind="undiscounted">70 €</del></div><div class="pr-early"><strong data-eur-apps="2" data-price-kind="current">56 €</strong></div></div><div class="pr-period">per user / month · from 2 apps</div><a class="btn btn-outline" href="#choose-apps">Choose apps →</a></article>
+<article class="pr-plan featured"><span class="pr-flag">ALL SIX APPS</span><h3>Bundle</h3><p class="pr-desc">The complete six-app suite.</p><div class="pr-prices"><div class="pr-normal"><span class="pr-normal-label"><span class="pr-bundle-save" data-bundle-save="6">Save 25%</span></span><del data-eur-apps="6" data-price-kind="undiscounted">210 €</del></div><div class="pr-early"><strong data-eur-apps="6" data-price-kind="current">157.50 €</strong></div></div><div class="pr-period">per user / month</div><a class="btn btn-secondary" href="#choose-apps">Select bundle →</a></article>
 </div>
 
  
 
 </div></section>
 
-<section class="section soft" id="discounts"><div class="wrap"><div class="pr-compact-discounts-heading"><div><p class="eyebrow">Simple, predictable savings</p><h2>Estimate your price</h2></div></div>
-<div class="pr-savings-layout">
-<div class="pr-rules-column">
- <div class="pr-discount-summary" aria-label="Discount rules">
-  <h3>Organisation discounts</h3>
-  <div class="pr-rule"><span>5–19 users</span><strong>Extra 10%</strong></div>
-  <div class="pr-rule"><span>20–49 users</span><strong>Extra 20%</strong></div>
-  <div class="pr-rule"><span>50+ users</span><strong>Custom quote</strong></div>
-  <p>Extra savings apply after your app-plan discount.</p>
- </div>
- <details class="pr-full-rules"><summary>View full discount tables <span aria-hidden="true">⌄</span></summary>
- <div class="pr-tables">
-  <div><h3>Multi-app discounts</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Apps per user</th><th>Bundle discount</th><th>Individual app total</th><th>Subscription / month</th></tr></thead><tbody>
-<tr><td>1 app</td><td data-bundle-apps="1">0%</td><td><span data-eur-apps="1" data-price-kind="undiscounted">35 €</span></td><td class="price-early" data-eur-apps="1" data-price-kind="current">35 €</td></tr>
-<tr><td>2 apps</td><td data-bundle-apps="2">20%</td><td><del data-eur-apps="2" data-price-kind="undiscounted">70 €</del></td><td class="price-early" data-eur-apps="2" data-price-kind="current">56 €</td></tr>
-<tr><td>3 apps</td><td data-bundle-apps="3">20%</td><td><del data-eur-apps="3" data-price-kind="undiscounted">105 €</del></td><td class="price-early" data-eur-apps="3" data-price-kind="current">84 €</td></tr>
-<tr><td>4 apps</td><td data-bundle-apps="4">20%</td><td><del data-eur-apps="4" data-price-kind="undiscounted">140 €</del></td><td class="price-early" data-eur-apps="4" data-price-kind="current">112 €</td></tr>
-<tr><td>5 apps</td><td data-bundle-apps="5">20%</td><td><del data-eur-apps="5" data-price-kind="undiscounted">175 €</del></td><td class="price-early" data-eur-apps="5" data-price-kind="current">140 €</td></tr>
-<tr><td>6 apps</td><td data-bundle-apps="6">25%</td><td><del data-eur-apps="6" data-price-kind="undiscounted">210 €</del></td><td class="price-early" data-eur-apps="6" data-price-kind="current">157.50 €</td></tr></tbody></table></div></div>
-  <div><h3>Organisation discounts</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Number of users</th><th>Extra discount</th></tr></thead><tbody>
-  <tr><td>1–4 users</td><td>0%</td></tr><tr><td>5–19 users</td><td>10%</td></tr><tr><td>20–49 users</td><td>20%</td></tr><tr><td>50+ users</td><td>Custom quote</td></tr></tbody></table></div><p class="pr-small">Organisation discounts are based on the number of licensed users and apply automatically for teams of 5–49. For 50+ users, request a custom quote. Organisation discounts apply after bundle savings.</p></div>
-</div>
- </details>
-</div>
-<div class="pr-savings-calculator" id="calculator" aria-label="Pricing calculator">
-<div class="pr-calc-card">
-  <div class="pr-input-grid">
-   <div class="pr-field"><label for="pr-app-count">Apps per user</label><select id="pr-app-count"><option value="1">1 app</option><option value="2">2 apps</option><option value="3" selected>3 apps</option><option value="4">4 apps</option><option value="5">5 apps</option><option value="6">All 6 apps</option></select></div>
-   <div class="pr-field"><label for="pr-users">Number of users</label><input id="pr-users" type="number" min="1" max="10000" step="1" inputmode="numeric" value="5"></div>
-  </div>
-  
-  <div class="pr-result" aria-live="polite" aria-atomic="true">
-    <div class="pr-result-label" id="pr-result-label">Your estimated monthly total</div>
-    <strong class="pr-total" id="pr-total">378 € <small>/month</small></strong>
-    <div class="pr-breakdown">
-      <div><span>Standard price without discounts</span><b id="pr-base">525 €</b></div>
-      <div><span id="pr-bundle-label">Multi-app discount (20%)</span><b id="pr-bundle">− 105 €</b></div>
-      <div><span id="pr-extra-label">Organisation discount (10%)</span><b id="pr-extra">− 42 €</b></div>
-      <div class="pr-saved"><span>Total monthly savings</span><b id="pr-saved">147 €</b></div>
-    </div>
-    <p class="pr-hint" id="pr-hint">Eligible organisation discounts are applied after the app bundle discount. Prices exclude VAT.</p>
-    <div class="pr-copy-row"><button class="btn btn-secondary" type="button" id="pr-copy">Export estimate .xlsx</button><span id="pr-copy-status" class="pr-copy-status" role="status"></span></div>
-  </div>
- </div>
-
-</div>
-</div>
-<p class="pr-small">Prices are provisional, exclude VAT and are based on EUR. DKK/USD amounts use indicative exchange rates. For 50+ users, request a custom quote.</p>
-</div></section>
 <section class="section" id="choose-apps"><div class="wrap">
- <div class="pr-compact-discounts-heading"><div><h2>Choose your apps</h2><p>Choose individual apps and see your specific subscription estimate.</p></div></div>
+ <div class="pr-compact-discounts-heading"><div><h2>Choose your apps</h2><p>Select your apps and licensed users to calculate one monthly price.</p></div></div>
  <div class="pr-select-toolbar"><button type="button" id="pr-select-all" class="pr-select-all" aria-pressed="false">Select all apps</button><span id="pr-select-selection-count" role="status" aria-live="polite">0 of 6 apps selected</span></div>
  <div class="pr-select-layout">
  <div class="pr-select-grid" role="group" aria-label="Choose DuckBio apps">
@@ -701,18 +690,36 @@ body:not(.homepage-exact) #choose-apps.section{padding:clamp(33px,4vw,56px) 0}
 <div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="duckman" data-app-name="DuckMan" aria-pressed="false" aria-label="Select DuckMan"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-duckman" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category"><b>DUCK</b>UMENT MANAGEMENT</span><span class="pr-select-name">Duck<b>Man</b></span></button><a class="pr-select-details" href="duckman.html" aria-label="Learn more about DuckMan">Learn more →</a></div>
 <div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="ducktrain" data-app-name="DuckTrain" aria-pressed="false" aria-label="Select DuckTrain"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-ducktrain" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category"><b>TRAIN</b>ING &amp; QUALIFICATION MANAGEMENT</span><span class="pr-select-name">Duck<b>Train</b></span></button><a class="pr-select-details" href="mantrain.html" aria-label="Learn more about DuckTrain">Learn more →</a></div>
  </div>
- <div class="pr-select-review">
-  <div class="pr-select-review-main"><p class="eyebrow">Your selection</p><h3 id="pr-select-title">No apps selected</h3><p id="pr-select-names">Select one or more apps above to calculate your subscription.</p>
+ <div class="pr-select-review" id="calculator">
+  <div class="pr-select-review-main"><p class="eyebrow">Your estimate</p><h3 id="pr-select-title">No apps selected</h3><p id="pr-select-names">Select one or more apps above to calculate your subscription.</p>
    <div class="pr-select-fields"><label for="pr-select-users">Licensed users<input id="pr-select-users" type="number" min="1" max="10000" value="1" step="1" inputmode="numeric"></label>
    </div>
   </div>
-  <div class="pr-select-review-price" aria-live="polite"><span class="pr-select-kicker">Estimated monthly price</span><strong id="pr-select-total">Choose an app</strong><p id="pr-select-breakdown">EUR reference prices; excludes VAT.</p>
-   <div class="pr-select-actions"><button class="btn btn-outline" type="button" id="pr-select-copy" disabled>Export selection in .xlsx</button><button class="btn btn-secondary" type="button" id="pr-select-buy" disabled title="Secure checkout has not been configured">Buy selected apps</button></div>
-   <p class="pr-select-note" id="pr-select-note">Checkout is not live yet. Selecting apps prepares a price estimate; no payment or subscription is created. <a href="support.html#pricing-and-subscriptions">Pricing and subscription FAQs</a></p><span class="pr-copy-status" role="status" id="pr-select-status"></span>
-  </div>
+  <div class="pr-select-review-price" aria-live="polite">
+<span class="pr-select-kicker">Estimated monthly price</span>
+<strong id="pr-select-total">Choose an app</strong>
+<p id="pr-select-breakdown">Prices exclude VAT.</p>
+<div class="pr-select-actions"><button class="btn btn-secondary" type="button" id="pr-select-copy" disabled>Export estimate .xlsx</button></div>
+<p class="pr-select-note" id="pr-select-note">Estimate only. Checkout is not live; no payment or subscription is created. <a href="support.html#pricing-and-subscriptions">Subscription FAQs</a></p>
+<span class="pr-copy-status" role="status" id="pr-select-status"></span>
+</div>
  </div>
  </div>
-</div></section>
+<details class="pr-full-rules pr-consolidated-discounts" id="discounts">
+<summary>Organisation discounts &amp; full price tables <span aria-hidden="true">⌄</span></summary>
+<p class="pr-consolidated-intro">Additional team savings apply after the app discount: <strong>5–19 users: 10%</strong> · <strong>20–49 users: 20%</strong> · <strong>50+ users: custom quote</strong>.</p>
+<div class="pr-tables">
+<div><h3>Price per user / month</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Apps</th><th>Saving</th><th>Price</th></tr></thead><tbody>
+<tr><td>1</td><td>–</td><td data-eur-apps="1" data-price-kind="current">35 €</td></tr>
+<tr><td>2</td><td>20%</td><td data-eur-apps="2" data-price-kind="current">56 €</td></tr>
+<tr><td>3</td><td>20%</td><td data-eur-apps="3" data-price-kind="current">84 €</td></tr>
+<tr><td>4</td><td>20%</td><td data-eur-apps="4" data-price-kind="current">112 €</td></tr>
+<tr><td>5</td><td>20%</td><td data-eur-apps="5" data-price-kind="current">140 €</td></tr>
+<tr><td>6</td><td>25%</td><td data-eur-apps="6" data-price-kind="current">157.5 €</td></tr>
+</tbody></table></div></div>
+<div><h3>Additional organisation savings</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Licensed users</th><th>Extra discount</th></tr></thead><tbody>
+<tr><td>1–4</td><td>0%</td></tr><tr><td>5–19</td><td>10%</td></tr><tr><td>20–49</td><td>20%</td></tr><tr><td>50+</td><td>Custom quote</td></tr></tbody></table></div></div>
+</div><p class="pr-small">Provisional prices exclude VAT. EUR is the reference currency; DKK/USD conversions are indicative.</p></details></div></section>
 </main><footer class="footer"><div class="wrap"><div class="footer-grid"><div><a class="brand" href="index.html"><img class="brand-mark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><p>Specialised scientific software for laboratory teams, research and structured workflows.</p></div><div><h4>Products</h4><nav aria-label="Products"><a href="apps.html">App workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></nav></div><div><h4>DuckBio</h4><nav aria-label="Company"><a href="index.html#contact">Contact</a><a href="pricing.html">Pricing</a><a href="apps.html">App workspace</a><a href="support.html">Support</a></nav></div><div><h4>Legal</h4><nav aria-label="Legal information"><a href="terms.html">Terms (draft)</a><a href="privacy.html">Privacy (draft)</a><a href="cookies.html">Cookies (draft)</a><a href="subscriptions.html">Subscriptions (draft)</a><a href="refunds.html">Refunds (draft)</a></nav></div></div><div class="footer-bottom"><span>© <span data-year>2026</span> DuckBio</span><span>Preview site · Authentication, trial and payments not yet launched</span></div></div></footer><script src="assets/xlsx-export.js"></script><script>
 (()=>{
 "use strict";
@@ -747,41 +754,14 @@ function renderStaticPrices(){
   el.textContent=pct(bundleDiscount(Number(el.dataset.bundleApps)));
  });
  document.querySelectorAll("[data-bundle-save]").forEach(el=>{
-  el.textContent="Additional saving: "+pct(bundleDiscount(Number(el.dataset.bundleSave)));
+  el.textContent="Save "+pct(bundleDiscount(Number(el.dataset.bundleSave)));
  });
 }
 currencyButtons.forEach(btn=>btn.addEventListener("click",()=>{
  currency=btn.dataset.currency;
  currencyButtons.forEach(b=>b.setAttribute("aria-pressed",String(b===btn)));
- renderStaticPrices();recalculate();renderSelection();
+ renderStaticPrices();renderSelection();
 }));
-let estimate=null;
-function recalculate(){
- const apps=Number(find("pr-app-count").value),users=Number(find("pr-users").value);
- const label=find("pr-result-label"),totalElement=find("pr-total");
- if(!Number.isInteger(users)||users<1||users>10000){
-  label.textContent="Enter a valid team size";totalElement.textContent="Use 1–10,000 users";find("pr-copy").disabled=true;estimate=null;return;
- }
- const baseEUR=unitEUR(1)*apps*users,suiteEUR=unitEUR(apps)*users;
- const custom=users>=50,orgRate=custom?0:users>=20?20:users>=5?10:0;
- const finalEUR=suiteEUR*(1-orgRate/100);
- /* All arithmetic is performed in EUR. Currency conversion happens once, at display. */
- const baseShown=round2(converted(baseEUR)),suiteShown=round2(converted(suiteEUR)),finalShown=round2(converted(finalEUR));
- label.textContent=custom?"Indicative total before custom quote":"Estimated monthly total";
- totalElement.textContent=formatEUR(custom?suiteEUR:finalEUR)+(custom?" /month*":" /month");
- find("pr-base").textContent=formatEUR(baseEUR);
- find("pr-bundle-label").textContent="Multi-app discount ("+pct(bundleDiscount(apps))+")";
- find("pr-bundle").textContent="− "+display(baseShown-suiteShown);
- find("pr-extra-label").textContent="Organisation discount ("+pct(orgRate)+")";
- find("pr-extra").textContent=custom?"Custom quote":"− "+display(suiteShown-finalShown);
- find("pr-saved").textContent=custom?"To be confirmed":display(baseShown-finalShown);
- find("pr-hint").textContent=custom?
-  "*For 50+ users, the figure shown is the bundle-adjusted baseline, not a final offer. Contact DuckBio for individual pricing. Excluding VAT.":
-  "Organisation discounts are applied after the multi-app discount in EUR, before converting to the selected currency. Prices exclude VAT.";
- find("pr-copy").disabled=false;estimate={apps,users,custom,baseEUR,suiteEUR,finalEUR,orgRate};
-}
-["pr-app-count","pr-users"].forEach(id=>{find(id).addEventListener("input",recalculate);find(id).addEventListener("change",recalculate)});
-
 function exportPriceRows(info,chosenApps){
  const label=info.apps===1?"Single":info.apps===6?"Bundle":"Mixed";
  const rows=[
@@ -804,16 +784,6 @@ function exportPriceRows(info,chosenApps){
  else rows.push(["Exact app choices","Not specified in this calculator"]);
  return rows;
 }
-find("pr-copy").addEventListener("click",()=>{
- if(!estimate)return;
- try{
-  if(!window.DuckBioXlsx)throw Error("Export utility unavailable");
-  window.DuckBioXlsx.download("DuckBio-pricing-estimate.xlsx",exportPriceRows(estimate));
-  find("pr-copy-status").textContent="Excel estimate exported.";
- }catch{find("pr-copy-status").textContent="Excel export failed. Reload the page and try again.";}
-});
-
-
 /* App selection is an order preview; payment must not be enabled until verified secure checkout exists. */
 const appSelections=[...document.querySelectorAll("[data-select-app]")];
 const selectedAppIds=new Set();
@@ -837,17 +807,17 @@ function renderSelection(){
  const users=Number(find("pr-select-users").value);
  const valid=Number.isInteger(users)&&users>=1&&users<=10000;
  find("pr-select-copy").disabled=!count||!valid;
- if(!count){selectionEstimate=null;find("pr-select-total").textContent="Choose an app";find("pr-select-breakdown").textContent="EUR reference prices; excludes VAT.";return;}
+ if(!count){selectionEstimate=null;find("pr-select-total").textContent="Choose an app";find("pr-select-breakdown").textContent="Prices exclude VAT.";return;}
  if(!valid){selectionEstimate=null;find("pr-select-total").textContent="Invalid user count";find("pr-select-breakdown").textContent="Enter between 1 and 10,000 licensed users.";return;}
  const priceEUR=unitEUR(count)*users;
  const custom=users>=50,organisationRate=custom?0:users>=20?20:users>=5?10:0;
  const totalEUR=priceEUR*(1-organisationRate/100);
  find("pr-select-total").textContent=custom?"Individual quote":formatEUR(totalEUR)+" / month";
- find("pr-select-breakdown").textContent=
-  "Plan: "+selectedLabel(count)+" · "+count+" "+(count===1?"app":"apps")+" · "+users+" "+(users===1?"user":"users")+
-  " · Additional saving: "+pct(bundleDiscount(count))+
-  " · Organisation discount: "+organisationRate+"%"+
-  (custom?" · 50+ users require custom pricing.":" · Excl. VAT.");
+ find("pr-select-breakdown").textContent=custom?
+  "For 50+ users request a custom quote. Bundle-adjusted baseline: "+formatEUR(priceEUR)+" /month. Excl. VAT.":
+  "Standard: "+formatEUR(unitEUR(1)*count*users)+" · App saving: "+formatEUR(unitEUR(1)*count*users-priceEUR)+
+  " ("+pct(bundleDiscount(count))+") · Team saving: "+formatEUR(priceEUR-totalEUR)+
+  " ("+pct(organisationRate)+") · Excl. VAT.";
  selectionEstimate={apps:count,users,custom,baseEUR:unitEUR(1)*count*users,suiteEUR:priceEUR,finalEUR:totalEUR,orgRate:organisationRate};
 }
 find("pr-select-all").addEventListener("click",()=>{
@@ -877,6 +847,5 @@ find("pr-select-copy").addEventListener("click",()=>{
 });
 renderStaticPrices();
 renderSelection();
-recalculate();
 })();
 </script></body></html>
