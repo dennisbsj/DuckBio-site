@@ -1,0 +1,32 @@
+name: Workspace private auth core tests
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-server/**'
+      - '.github/workflows/workspace-auth-core.yml'
+  pull_request:
+    paths:
+      - 'workspace-server/**'
+      - '.github/workflows/workspace-auth-core.yml'
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Validate private broker and gateway syntax
+        run: npm run check
+        working-directory: workspace-server
+      - name: Exercise isolated account, identity and gateway regressions
+        run: npm test
+        working-directory: workspace-server
