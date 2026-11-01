@@ -65,9 +65,10 @@ test('real Chromium Workspace login shows per-app seats and enforces edits witho
  await page.locator('#members').getByText('DuckNote (reviewer)').waitFor();
  assert.equal(f.org.accessFor({organizationId:'lab-a',accountId:f.worker.id,appId:'eel'}).role,'reviewer');
  await page.getByRole('button',{name:'Buy users'}).click();
- await page.locator('#buy-fields input[name=eel]').fill('3');
+ await page.locator('#draft-seats').fill('3');
+ await page.locator('#buy-fields input[name=eel]').check();
  await page.getByRole('button',{name:'Review selection'}).click();
- assert.match(await page.locator('#buy-summary').textContent(),/Checkout is not connected/i);
+ assert.match(await page.locator('#buy-summary').textContent(),/not a purchase/i);
  const after=f.org.overview('lab-a',f.owner.id).apps.find(a=>a.id==='eel');
  assert.equal(after.purchased,2,'browser quote does not mint licences');
  await page.getByRole('button',{name:'Sign out'}).click();
@@ -174,4 +175,23 @@ test('removing a member from admin roster revokes their org access without delet
  assert.equal(org.overview('lab-a',owner.id).users.some(u=>u.accountId===worker.id),false);
  assert.equal(identity.getUser(worker.id).email,'worker@example.test');
  assert.equal(org.accessFor({organizationId:'lab-a',accountId:worker.id,appId:'eel'}),null);
+});
+
+test('admin saves and cancels subscription drafts without minting paid seats',{timeout:45000},async t=>{
+ const {page,org,owner}=await fixture(t);
+ await signIn(page);
+ const before=org.overview('lab-a',owner.id).apps.find(a=>a.id==='eel').purchased;
+ await page.getByRole('button',{name:'Subscriptions'}).click();
+ await page.getByRole('button',{name:'Prepare subscription'}).click();
+ await page.locator('#draft-plan').selectOption('Mixed');
+ await page.locator('#draft-seats').fill('4');
+ await page.locator('#buy-fields input[name=eel]').check();
+ await page.locator('#buy-fields input[name=goflo]').check();
+ await page.getByRole('button',{name:'Save subscription draft'}).click();
+ await page.locator('#subscription-drafts').getByText('Mixed · 4 users per app').waitFor();
+ assert.equal(org.overview('lab-a',owner.id).apps.find(a=>a.id==='eel').purchased,before);
+ page.once('dialog',dialog=>dialog.accept());
+ await page.getByRole('button',{name:'Cancel draft'}).click();
+ await page.locator('#subscription-drafts').getByText(/canceled/).waitFor();
+ assert.equal(org.overview('lab-a',owner.id).apps.find(a=>a.id==='eel').purchased,before);
 });
