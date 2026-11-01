@@ -163,3 +163,15 @@ test('admin creates a one-use org invitation and recipient activates new account
  await page.goto(link);
  await page.locator('#sign-in:not([hidden])').waitFor();
 });
+
+test('removing a member from admin roster revokes their org access without deleting central identity',{timeout:45000},async t=>{
+ const {page,org,identity,worker,owner}=await fixture(t);
+ await signIn(page);
+ page.once('dialog',dialog=>dialog.accept());
+ const row=page.locator('#members tr').filter({hasText:'worker@example.test'});
+ await row.getByRole('button',{name:'Remove'}).click();
+ await page.waitForFunction(()=>!document.querySelector('#members')?.textContent.includes('worker@example.test'));
+ assert.equal(org.overview('lab-a',owner.id).users.some(u=>u.accountId===worker.id),false);
+ assert.equal(identity.getUser(worker.id).email,'worker@example.test');
+ assert.equal(org.accessFor({organizationId:'lab-a',accountId:worker.id,appId:'eel'}),null);
+});
