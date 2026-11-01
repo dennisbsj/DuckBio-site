@@ -626,7 +626,7 @@ body:not(.homepage-exact) #choose-apps.section{padding:clamp(33px,4vw,56px) 0}
 
 /* One-estimate Pricing layout: compact plans and app selection. */
 body:not(.homepage-exact) .pr-hero.pr-plans-first{padding:22px 0 28px}
-.pr-plans-first .pr-compact-header{margin-bottom:6px}
+.pr-plans-first .pr-compact-header{margin-bottom:17px}
 .pr-plans-first .pr-currency-top{margin:0 0 10px}
 body:not(.homepage-exact) .pr-plans-first .pr-plan,body:not(.homepage-exact) .pr-plans-first .pr-plan.featured{padding:18px;min-height:0}
 .pr-plans-first .pr-plan .pr-desc{min-height:0;margin:0 0 10px}
@@ -635,13 +635,25 @@ body:not(.homepage-exact) .pr-plans-first .pr-plan,body:not(.homepage-exact) .pr
 .pr-plans-first .pr-plan .pr-period{margin:0 0 12px}
 .pr-plans-first .pr-plan .btn{margin-top:auto}
 body:not(.homepage-exact) #choose-apps.section{padding:26px 0 38px}
-.pr-select-layout .pr-select-grid{align-self:start;grid-auto-rows:auto}
-.pr-select-layout .pr-select-card{height:auto}
-.pr-select-layout .pr-select-button{height:auto;min-height:98px;padding:10px 8px 4px;gap:4px}
+.pr-select-layout{align-items:stretch}
+.pr-select-layout > .pr-select-grid{
+ align-self:stretch;
+ grid-template-rows:repeat(2,minmax(0,1fr));
+ grid-auto-rows:1fr;
+ min-height:0
+}
+.pr-select-layout .pr-select-card{
+ height:100%;min-height:0;display:flex;flex-direction:column;
+}
+.pr-select-layout .pr-select-button{
+ flex:1 1 auto;height:100%;width:100%;min-height:0;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;
+ padding:10px 8px 4px;gap:5px
+}
 .pr-select-layout .pr-select-button img{width:50px;height:50px;margin:0 auto 2px}
 .pr-select-layout .pr-select-category{display:none}
 .pr-select-layout .pr-select-details{padding:6px 5px 9px}
-.pr-select-layout .pr-select-review{height:auto;align-self:start}
+.pr-select-layout .pr-select-review{height:100%;min-height:0;align-self:stretch}
 .pr-select-layout .pr-select-review-price{margin-top:8px}
 #pr-select-breakdown{line-height:1.55;overflow-wrap:anywhere}
 .pr-consolidated-discounts{margin-top:22px}
@@ -651,9 +663,14 @@ body:not(.homepage-exact) #choose-apps.section{padding:26px 0 38px}
 .pr-consolidated-discounts .pr-table th,.pr-consolidated-discounts .pr-table td{font-size:12px;padding:9px 8px}
 .pr-consolidated-discounts>.pr-small{padding:0 15px 15px;color:#d1e6ed}
 @media(max-width:760px){
- .pr-select-layout .pr-select-grid{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:none;grid-auto-rows:auto;align-self:start}
+ .pr-select-layout > .pr-select-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-rows:none;grid-auto-rows:auto;
+  align-self:auto;height:auto
+ }
  .pr-select-layout .pr-select-card{height:auto}
- .pr-select-layout .pr-select-button{min-height:88px;padding:10px 4px 4px;gap:4px}
+ .pr-select-layout .pr-select-review{height:auto;align-self:auto}
+ .pr-select-layout .pr-select-button{height:auto;min-height:88px;padding:10px 4px 4px;gap:4px}
  .pr-select-layout .pr-select-button img{width:44px;height:44px}
  .pr-select-layout .pr-select-check{width:19px;height:19px;top:6px;right:6px}
  .pr-select-layout .pr-select-name{font-size:12px}
@@ -661,10 +678,28 @@ body:not(.homepage-exact) #choose-apps.section{padding:26px 0 38px}
  .pr-consolidated-discounts .pr-tables{grid-template-columns:1fr}
 }
 @media(max-width:370px){.pr-select-layout .pr-select-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Pricing title uses the same vivid cyan family as "ducked" on the home hero. */
+body:not(.homepage-exact) .pr-hero.pr-plans-first .pr-compact-header h1{
+ font-size:clamp(42px,5.6vw,74px);
+ line-height:1.06;font-weight:900;letter-spacing:-.052em;
+ text-wrap:balance;max-width:980px;
+ text-shadow:0 2px 14px rgba(2,26,51,.17)
+}
+body:not(.homepage-exact) .pr-hero.pr-plans-first .pr-compact-header h1 .pr-heading-ducks{
+ color:#49e8ef!important;
+}
+@media(max-width:760px){
+ body:not(.homepage-exact) .pr-hero.pr-plans-first .pr-compact-header h1{
+  font-size:clamp(35px,7.1vw,54px);
+  line-height:1.08;
+ }
+ .pr-plans-first .pr-compact-header{margin-bottom:16px}
+}
 </style></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
 <section class="pr-hero pr-plans-first" id="plans"><div class="wrap">
  <div class="pr-compact-header">
- <h1>Get your ducks in a row.</h1>
+ <h1>Get your <span class="pr-heading-ducks">ducks</span> in a row.</h1>
  
 </div>
 <div class="pr-currency-top"><div class="pr-currency-toggle" role="group" aria-label="Choose display currency"><button type="button" data-currency="DKK" aria-pressed="false">DKK</button><button type="button" data-currency="EUR" aria-pressed="true">EUR</button><button type="button" data-currency="USD" aria-pressed="false">USD</button></div></div>
