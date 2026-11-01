@@ -726,12 +726,14 @@ html:not([data-theme="dark"]) .settings-panel{
 html:not([data-theme="dark"]) .settings-panel button{color:#165069}
 html:not([data-theme="dark"]) .settings-panel button:hover{background:#e5f6fa}
 </style>
+<link rel="stylesheet" href="assets/workspace-admin.css?v=20261101-1">
 </head>
 <body data-workspace-mode="preview">
 <div class="bar"><div class="brand"><img src="assets/duckbio-brand-nofill-dark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><div class="bar-tools" role="toolbar" aria-label="Workspace communication and settings">
 <button class="bar-icon-button" type="button" data-communication="Messaging" aria-label="Messaging" title="Messaging"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.3 9.6 9.6 0 0 1-3.4-.6L3 21l1.8-5.6A8.4 8.4 0 1 1 21 11.5Z"/><path d="M8 11.5h8"/></svg></button>
 <button class="bar-icon-button" type="button" data-communication="Mail" aria-label="Mail" title="Mail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3.5 6 8.5 7 8.5-7"/></svg></button>
-<details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button></div></details></div></div>
+<button type="button" class="ua-launch" data-open-user-admin aria-label="User administration — demo admin">User administration</button>
+<details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button><button type="button" data-open-user-admin>User administration</button></div></details></div></div>
 <div class="shell">
 <main>
 <div class="main-title"><div><span class="kicker">MY APPS</span><h1>Your DuckBio workspace</h1><p>Click or tap a card below to open that app’s product page.</p></div><span class="count" id="workspace-app-count" aria-live="polite" aria-label="Preview: 6 of 6 available apps, not actual purchases" title="Preview only: six example apps are shown. Purchases are not connected yet.">6/6 apps</span></div>
@@ -805,6 +807,73 @@ html:not([data-theme="dark"]) .settings-panel button:hover{background:#e5f6fa}
  <div class="modal-head"><div><p class="modal-eyebrow">Communication preview</p><h2 id="communication-heading">Communication</h2></div><button type="button" class="modal-close" data-close-dialog aria-label="Close communication preview">×</button></div>
  <div class="empty-communication"><strong id="communication-label">Messaging</strong><p>Messaging and Mail are planned features. No real messages can be sent or received from this preview.</p></div>
  <div class="modal-actions"><button type="button" class="modal-btn primary" data-close-dialog>Close</button></div>
+</dialog>
+
+
+<!-- Demo-only organisation administration: no live identity, entitlements or checkout. -->
+<dialog class="launcher-dialog ua-dialog" id="ua-dialog" aria-labelledby="ua-heading">
+ <div class="modal-head">
+  <div><p class="modal-eyebrow">Organisation admin · interactive preview</p><h2 id="ua-heading">User administration</h2></div>
+  <button type="button" class="modal-close" id="ua-close" aria-label="Close user administration">×</button>
+ </div>
+ <p class="ua-intro">Manage organisation users, app-specific roles and user licences.</p>
+ <p class="ua-preview-note">Demo only. Accounts, permissions and licence changes are temporary examples, not saved to DuckBio. Payments and real access require a secure service.</p>
+ <div id="ua-main">
+  <section data-ua-panel="list" aria-label="Organisation users and app licences">
+   <div class="ua-toolbar"><strong>Organisation users</strong><div class="ua-actions">
+    <button type="button" class="ua-secondary" data-ua-nav="buy">+ Buy users</button>
+    <button type="button" class="ua-primary" id="ua-create" data-ua-nav="account">+ Create account</button>
+   </div></div>
+   <div class="ua-metric-row">
+    <div class="ua-metric"><strong id="ua-organisation-count">3</strong><span>Accounts</span></div>
+    <div class="ua-metric"><strong id="ua-admin-count">1</strong><span>Organisation admins</span></div>
+    <div class="ua-metric"><strong>6</strong><span>Apps</span></div>
+   </div>
+   <p id="ua-list-message" class="ua-message" role="status" aria-live="polite"></p>
+   <div class="ua-table-wrap"><table class="ua-table"><thead><tr><th>Name / Email</th><th>Nickname</th><th>Workspace role</th><th>App roles</th><th>Actions</th></tr></thead><tbody id="ua-user-rows"></tbody></table></div>
+   <h3 class="ua-section-title">Licences by app</h3>
+   <p class="ua-hint">A licence is assigned separately for each app. A user can have different roles in different apps. There is no organisation-wide pool of spare users.</p>
+   <div class="ua-table-wrap"><table class="ua-table"><thead><tr><th>App</th><th>Assigned users</th><th>Purchased users</th></tr></thead><tbody id="ua-licence-totals"></tbody></table></div>
+  </section>
+  <section data-ua-panel="account" hidden aria-label="Create or edit organisation user">
+   <button type="button" class="ua-secondary ua-back" data-ua-nav="list">← All users</button>
+   <h3 class="ua-section-title" id="ua-account-heading">Create account</h3>
+   <form id="ua-account-form" autocomplete="off">
+    <div class="ua-grid">
+     <label class="ua-field">Name <input name="name" maxlength="120" placeholder="Full name" required></label>
+     <label class="ua-field">Nickname <input name="nickname" maxlength="80" placeholder="Display name" required></label>
+     <label class="ua-field ua-full">Email <input name="email" type="email" maxlength="254" placeholder="user@organisation.com" required></label>
+    </div>
+    <h3 class="ua-section-title">App access &amp; permissions</h3>
+    <p class="ua-hint">Choose the user's role from the dropdown for each app. No access means the user is not assigned a licence for that app. An app's Admin role is independent of Workspace administration.</p>
+    <div class="ua-roles" id="ua-role-fields"></div>
+    <label class="ua-checkline"><input type="checkbox" name="organisationAdmin"><span><strong>Organisation administrator</strong><br>Also a normal Workspace user, with additional permission to manage organisation accounts and purchases.</span></label>
+    <p id="ua-account-message" class="ua-message" role="status" aria-live="polite"></p>
+    <div class="ua-modal-footer"><span class="ua-role-count">Changes in this preview only</span><button type="button" class="ua-secondary" data-ua-nav="list">Cancel</button><button type="submit" class="ua-primary" id="ua-account-action">Create account</button></div>
+   </form>
+  </section>
+  <section data-ua-panel="buy" hidden aria-label="Purchase app user licences">
+   <button type="button" class="ua-secondary ua-back" data-ua-nav="list">← All users</button>
+   <h3 class="ua-section-title">Buy users</h3>
+   <p class="ua-hint">Choose how many user licences to add to each app. Each app has its own licence count. Mixed and Bundle discounts will be applied by the real subscription service.</p>
+   <form id="ua-buy-form">
+    <div class="ua-licence-list" id="ua-buy-rows"></div>
+    <p id="ua-buy-message" class="ua-message" role="status" aria-live="polite"></p>
+    <div class="ua-summary" id="ua-buy-review" hidden>
+     <strong>Purchase summary · preview</strong>
+     <p id="ua-buy-selection"></p>
+     <p id="ua-buy-total"></p>
+     <p>Current subscription / new subscription / monthly difference: <strong>Calculated at real checkout</strong>.</p>
+     <p>Actual billing totals, billing-period adjustments and VAT must be displayed and accepted before a real payment. No checkout is connected in this preview.</p>
+    </div>
+    <div class="ua-modal-footer">
+     <button type="button" class="ua-secondary" data-ua-nav="list">Cancel</button>
+     <button type="submit" class="ua-primary" id="ua-buy-review-action">Review changes</button>
+     <button type="button" class="ua-primary" id="ua-buy-apply" hidden>Simulate licence update</button>
+    </div>
+   </form>
+  </section>
+ </div>
 </dialog>
 
 <script>
@@ -1015,4 +1084,5 @@ document.fonts?.ready?.then(scheduleSize);
 scheduleSize();
 })();
 </script>
+<script src="assets/workspace-admin.js?v=20261101-1"></script>
 </body></html>
