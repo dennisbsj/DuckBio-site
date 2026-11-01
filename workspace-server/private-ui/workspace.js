@@ -38,6 +38,29 @@ function renderMembers(){
   row.append(name,el('td',user.nickname),el('td',user.admin?'Organization admin':'User'),roles,controls);root.append(row);
  }
 }
+function renderInvitations(invitations){
+ const root=$('pending-invitations');root.replaceChildren();
+ if(!invitations.length){const row=el('tr'),cell=el('td','No pending invitations.');cell.colSpan=4;row.append(cell);root.append(row);return;}
+ for(const invite of invitations){
+  const row=el('tr'),name=el('td'),controls=el('td');
+  name.append(el('strong',invite.name),el('small',invite.email));
+  controls.append(button('Revoke invitation',()=>revokeInvitation(invite)));
+  row.append(name,el('td',invite.admin?'Organization admin':'User'),el('td',new Date(invite.expiresAt).toLocaleDateString('en-GB')),controls);
+  root.append(row);
+ }
+}
+async function refreshInvitations(){
+ const data=await request('/api/suite/organization/invite/list',{organizationId:state.selected});
+ renderInvitations(data.invitations);
+}
+async function revokeInvitation(invite){
+ if(!window.confirm('Revoke the invitation for '+invite.email+'? The activation link will stop working.'))return;
+ try{
+  const result=await request('/api/suite/organization/invite/revoke',{organizationId:state.selected,email:invite.email});
+  await refreshInvitations();
+  status(result.revoked?'Invitation revoked for '+invite.email+'.':'This invitation was already inactive.');
+ }catch(e){status(e.message);}
+}
 async function removeUser(user){
  if(!window.confirm('Remove '+user.name+' from '+state.overview.organization.name+'? This does not delete their DuckBio account or any other organization memberships.'))return;
  try{await request('/api/suite/organization/user/remove',{organizationId:state.selected,accountId:user.accountId});await overview(state.selected);status('Removed '+user.name+' from this organization.');}
@@ -65,7 +88,7 @@ function edit(user){
 async function overview(orgId){
  const view=await request('/api/suite/organization/overview',{organizationId:orgId});
  state.overview=view;$('organization-name').textContent=view.organization.name;
- renderSeats();renderMembers();$('edit-panel').hidden=true;$('buy-panel').hidden=true;$('invite-panel').hidden=true;
+ renderSeats();renderMembers();await refreshInvitations();$('edit-panel').hidden=true;$('buy-panel').hidden=true;$('invite-panel').hidden=true;
  state.matrix=null;
  status('Workspace data loaded from the private server.');
 }
@@ -290,7 +313,7 @@ $('invite-form').addEventListener('submit',async event=>{
    organizationId:state.selected,name:$('invite-name').value.trim(),nickname:$('invite-nickname').value.trim(),
    email:$('invite-email').value.trim(),admin:$('invite-admin').checked});
   $('invitation-link').value=result.invitationUrl;
-  $('invite-result').hidden=false;status('Invitation created. Share the link securely with the invited person.');
+  $('invite-result').hidden=false;await refreshInvitations();status('Invitation created. Share the link securely with the invited person.');
  }catch(e){status(e.message);}finally{state.busy=false;}
 });
 $('copy-invitation').addEventListener('click',async()=>{
