@@ -183,6 +183,19 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         return {token,expiresAt};
       });
     },
+    listPendingInvitations(organizationId,actorId){
+      requireAdmin(organizationId,actorId);
+      return db.prepare('SELECT email,name,nickname,admin,expires_at FROM organization_invites WHERE org=? AND expires_at>? ORDER BY email').all(organizationId,clock())
+        .map(row=>({email:row.email,name:row.name,nickname:row.nickname,admin:Boolean(row.admin),expiresAt:row.expires_at}));
+    },
+    revokeInvitation({organizationId,actorId,email}){
+      if(!safeEmail(email))fail('invalid_invitation');
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        const result=db.prepare('DELETE FROM organization_invites WHERE org=? AND email=? AND expires_at>?').run(organizationId,email.trim().toLowerCase(),clock());
+        return {revoked:result.changes===1};
+      });
+    },
     previewInvitation(token){
       if(!safeToken(token))return null;
       const row=db.prepare('SELECT i.*,o.name AS organization_name FROM organization_invites i JOIN organizations o ON o.id=i.org JOIN members m ON m.org=i.org AND m.account=i.issued_by AND m.admin=1 WHERE i.token_hash=? AND i.expires_at>?').get(inviteHash(token),clock());

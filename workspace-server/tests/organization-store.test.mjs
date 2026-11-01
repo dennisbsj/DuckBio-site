@@ -114,6 +114,27 @@ test('organization invitation is opaque, one-use, expires, and does not pre-gran
  assert.equal(store.previewInvitation(invitation.token),null);
  assert.throws(()=>store.acceptInvitation({token:invitation.token,accountId:'other',email:'new@example.test'}),/invalid_invitation/);
 });
+test('administrators list and revoke only their own pending invitations, without exposing tokens',t=>{
+ const {store}=fixture(t);
+ store.setupOrganization({organizationId:'two',name:'Another lab',owner:{accountId:'admin2',name:'Admin Two',nickname:'Two',email:'two@example.test'}});
+ const first=store.issueInvitation({organizationId:'one',actorId:'admin1',name:'Scientist',nickname:'Sci',email:'scientist@example.test'});
+ store.issueInvitation({organizationId:'two',actorId:'admin2',name:'Other',nickname:'Other',email:'other@example.test'});
+ assert.throws(()=>store.listPendingInvitations('one','admin2'),/access_denied/);
+ const pending=store.listPendingInvitations('one','admin1');
+ assert.equal(pending.length,1);
+ assert.equal(pending[0].email,'scientist@example.test');
+ assert.equal(Object.keys(pending[0]).includes('token'),false);
+ assert.deepEqual(store.listPendingInvitations('two','admin2').map(i=>i.email),['other@example.test']);
+ assert.throws(()=>store.revokeInvitation({organizationId:'one',actorId:'admin2',email:'scientist@example.test'}),/access_denied/);
+ assert.deepEqual(store.revokeInvitation({organizationId:'one',actorId:'admin1',email:'scientist@example.test'}),{revoked:true});
+ assert.equal(store.previewInvitation(first.token),null);
+ assert.equal(store.listPendingInvitations('one','admin1').length,0);
+ assert.deepEqual(store.revokeInvitation({organizationId:'one',actorId:'admin1',email:'scientist@example.test'}),{revoked:false});
+ assert.equal(store.listPendingInvitations('two','admin2').length,1);
+ const replacement=store.issueInvitation({organizationId:'one',actorId:'admin1',name:'Scientist',nickname:'Sci',email:'scientist@example.test'});
+ assert.notEqual(replacement.token,first.token);
+ assert.equal(store.previewInvitation(replacement.token).email,'scientist@example.test');
+});
 test('removing a user revokes only this org, while other organization membership persists',t=>{
  const {store}=fixture(t);
  store.setupOrganization({organizationId:'two',name:'Other lab',owner:{accountId:'admin2',name:'Admin Two',nickname:'Two',email:'two@example.test'}});

@@ -165,6 +165,27 @@ test('admin creates a one-use org invitation and recipient activates new account
  await page.locator('#sign-in:not([hidden])').waitFor();
 });
 
+test('pending invitation is listed and can be revoked in the real browser',{timeout:45000},async t=>{
+ const {page,org,owner,identity}=await fixture(t);
+ await signIn(page);
+ await page.getByRole('button',{name:'Invite user'}).click();
+ await page.locator('#invite-name').fill('Temporary researcher');
+ await page.locator('#invite-nickname').fill('Temp');
+ await page.locator('#invite-email').fill('temp@example.test');
+ await page.getByRole('button',{name:'Create invitation'}).click();
+ await page.locator('#invite-result:not([hidden])').waitFor();
+ const link=await page.locator('#invitation-link').inputValue();
+ const row=page.locator('#pending-invitations tr').filter({hasText:'temp@example.test'});
+ await row.waitFor();
+ page.once('dialog',dialog=>dialog.accept());
+ await row.getByRole('button',{name:'Revoke invitation'}).click();
+ await page.waitForFunction(()=>!document.querySelector('#pending-invitations')?.textContent.includes('temp@example.test'));
+ assert.equal(org.listPendingInvitations('lab-a',owner.id).length,0);
+ await page.getByRole('button',{name:'Sign out'}).click();
+ await page.goto(link);
+ await page.locator('#sign-in:not([hidden])').waitFor();
+ assert.equal(identity.findUserByEmail('temp@example.test'),null);
+});
 test('removing a member from admin roster revokes their org access without deleting central identity',{timeout:45000},async t=>{
  const {page,org,identity,worker,owner}=await fixture(t);
  await signIn(page);

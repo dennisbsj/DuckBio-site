@@ -173,6 +173,30 @@ test('org admin can invite new central account, activated only once, without app
  assert.equal((await admin.call('/api/suite/organization/user/remove',{organizationId:'org-a',accountId:owner.id})).status,409,'last admin cannot be removed');
 });
 
+test('pending invitation list and revocation require selected organization and CSRF',async t=>{
+ const f=await fixture(t),admin=f.browser(),guest=f.browser();
+ await admin.preflight();await guest.preflight();
+ const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
+ f.organizationStore.setupOrganization({organizationId:'org-a',name:'Alpha lab',owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:'owner@example.test'}});
+ f.organizationStore.setupOrganization({organizationId:'org-b',name:'Beta lab',owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:'owner@example.test'}});
+ assert.equal((await admin.call('/api/suite/organization/invite/list',{organizationId:'org-a'})).status,403);
+ await admin.call('/api/suite/organization/select',{organizationId:'org-a'});
+ const invitationResponse=await admin.call('/api/suite/organization/invite',{organizationId:'org-a',name:'Scientist',nickname:'Sci',email:'new@example.test'});
+ const token=new URL((await invitationResponse.json()).invitationUrl).searchParams.get('invite');
+ assert.equal((await admin.call('/api/suite/organization/invite/list',{organizationId:'org-a'},'POST',false)).status,403);
+ assert.equal((await guest.call('/api/suite/organization/invite/list',{organizationId:'org-a'})).status,401);
+ assert.equal((await admin.call('/api/suite/organization/invite/list',{organizationId:'org-b'})).status,403);
+ const pending=(await (await admin.call('/api/suite/organization/invite/list',{organizationId:'org-a'})).json()).invitations;
+ assert.deepEqual(pending.map(x=>x.email),['new@example.test']);
+ assert.equal(JSON.stringify(pending).includes(token),false);
+ assert.equal((await admin.call('/api/suite/organization/invite/revoke',{organizationId:'org-b',email:'new@example.test'})).status,403);
+ assert.equal((await admin.call('/api/suite/organization/invite/revoke',{organizationId:'org-a',email:'new@example.test'},'POST',false)).status,403);
+ assert.equal((await admin.call('/api/suite/organization/invite/revoke',{organizationId:'org-a',email:'new@example.test'})).status,200);
+ assert.equal((await (await admin.call('/api/suite/organization/invite/list',{organizationId:'org-a'})).json()).invitations.length,0);
+ assert.equal((await guest.call('/api/suite/organization/invite/preview?token='+token)).status,403);
+ assert.equal((await guest.call('/api/suite/organization/invite/accept',{token,password:'Long new password 12345'})).status,403);
+ assert.equal(f.identityStore.findUserByEmail('new@example.test'),null);
+});
 test('subscription draft HTTP API is CSRF protected, org locked and cannot mint seats',async t=>{
  const f=await fixture(t),admin=f.browser();await admin.preflight();
  const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
