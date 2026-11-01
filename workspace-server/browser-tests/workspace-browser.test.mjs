@@ -250,6 +250,134 @@ test('admin deactivates and reactivates one member from the roster',{timeout:450
  assert.equal(org.accessFor({organizationId:'lab-a',accountId:worker.id,appId:'eel'}).role,'scientist');
  await page.locator('#audit-events').getByText('Member Reactivated').waitFor();
 });
+
+test('end-to-end administrator lifecycle: two organizations, invitations, rights, suspension and audit',{timeout:90000},async t=>{
+ const {page,org,identity,owner}=await fixture(t,{multi:true});
+ const email='journey@example.test',password='Journey secret passphrase 123456';
+ async function login(emailAddress,passwordText,organization){
+  await page.locator('#sign-in:not([hidden])').waitFor();
+  await page.locator('#email').fill(emailAddress);
+  await page.locator('#password').fill(passwordText);
+  await page.getByRole('button',{name:'Sign in'}).click();
+  await page.locator('#organization-choice:not([hidden])').waitFor();
+  await page.getByRole('button',{name:new RegExp(organization)}).click();
+ }
+ async function signOut(){
+  await page.getByRole('button',{name:'Sign out'}).click();
+  await page.locator('#sign-in:not([hidden])').waitFor();
+ }
+ async function invite(name,role){
+  await page.getByRole('button',{name:'Invite user'}).click();
+  await page.locator('#invite-name').fill(name);
+  await page.locator('#invite-nickname').fill('Journey');
+  await page.locator('#invite-email').fill(email);
+  if(role)await page.locator('#invite-role-fields select[name=eel]').selectOption(role);
+  await page.getByRole('button',{name:'Create invitation'}).click();
+  await page.locator('#invite-result:not([hidden])').waitFor();
+  const link=await page.locator('#invitation-link').inputValue();
+  assert.match(link,/invite=/);
+  return link;
+ }
+ // Organization A: pre-allocate the last DuckNote seat while inviting.
+ await login('owner@example.test','Example passphrase 123456','Synthetic laboratory');
+ await page.locator('#portal:not([hidden])').waitFor();
+ const invitationA=await invite('Journey member','reviewer');
+ let seats=org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel');
+ assert.equal(seats.assigned,1);
+ assert.equal(seats.reserved,1);
+ assert.equal(seats.purchased,2);
+ await signOut();
+ // Organization B: independently invite the SAME email, without app grants.
+ await login('owner@example.test','Example passphrase 123456','Second laboratory');
+ await page.locator('#portal:not([hidden])').waitFor();
+ const invitationB=await invite('Journey member',null);
+ assert.equal(org.listPendingInvitations('lab-b',owner.id).length,1);
+ await signOut();
+ // New identity is created from A's single-use invitation; no central app grants.
+ await page.goto(invitationA);
+ await page.locator('#invite-accept-panel:not([hidden])').waitFor();
+ await page.locator('#invite-password').fill(password);
+ await page.getByRole('button',{name:'Activate invitation'}).click();
+ await page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('invitation accepted'));
+ const user=identity.findUserByEmail(email);
+ assert.equal(user.state,'active');
+ assert.deepEqual(org.organizationsFor(user.id).map(x=>x.id),['lab-a']);
+ assert.equal(org.accessFor({organizationId:'lab-a',accountId:user.id,appId:'eel'}).role,'reviewer');
+ assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').reserved,0);
+ await signOut();
+ // Same verified identity joins B via existing-account sign-in, without being
+ // matched to another user's native app account by email.
+ await page.goto(invitationB);
+ await page.locator('#invite-accept-panel:not([hidden])').waitFor();
+ await page.getByRole('button',{name:'I already have a DuckBio account'}).click();
+ await page.locator('#email').fill(email);
+ await page.locator('#password').fill(password);
+ await page.getByRole('button',{name:'Sign in'}).click();
+ await page.locator('#organization-choice:not([hidden])').waitFor();
+ assert.deepEqual(org.organizationsFor(user.id).map(x=>x.id),['lab-b','lab-a']);
+ await page.getByRole('button',{name:/Second laboratory/}).click();
+ await page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('do not have organization administrator rights'));
+ assert.equal(await page.locator('#portal').isVisible(),false);
+ const attempts=await page.evaluate(async()=>{
+  const session=await (await fetch('/api/suite/auth/session')).json();
+  const invoke=async(route,data)=> (await fetch(route,{method:'POST',headers:{'content-type':'application/json','x-csrf-token':session.csrfToken},body:JSON.stringify(data)})).status;
+  return {
+   otherOrganization:await invoke('/api/suite/organization/select',{organizationId:'lab-a'}),
+   unauthorizedAdmin:await invoke('/api/suite/organization/overview',{organizationId:'lab-b'})
+  };
+ });
+ assert.deepEqual(attempts,{otherOrganization:409,unauthorizedAdmin:403},'session is locked and nonadmins cannot administer');
+ await signOut();
+ // A new login allows the user to choose A; the account is still not an admin.
+ await login(email,password,'Synthetic laboratory');
+ await page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('do not have organization administrator rights'));
+ assert.equal(org.accessFor({organizationId:'lab-a',accountId:user.id,appId:'eel'}).role,'reviewer');
+ await signOut();
+ // Org A admin changes role (same paid seat), then suspends the member.
+ await login('owner@example.test','Example passphrase 123456','Synthetic laboratory');
+ await page.locator('#portal:not([hidden])').waitFor();
+ const memberRow=()=>page.locator('#members tr').filter({hasText:email});
+ await memberRow().getByRole('button',{name:'Edit permissions'}).click();
+ await page.locator('#role-fields select[name=eel]').selectOption('scientist');
+ await page.locator('#member-form button[type=submit]').click();
+ await page.locator('#members').getByText('DuckNote (scientist)').waitFor();
+ assert.equal(org.accessFor({organizationId:'lab-a',accountId:user.id,appId:'eel'}).role,'scientist');
+ page.once('dialog',dialog=>dialog.accept());
+ await memberRow().getByRole('button',{name:'Deactivate'}).click();
+ await page.waitForFunction(emailAddress=>[...document.querySelectorAll('#members tr')].some(row=>row.textContent.includes(emailAddress)&&row.textContent.includes('Deactivated')),email);
+ assert.equal(org.accessFor({organizationId:'lab-a',accountId:user.id,appId:'eel'}),null);
+ assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').assigned,2,'suspended account still reserves its paid seat');
+ assert.equal(org.organizationsFor(user.id).length,1,'second organization membership remains');
+ await signOut();
+ // Suspended member can sign in but may only select B.
+ await page.locator('#email').fill(email);
+ await page.locator('#password').fill(password);
+ await page.getByRole('button',{name:'Sign in'}).click();
+ await page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('do not have organization administrator rights'));
+ const visible=await page.evaluate(async()=> (await (await fetch('/api/suite/organizations')).json()).organizations.map(x=>x.id));
+ assert.deepEqual(visible,['lab-b']);
+ await signOut();
+ // Reactivation restores only A's prior role, and a fresh login gives the
+ // same user both organization choices.
+ await login('owner@example.test','Example passphrase 123456','Synthetic laboratory');
+ await page.locator('#portal:not([hidden])').waitFor();
+ page.once('dialog',dialog=>dialog.accept());
+ await memberRow().getByRole('button',{name:'Reactivate'}).click();
+ await page.waitForFunction(emailAddress=>[...document.querySelectorAll('#members tr')].some(row=>row.textContent.includes(emailAddress)&&row.textContent.includes('Active')&&!row.textContent.includes('Deactivated')),email);
+ assert.equal(org.accessFor({organizationId:'lab-a',accountId:user.id,appId:'eel'}).role,'scientist');
+ const events=org.auditLog('lab-a',owner.id);
+ for(const action of ['invitation.issued','invitation.accepted','member.updated','member.deactivated','member.reactivated'])
+  assert(events.some(e=>e.action===action),action+' recorded in tenant audit');
+ assert(!JSON.stringify(events).includes(new URL(invitationA).searchParams.get('invite')),'audit does not expose invite tokens');
+ await signOut();
+ await page.locator('#email').fill(email);
+ await page.locator('#password').fill(password);
+ await page.getByRole('button',{name:'Sign in'}).click();
+ await page.locator('#organization-choice:not([hidden])').waitFor();
+ assert.equal(await page.locator('#organization-options button').count(),2);
+ assert.deepEqual(org.organizationsFor(user.id).map(x=>x.id),['lab-b','lab-a']);
+});
+
 test('admin saves and cancels subscription drafts without minting paid seats',{timeout:45000},async t=>{
  const {page,org,owner}=await fixture(t);
  await signIn(page);
