@@ -35,7 +35,8 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     'CREATE TABLE IF NOT EXISTS members(org TEXT NOT NULL REFERENCES organizations(id),account TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,email TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),PRIMARY KEY(org,account),UNIQUE(org,email))',
     'CREATE TABLE IF NOT EXISTS seats(org TEXT NOT NULL REFERENCES organizations(id),app TEXT NOT NULL,purchased INTEGER NOT NULL DEFAULT 0 CHECK(purchased>=0),PRIMARY KEY(org,app))',
     'CREATE TABLE IF NOT EXISTS assignments(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,role TEXT NOT NULL,PRIMARY KEY(org,account,app),FOREIGN KEY(org,account) REFERENCES members(org,account) ON DELETE CASCADE)',
-    'CREATE TABLE IF NOT EXISTS receipts(reference TEXT PRIMARY KEY,org TEXT NOT NULL,digest TEXT NOT NULL,recorded_at INTEGER NOT NULL)'
+    'CREATE TABLE IF NOT EXISTS receipts(reference TEXT PRIMARY KEY,org TEXT NOT NULL,digest TEXT NOT NULL,recorded_at INTEGER NOT NULL)',
+    'CREATE TABLE IF NOT EXISTS session_organizations(session_id TEXT PRIMARY KEY,account TEXT NOT NULL,org TEXT NOT NULL,selected_at INTEGER NOT NULL)'
   ].join(';')+';');
   for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))chmodSync(databasePath+suffix,0o600);
   const tx=work=>{db.exec('BEGIN IMMEDIATE');try{const result=work();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
@@ -58,6 +59,28 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     organizationsFor(account){
       if(!safeId(account))return [];
       return db.prepare('SELECT o.id,o.name,m.admin FROM members m JOIN organizations o ON o.id=m.org WHERE m.account=? ORDER BY o.name').all(account).map(x=>({id:x.id,name:x.name,admin:Boolean(x.admin)}));
+    },
+    selectSessionOrganization({sessionId,accountId,organizationId}){
+      if(!safeId(sessionId)||!safeId(accountId)||!safeId(organizationId))fail('access_denied');
+      return tx(()=>{
+        const member=db.prepare('SELECT 1 FROM members WHERE org=? AND account=?').get(organizationId,accountId);
+        if(!member)fail('access_denied');
+        const selected=db.prepare('SELECT account,org FROM session_organizations WHERE session_id=?').get(sessionId);
+        if(selected){
+          if(selected.account!==accountId||selected.org!==organizationId)fail('organization_locked');
+          return {organizationId,alreadySelected:true};
+        }
+        db.prepare('INSERT INTO session_organizations(session_id,account,org,selected_at) VALUES(?,?,?,?)').run(sessionId,accountId,organizationId,clock());
+        return {organizationId,alreadySelected:false};
+      });
+    },
+    currentSessionOrganization({sessionId,accountId}){
+      if(!safeId(sessionId)||!safeId(accountId))return null;
+      const row=db.prepare('SELECT o.id,o.name,m.admin FROM session_organizations s JOIN organizations o ON o.id=s.org JOIN members m ON m.org=s.org AND m.account=s.account WHERE s.session_id=? AND s.account=?').get(sessionId,accountId);
+      return row?{id:row.id,name:row.name,admin:Boolean(row.admin)}:null;
+    },
+    clearSessionOrganization(sessionId){
+      if(safeId(sessionId))db.prepare('DELETE FROM session_organizations WHERE session_id=?').run(sessionId);
     },
     overview(org,actor){
       requireAdmin(org,actor);

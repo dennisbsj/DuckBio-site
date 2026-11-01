@@ -26,9 +26,14 @@
       <button type="submit" class="primary">Sign in</button>
     </form>
   </section>
+  <section id="organization-choice" class="panel" hidden>
+    <h2>Choose your organization</h2>
+    <p>This organization will remain selected for the entire login session. Sign out to choose a different one.</p>
+    <div id="organization-options" class="roles"></div>
+  </section>
   <div id="portal" hidden>
     <section class="panel toolbar">
-      <label>Organization<select id="organizations" aria-label="Choose organization"></select></label>
+      <label>Current organization<select id="organizations" aria-label="Current organization" disabled></select></label><small>To change organization, sign out and sign in again.</small>
       <div class="actions"><button type="button" id="create" class="primary">Create account access</button><button type="button" id="buy">Buy users</button></div>
     </section>
     <section class="panel">

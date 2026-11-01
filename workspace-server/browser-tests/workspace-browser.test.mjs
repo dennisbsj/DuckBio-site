@@ -12,7 +12,7 @@ import {createSqliteAuthStores} from '../shared-auth/sqlite-store.mjs';
 import {createOrganizationStore} from '../organization-store.mjs';
 import {createAccountService} from '../shared-auth/account-service.mjs';
 
-async function fixture(t) {
+async function fixture(t, {multi=false}={}) {
  const temp=mkdtempSync(path.join(os.tmpdir(),'duckbio-workspace-browser-'));
  const identity=createIdentityStore({databasePath:path.join(temp,'identity.sqlite')});
  const auth=createSqliteAuthStores({databasePath:path.join(temp,'auth.sqlite')});
@@ -22,6 +22,7 @@ async function fixture(t) {
  const owner=await identity.bootstrap(token,{email:'owner@example.test',displayName:'Lab owner',password:'Example passphrase 123456'});
  const worker=await identity.createUser({email:'worker@example.test',displayName:'Lab worker',password:'Worker passphrase 123456'});
  org.setupOrganization({organizationId:'lab-a',name:'Synthetic laboratory',owner:{accountId:owner.id,name:'Lab owner',nickname:'Owner',email:'owner@example.test'}});
+ if(multi)org.setupOrganization({organizationId:'lab-b',name:'Second laboratory',owner:{accountId:owner.id,name:'Lab owner',nickname:'Owner',email:'owner@example.test'}});
  org.applyVerifiedSeatPurchase({reference:'test-purchase-1',organizationId:'lab-a',plan:'Mixed',apps:['eel','goflo'],seats:2});
  org.saveMember({organizationId:'lab-a',actorId:owner.id,member:{accountId:worker.id,name:'Lab worker',nickname:'Worker',email:'worker@example.test',admin:false,roles:{eel:'scientist'}}});
  const registrations=['goflo','eel','methpipe','mantrain','duckman','limsman'].map(id=>({id,appId:id,secret:randomBytes(32).toString('base64url'),redirectUris:['https://example.invalid/'+id+'/auth/callback'],nativeOrigin:'https://example.invalid'}));
@@ -88,4 +89,26 @@ test('responsive Workspace still refuses to create unverified central accounts',
  await page.locator('#role-fields select[name=eel]').selectOption('scientist');
  await page.locator('#member-form button[type=submit]').click();
  await page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('Check the account, email and app roles.'),null,{timeout:10000});
+});
+
+test('two organizations require explicit login-time selection and a fresh login to change',{timeout:45000},async t=>{
+ const {page}=await fixture(t,{multi:true});
+ await page.locator('#email').fill('owner@example.test');
+ await page.locator('#password').fill('Example passphrase 123456');
+ await page.getByRole('button',{name:'Sign in'}).click();
+ await page.locator('#organization-choice:not([hidden])').waitFor();
+ assert.equal(await page.locator('#portal').isVisible(),false);
+ await page.getByRole('button',{name:/Synthetic laboratory/}).click();
+ await page.locator('#portal:not([hidden])').waitFor();
+ assert.equal(await page.locator('#organizations').isDisabled(),true);
+ assert.equal(await page.locator('#organization-name').textContent(),'Synthetic laboratory');
+ await page.getByRole('button',{name:'Sign out'}).click();
+ await page.locator('#sign-in:not([hidden])').waitFor();
+ await page.locator('#email').fill('owner@example.test');
+ await page.locator('#password').fill('Example passphrase 123456');
+ await page.getByRole('button',{name:'Sign in'}).click();
+ await page.locator('#organization-choice:not([hidden])').waitFor();
+ await page.getByRole('button',{name:/Second laboratory/}).click();
+ await page.locator('#portal:not([hidden])').waitFor();
+ assert.equal(await page.locator('#organization-name').textContent(),'Second laboratory');
 });
