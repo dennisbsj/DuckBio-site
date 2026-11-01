@@ -77,7 +77,7 @@ async function chooseOrganization(orgId){
   $('organizations').replaceChildren();
   const option=el('option',chosen.selectedOrganization.name);option.value=chosen.selectedOrganization.id;
   $('organizations').append(option);
-  $('organization-choice').hidden=true;
+  $('organization-choice').hidden=true;$('invite-accept-panel').hidden=true;
   if(!chosen.selectedOrganization.admin){
    $('portal').hidden=true;$('sign-in').hidden=true;$('logout').hidden=false;
    status('Signed in. You do not have organization administrator rights.');return;
@@ -91,7 +91,7 @@ async function load(){
   const data=await request('/api/suite/organizations');
   state.orgs=data.organizations||[];
   $('logout').hidden=false;
-  $('sign-in').hidden=true;
+  $('sign-in').hidden=true;$('invite-accept-panel').hidden=true;
   $('portal').hidden=true;
   if(data.selectedOrganization){
    state.selected=data.selectedOrganization.id;
