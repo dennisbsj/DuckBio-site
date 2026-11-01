@@ -140,25 +140,71 @@ $('member-form').addEventListener('submit',async e=>{
  try{await request('/api/suite/organization/user/save',{organizationId:state.selected,member});await overview(state.selected);status('App permissions updated. Native app-account mapping remains separately controlled.');}
  catch(err){status(err.message);}finally{state.busy=false;}
 });
+
+function draftSelection(){
+ const plan=$('draft-plan').value,seats=Number($('draft-seats').value);
+ const apps=[...$('buy-fields').querySelectorAll('input[type=checkbox]:checked')].map(x=>x.name);
+ if(!Number.isSafeInteger(seats)||seats<1||seats>10000)return null;
+ if((plan==='Single'&&apps.length!==1)||(plan==='Mixed'&&(apps.length<2||apps.length>5))||(plan==='Bundle'&&apps.length!==6))return null;
+ return {organizationId:state.selected,plan,apps,seats};
+}
+function applyPlan(){
+ const bundle=$('draft-plan').value==='Bundle';
+ for(const input of $('buy-fields').querySelectorAll('input')){
+  if(bundle)input.checked=true;
+  input.disabled=bundle;
+ }
+}
+$('draft-plan').addEventListener('change',applyPlan);
 $('buy').addEventListener('click',()=>{
  showTab('subscriptions');$('edit-panel').hidden=true;$('buy-panel').hidden=false;
+ $('draft-plan').value='Single';$('draft-seats').value='1';
  const root=$('buy-fields');root.replaceChildren();
  for(const app of state.overview.apps){
   const card=el('div',undefined,'role-card'),label=el('label',app.name),input=el('input');
-  input.type='number';input.name=app.id;input.min='0';input.max='1000';input.step='1';input.value='0';
-  label.append(input);card.append(label,el('small',app.purchased+' purchased'));root.append(card);
+  input.type='checkbox';input.name=app.id;input.checked=false;input.setAttribute('aria-label',app.name+' for subscription');
+  label.className='inline';label.append(input);
+  card.append(label,el('small',app.purchased+' purchased · '+app.assigned+' assigned'));root.append(card);
  }
+ applyPlan();
  $('buy-summary').textContent='No real payment or licence change is possible yet.';
  $('buy-panel').scrollIntoView({behavior:'smooth',block:'start'});
 });
 $('review-buy').addEventListener('click',()=>{
- const rows=[...$('buy-fields').querySelectorAll('input')];
- if(rows.some(i=>!i.checkValidity())){$('buy-summary').textContent='Select whole numbers between 0 and 1000.';return;}
- const selected=rows.filter(i=>Number(i.value)>0).map(i=>state.overview.apps.find(a=>a.id===i.name).name+': +'+i.value);
- $('buy-summary').textContent=selected.length?'Selection: '+selected.join(' · ')+'. Checkout is not connected; no licences were purchased.':'Choose at least one app.';
+ const draft=draftSelection();
+ if(!draft){$('buy-summary').textContent='Single requires 1 app, Mixed 2–5, Bundle all six; choose 1–10,000 users per app.';return;}
+ $('buy-summary').textContent=draft.plan+' · '+draft.apps.map(id=>state.overview.apps.find(a=>a.id===id).name).join(', ')+' · '+draft.seats+' users/app. This is not a purchase.';
+});
+$('save-draft').addEventListener('click',async()=>{
+ const draft=draftSelection();
+ if(!draft){$('buy-summary').textContent='Select a valid plan, apps and number of users.';return;}
+ try{
+  await request('/api/suite/organization/subscription/draft',draft);
+  $('buy-panel').hidden=true;await refreshSubscriptions();
+  status('Subscription draft saved. No checkout, payment or licence assignment occurred.');
+ }catch(e){$('buy-summary').textContent=e.message;}
 });
 $('cancel-buy').addEventListener('click',()=>{$('buy-panel').hidden=true;});
 $('open-buy').addEventListener('click',()=>$('buy').click());
+async function refreshSubscriptions(){
+ if(!state.selected)return;
+ const result=await request('/api/suite/organization/subscriptions',{organizationId:state.selected});
+ const root=$('subscription-drafts');root.replaceChildren();
+ if(!result.drafts.length){root.append(el('p','No subscription drafts.'));return;}
+ for(const draft of result.drafts){
+  const card=el('div',undefined,'role-card');
+  const labels=draft.apps.map(id=>state.overview.apps.find(a=>a.id===id)?.name||id);
+  card.append(el('strong',draft.plan+' · '+draft.seats+' users per app'),el('small',labels.join(', ')+' · '+draft.status));
+  if(draft.status==='draft'){
+   card.append(button('Cancel draft',async()=>{
+    if(!window.confirm('Cancel this draft? This does not change purchased subscriptions or licences.'))return;
+    try{await request('/api/suite/organization/subscription/cancel',{organizationId:state.selected,draftId:draft.id});await refreshSubscriptions();}
+    catch(e){status(e.message);}
+   }));
+  }
+  root.append(card);
+ }
+}
 
 function showTab(tab){
  for(const button of document.querySelectorAll('[data-tab]')){
@@ -168,6 +214,7 @@ function showTab(tab){
  }
  for(const name of ['users','subscriptions','matrix'])$('tab-'+name).hidden=name!==tab;
  if(tab==='matrix')loadMatrix().catch(e=>{$('matrix-info').textContent=e.message;});
+ if(tab==='subscriptions')refreshSubscriptions().catch(e=>status(e.message));
 }
 async function loadMatrix(){
  if(!state.selected)return;
