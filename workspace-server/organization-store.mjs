@@ -5,7 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const policy=JSON.parse(readFileSync(fileURLToPath(new URL('../suite-permissions.json',import.meta.url)),'utf8'));
-export const APPLICATIONS=Object.freeze([['limsman','LabDuck','LIMSMan'],['goflo','CytoDuck','GoFlo'],['methpipe','DuckPipe','MethPipe'],['eel','DuckNote','EEL'],['duckman','DuckMan','DuckMan'],['mantrain','DuckTrain','ManTrain']].map(([id,name,key])=>Object.freeze({id,name,roles:Object.freeze(Object.keys(policy.apps[key].roles))})));
+export const APPLICATIONS=Object.freeze([['limsman','LabDuck','LIMSMan'],['goflo','CytoDuck','GoFlo'],['methpipe','DuckPipe','MethPipe'],['eel','DuckNote','EEL'],['duckman','DuckMan','DuckMan'],['mantrain','DuckTrain','ManTrain']].map(([id,name,key])=>Object.freeze({id,name,roles:Object.freeze(Object.keys(policy.apps[key].roles)),rolePermissions:Object.freeze(policy.apps[key].roles),permissions:Object.freeze([...new Set(Object.values(policy.apps[key].roles).flat().filter(p=>p!=='*'))].sort())})));
 const byId=new Map(APPLICATIONS.map(x=>[x.id,x]));
 const safeId=x=>typeof x==='string'&&/^[\w.:-]{1,128}$/.test(x);
 const safeText=(x,max=120)=>typeof x==='string'&&x.trim().length>0&&x.length<=max&&!/[\u0000-\u001f\u007f]/.test(x);
@@ -36,7 +36,8 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     'CREATE TABLE IF NOT EXISTS seats(org TEXT NOT NULL REFERENCES organizations(id),app TEXT NOT NULL,purchased INTEGER NOT NULL DEFAULT 0 CHECK(purchased>=0),PRIMARY KEY(org,app))',
     'CREATE TABLE IF NOT EXISTS assignments(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,role TEXT NOT NULL,PRIMARY KEY(org,account,app),FOREIGN KEY(org,account) REFERENCES members(org,account) ON DELETE CASCADE)',
     'CREATE TABLE IF NOT EXISTS receipts(reference TEXT PRIMARY KEY,org TEXT NOT NULL,digest TEXT NOT NULL,recorded_at INTEGER NOT NULL)',
-    'CREATE TABLE IF NOT EXISTS session_organizations(session_id TEXT PRIMARY KEY,account TEXT NOT NULL,org TEXT NOT NULL,selected_at INTEGER NOT NULL)'
+    'CREATE TABLE IF NOT EXISTS session_organizations(session_id TEXT PRIMARY KEY,account TEXT NOT NULL,org TEXT NOT NULL,selected_at INTEGER NOT NULL)',
+    'CREATE TABLE IF NOT EXISTS permission_overrides(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,permission TEXT NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),PRIMARY KEY(org,account,app,permission),FOREIGN KEY(org,account,app) REFERENCES assignments(org,account,app) ON DELETE CASCADE)'
   ].join(';')+';');
   for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))chmodSync(databasePath+suffix,0o600);
   const tx=work=>{db.exec('BEGIN IMMEDIATE');try{const result=work();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
@@ -109,6 +110,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
       return tx(()=>{
         requireAdmin(organizationId,actorId);
         const prior=db.prepare('SELECT * FROM members WHERE org=? AND account=?').get(organizationId,member.accountId);
+        const previousRoles=prior?roles(organizationId,member.accountId):{};
         if(prior?.admin&&!member.admin&&db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1').get(organizationId).n===1)fail('last_organization_admin');
         const collision=db.prepare('SELECT account FROM members WHERE org=? AND email=?').get(organizationId,email);
         if(collision&&collision.account!==member.accountId)fail('duplicate_organization_email');
@@ -120,11 +122,47 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         }
         db.prepare('INSERT INTO members(org,account,name,nickname,email,admin) VALUES(?,?,?,?,?,?) ON CONFLICT(org,account) DO UPDATE SET name=excluded.name,nickname=excluded.nickname,email=excluded.email,admin=excluded.admin').run(organizationId,member.accountId,member.name.trim(),member.nickname.trim(),email,member.admin?1:0);
         for(const app of APPLICATIONS){
+          if(previousRoles[app.id] && requested[app.id] && previousRoles[app.id]!==requested[app.id])
+            db.prepare('DELETE FROM permission_overrides WHERE org=? AND account=? AND app=?').run(organizationId,member.accountId,app.id);
           if(requested[app.id])db.prepare('INSERT INTO assignments(org,account,app,role) VALUES(?,?,?,?) ON CONFLICT(org,account,app) DO UPDATE SET role=excluded.role').run(organizationId,member.accountId,app.id,requested[app.id]);
           else db.prepare('DELETE FROM assignments WHERE org=? AND account=? AND app=?').run(organizationId,member.accountId,app.id);
         }
         return view(organizationId,db.prepare('SELECT * FROM members WHERE org=? AND account=?').get(organizationId,member.accountId));
       });
+    },
+    matrix(organizationId,actorId){
+      const result=this.overview(organizationId,actorId);
+      result.users=result.users.map(user=>({
+        ...user,
+        overrides:Object.fromEntries(APPLICATIONS.map(app=>[app.id,
+          Object.fromEntries(db.prepare('SELECT permission,enabled FROM permission_overrides WHERE org=? AND account=? AND app=? ORDER BY permission').all(organizationId,user.accountId,app.id).map(x=>[x.permission,Boolean(x.enabled)]))
+        ]))
+      }));
+      return result;
+    },
+    setPermission({organizationId,actorId,accountId,appId,permission,enabled}){
+      if(!safeId(accountId)||!byId.has(appId)||!byId.get(appId).permissions.includes(permission)||typeof enabled!=='boolean')fail('invalid_permission');
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        const assigned=db.prepare('SELECT role FROM assignments WHERE org=? AND account=? AND app=?').get(organizationId,accountId,appId);
+        if(!assigned)fail('app_access_required');
+        const allowed=byId.get(appId).rolePermissions[assigned.role]||[];
+        const baseline=allowed.includes('*')||allowed.includes(permission);
+        if(enabled===baseline)db.prepare('DELETE FROM permission_overrides WHERE org=? AND account=? AND app=? AND permission=?').run(organizationId,accountId,appId,permission);
+        else db.prepare('INSERT INTO permission_overrides(org,account,app,permission,enabled) VALUES(?,?,?,?,?) ON CONFLICT(org,account,app,permission) DO UPDATE SET enabled=excluded.enabled').run(organizationId,accountId,appId,permission,enabled?1:0);
+        return {organizationId,accountId,appId,permission,enabled};
+      });
+    },
+    effectivePermissions({organizationId,accountId,appId}){
+      if(!safeId(organizationId)||!safeId(accountId)||!byId.has(appId))return [];
+      const assigned=db.prepare('SELECT role FROM assignments WHERE org=? AND account=? AND app=?').get(organizationId,accountId,appId);
+      if(!assigned)return [];
+      const app=byId.get(appId),base=app.rolePermissions[assigned.role]||[];
+      const allowed=new Set(base.includes('*')?app.permissions:base);
+      for(const row of db.prepare('SELECT permission,enabled FROM permission_overrides WHERE org=? AND account=? AND app=?').all(organizationId,accountId,appId)) {
+        if(row.enabled)allowed.add(row.permission);else allowed.delete(row.permission);
+      }
+      return [...allowed].sort();
     },
     accessFor({organizationId,accountId,appId}){
       if(!safeId(organizationId)||!safeId(accountId)||!byId.has(appId))return null;
