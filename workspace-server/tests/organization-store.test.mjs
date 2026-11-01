@@ -135,6 +135,27 @@ test('administrators list and revoke only their own pending invitations, without
  assert.notEqual(replacement.token,first.token);
  assert.equal(store.previewInvitation(replacement.token).email,'scientist@example.test');
 });
+test('invited app roles reserve paid seats atomically and transfer them on acceptance',t=>{
+ const {store}=fixture(t);
+ buy(store,'seat-reserved','Single',['eel'],1);
+ assert.throws(()=>store.issueInvitation({organizationId:'one',actorId:'admin1',name:'No seat',nickname:'N',email:'no@example.test',roles:{goflo:'Analyst'}}),/app_seats_exhausted/);
+ const invitation=store.issueInvitation({organizationId:'one',actorId:'admin1',name:'Scientist',nickname:'Sci',email:'invited@example.test',roles:{eel:'scientist'}});
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,1);
+ assert.equal(store.listPendingInvitations('one','admin1')[0].roles.eel,'scientist');
+ assert.throws(()=>store.issueInvitation({organizationId:'one',actorId:'admin1',name:'Second',nickname:'S',email:'second@example.test',roles:{eel:'reviewer'}}),/app_seats_exhausted/);
+ assert.throws(()=>store.saveMember({organizationId:'one',actorId:'admin1',member:member('someone',{eel:'scientist'})}),/app_seats_exhausted/);
+ const result=store.acceptInvitation({token:invitation.token,accountId:'invited',email:'invited@example.test'});
+ assert.equal(result.roles.eel,'scientist');
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,0);
+ assert.equal(store.accessFor({organizationId:'one',accountId:'invited',appId:'eel'}).role,'scientist');
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').assigned,1);
+ assert.throws(()=>store.acceptInvitation({token:invitation.token,accountId:'other',email:'invited@example.test'}),/invalid_invitation/);
+ store.removeMember({organizationId:'one',actorId:'admin1',accountId:'invited'});
+ const again=store.issueInvitation({organizationId:'one',actorId:'admin1',name:'Again',nickname:'A',email:'again@example.test',roles:{eel:'reviewer'}});
+ assert.equal(store.revokeInvitation({organizationId:'one',actorId:'admin1',email:'again@example.test'}).revoked,true);
+ assert.equal(store.previewInvitation(again.token),null);
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,0);
+});
 test('removing a user revokes only this org, while other organization membership persists',t=>{
  const {store}=fixture(t);
  store.setupOrganization({organizationId:'two',name:'Other lab',owner:{accountId:'admin2',name:'Admin Two',nickname:'Two',email:'two@example.test'}});

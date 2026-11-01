@@ -197,6 +197,29 @@ test('pending invitation list and revocation require selected organization and C
  assert.equal((await guest.call('/api/suite/organization/invite/accept',{token,password:'Long new password 12345'})).status,403);
  assert.equal(f.identityStore.findUserByEmail('new@example.test'),null);
 });
+test('app-role invitations reserve seats before acceptance and cannot exceed licensed capacity over HTTP',async t=>{
+ const f=await fixture(t),admin=f.browser(),guest=f.browser();
+ await admin.preflight();await guest.preflight();
+ const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
+ f.organizationStore.setupOrganization({organizationId:'org-a',name:'Alpha lab',owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:'owner@example.test'}});
+ await admin.call('/api/suite/organization/select',{organizationId:'org-a'});
+ const data={organizationId:'org-a',name:'Scientist',nickname:'Sci',email:'new@example.test',roles:{eel:'scientist'}};
+ assert.equal((await admin.call('/api/suite/organization/invite',data)).status,409,'no purchased DuckNote seat');
+ f.organizationStore.applyVerifiedSeatPurchase({reference:'trusted-seat',organizationId:'org-a',plan:'Single',apps:['eel'],seats:1});
+ assert.equal((await admin.call('/api/suite/organization/invite',{...data,roles:{eel:'not-a-real-role'}})).status,400);
+ const created=await admin.call('/api/suite/organization/invite',data);
+ assert.equal(created.status,201);
+ const token=new URL((await created.json()).invitationUrl).searchParams.get('invite');
+ const listed=(await (await admin.call('/api/suite/organization/invite/list',{organizationId:'org-a'})).json()).invitations;
+ assert.equal(listed[0].roles.eel,'scientist');
+ assert.equal((await admin.call('/api/suite/organization/invite',{...data,email:'other@example.test'})).status,409);
+ assert.equal((await (await admin.call('/api/suite/organization/overview',{organizationId:'org-a'})).json()).apps.find(x=>x.id==='eel').reserved,1);
+ const accepted=await guest.call('/api/suite/organization/invite/accept',{token,password:'Long new password 12345'});
+ assert.equal(accepted.status,201);
+ const account=f.identityStore.findUserByEmail('new@example.test');
+ assert.equal(f.organizationStore.accessFor({organizationId:'org-a',accountId:account.id,appId:'eel'}).role,'scientist');
+ assert.equal(f.organizationStore.overview('org-a',owner.id).apps.find(x=>x.id==='eel').reserved,0);
+});
 test('subscription draft HTTP API is CSRF protected, org locked and cannot mint seats',async t=>{
  const f=await fixture(t),admin=f.browser();await admin.preflight();
  const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;

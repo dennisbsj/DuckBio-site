@@ -22,7 +22,7 @@ function renderSeats(){
  const root=$('seats');root.replaceChildren();
  const subscriptions=$('subscription-seats');subscriptions.replaceChildren();
  for(const app of state.overview.apps){
-  const card=el('div',undefined,'seat-card');card.append(el('div',app.name),el('strong',app.assigned+' / '+app.purchased),el('small','Assigned / purchased'));
+  const card=el('div',undefined,'seat-card');card.append(el('div',app.name),el('strong',app.assigned+' / '+app.purchased),el('small','Assigned / purchased · '+(app.reserved||0)+' pending reservations'));
   root.append(card);
   const copy=card.cloneNode(true);subscriptions.append(copy);
  }
@@ -40,13 +40,26 @@ function renderMembers(){
 }
 function renderInvitations(invitations){
  const root=$('pending-invitations');root.replaceChildren();
- if(!invitations.length){const row=el('tr'),cell=el('td','No pending invitations.');cell.colSpan=4;row.append(cell);root.append(row);return;}
+ if(!invitations.length){const row=el('tr'),cell=el('td','No pending invitations.');cell.colSpan=5;row.append(cell);root.append(row);return;}
  for(const invite of invitations){
   const row=el('tr'),name=el('td'),controls=el('td');
   name.append(el('strong',invite.name),el('small',invite.email));
   controls.append(button('Revoke invitation',()=>revokeInvitation(invite)));
-  row.append(name,el('td',invite.admin?'Organization admin':'User'),el('td',new Date(invite.expiresAt).toLocaleDateString('en-GB')),controls);
+  const labels=Object.entries(invite.roles||{}).map(([id,role])=>state.overview.apps.find(a=>a.id===id)?.name+' ('+role+')');
+  row.append(name,el('td',invite.admin?'Organization admin':'User'),el('td',labels.join(', ')||'No access'),el('td',new Date(invite.expiresAt).toLocaleDateString('en-GB')),controls);
   root.append(row);
+ }
+}
+function renderInviteRoleFields(){
+ const root=$('invite-role-fields');root.replaceChildren();
+ for(const app of state.overview.apps){
+  const card=el('div',undefined,'role-card'),label=el('label',app.name),select=el('select');
+  select.name=app.id;select.setAttribute('aria-label',app.name+' invitation role');
+  const none=el('option','No access');none.value='';select.append(none);
+  for(const role of app.roles){const option=el('option',role);option.value=role;select.append(option);}
+  label.append(select);
+  card.append(label,el('small',app.assigned+' assigned · '+(app.reserved||0)+' reserved · '+app.purchased+' purchased'));
+  root.append(card);
  }
 }
 async function refreshInvitations(){
@@ -57,7 +70,7 @@ async function revokeInvitation(invite){
  if(!window.confirm('Revoke the invitation for '+invite.email+'? The activation link will stop working.'))return;
  try{
   const result=await request('/api/suite/organization/invite/revoke',{organizationId:state.selected,email:invite.email});
-  await refreshInvitations();
+  await overview(state.selected);
   status(result.revoked?'Invitation revoked for '+invite.email+'.':'This invitation was already inactive.');
  }catch(e){status(e.message);}
 }
@@ -301,7 +314,7 @@ $('matrix-sort').addEventListener('change',renderMatrix);
 $('invite').addEventListener('click',()=>{
  showTab('users');$('edit-panel').hidden=true;
  $('invite-panel').hidden=false;$('invite-result').hidden=true;
- $('invite-form').reset();$('invite-panel').scrollIntoView({behavior:'smooth',block:'start'});
+ $('invite-form').reset();renderInviteRoleFields();$('invite-panel').scrollIntoView({behavior:'smooth',block:'start'});
 });
 $('close-invite').addEventListener('click',()=>{$('invite-panel').hidden=true;});
 $('invite-form').addEventListener('submit',async event=>{
@@ -309,11 +322,15 @@ $('invite-form').addEventListener('submit',async event=>{
  if(state.busy||!event.currentTarget.reportValidity())return;
  state.busy=true;
  try{
+  const roles={};
+  for(const select of $('invite-role-fields').querySelectorAll('select'))if(select.value)roles[select.name]=select.value;
   const result=await request('/api/suite/organization/invite',{
    organizationId:state.selected,name:$('invite-name').value.trim(),nickname:$('invite-nickname').value.trim(),
-   email:$('invite-email').value.trim(),admin:$('invite-admin').checked});
+   email:$('invite-email').value.trim(),admin:$('invite-admin').checked,roles});
   $('invitation-link').value=result.invitationUrl;
-  $('invite-result').hidden=false;await refreshInvitations();status('Invitation created. Share the link securely with the invited person.');
+  $('invite-result').hidden=false;await refreshInvitations();
+  state.overview=await request('/api/suite/organization/overview',{organizationId:state.selected});renderSeats();
+  status('Invitation created. Selected app seats are reserved until acceptance, revocation or expiry.');
  }catch(e){status(e.message);}finally{state.busy=false;}
 });
 $('copy-invitation').addEventListener('click',async()=>{

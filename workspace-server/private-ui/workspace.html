@@ -64,7 +64,7 @@
     <section class="panel">
       <h2>Pending invitations</h2>
       <p>Invitations expire after seven days. Revoke an invitation to disable its activation link immediately.</p>
-      <div class="table-scroll"><table><thead><tr><th>User</th><th>Organization role</th><th>Expires</th><th>Actions</th></tr></thead><tbody id="pending-invitations"></tbody></table></div>
+      <div class="table-scroll"><table><thead><tr><th>User</th><th>Organization role</th><th>App roles</th><th>Expires</th><th>Actions</th></tr></thead><tbody id="pending-invitations"></tbody></table></div>
     </section>
     <section id="edit-panel" class="panel" hidden>
       <h2 id="edit-title">Assign app access</h2>
@@ -84,12 +84,13 @@
     </section>
     <section id="invite-panel" class="panel" hidden>
       <h2>Invite a user</h2>
-      <p>Invite a new or existing DuckBio account to this organization. No app licence is assigned until an administrator selects an app role after acceptance.</p>
+      <p>Invite a new or existing DuckBio account. Selected app roles reserve purchased licences while the invitation is pending. No app access is activated until acceptance.</p>
       <form id="invite-form" class="fields">
         <label>Name<input id="invite-name" maxlength="120" required></label>
         <label>Nickname<input id="invite-nickname" maxlength="120" required></label>
         <label>Email<input id="invite-email" type="email" maxlength="254" required></label>
         <label class="inline"><input id="invite-admin" type="checkbox"> Organization administrator</label>
+        <div class="wide-field"><h3>App access and roles</h3><div id="invite-role-fields" class="roles"></div></div>
         <div class="actions"><button type="submit" class="primary">Create invitation</button><button type="button" id="close-invite">Cancel</button></div>
       </form>
       <div id="invite-result" hidden>

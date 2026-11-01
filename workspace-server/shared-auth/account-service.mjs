@@ -202,7 +202,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           }
           else if (route === '/api/suite/organization/invite') {
             requireSelection(body.organizationId);
-            const issued=organizationStore.issueInvitation({organizationId:body.organizationId,actorId:user.id,email:body.email,name:body.name,nickname:body.nickname,admin:body.admin===true});
+            const issued=organizationStore.issueInvitation({organizationId:body.organizationId,actorId:user.id,email:body.email,name:body.name,nickname:body.nickname,admin:body.admin===true,roles:body.roles??{}});
             const inviteUrl=new URL('/workspace',origin);inviteUrl.searchParams.set('invite',issued.token);
             send(res,201,{invitationUrl:inviteUrl.href,expiresAt:issued.expiresAt});
           }
