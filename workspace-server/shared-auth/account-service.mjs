@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createAuthBroker } from './broker.mjs';
 import { createLocalIdentityAdapter, IdentityStoreError } from './identity-store.mjs';
+import { OrganizationError } from '../organization-store.mjs';
 
 const APP_NAMES = Object.freeze({ goflo: 'GoFlo', eel: 'EEL', methpipe: 'MethPipe', mantrain: 'ManTrain', duckman: 'DuckMan', limsman: 'LIMSMan' });
 const STATIC_APPS = new Set(['goflo', 'methpipe', 'mantrain']);
@@ -23,7 +24,7 @@ function userView(user) { return { id: user.id, email: user.email, displayName: 
 
 /** Account service is independent of all business-data apps. It never migrates
  * their passwords/users, links by email, or promotes a central role to an app role. */
-export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
+export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
   const url = new URL(origin);
   const identity = createLocalIdentityAdapter({ store: identityStore, origin });
   const broker = createAuthBroker({ origin, issuer, clients, identity, store: authStore, clock, getClientAddress });
@@ -85,6 +86,12 @@ export function createAccountService({ origin, issuer = origin, clients, identit
   }
   function errorResponse(res, error) {
     let status = error.status ?? 503; let code = error.code ?? 'unavailable';
+    if (error instanceof OrganizationError) {
+      status = code === 'access_denied' ? 403
+        : ['app_seats_exhausted','last_organization_admin','duplicate_organization_email'].includes(code) ? 409
+        : 400;
+      if (!['access_denied','app_seats_exhausted','last_organization_admin','duplicate_organization_email','invalid_roles','invalid_member'].includes(code)) code = 'invalid_input';
+    }
     if (error instanceof IdentityStoreError) {
       if (code === 'invalid_setup_token') status = 403;
       else if (['account_exists', 'invitation_exists', 'last_active_admin', 'mapping_already_linked'].includes(code)) status = 409;
@@ -107,7 +114,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           send(res, 200, { status: 'ok', mode: 'local', buildVersion, configured: identityStore.listUsers().length > 0 }); return true;
         }
         if (!route.startsWith('/api/suite/')) return staticFile(req, res, route);
-        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST' };
+        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/overview': 'POST', '/api/suite/organization/user/save': 'POST' };
         if (!methods[route]) return false;
         if (![methods[route]].flat().includes(req.method)) throw new ServiceError(405, 'method_not_allowed');
         if (route !== '/api/suite/admin/native-users' && parsed.search) throw new ServiceError(400, 'invalid_input');
@@ -115,7 +122,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
         const body = req.method === 'GET' ? null : await jsonBody(req);
         if (route === '/api/suite/setup') {
           const user = await broker.credentialWork(req, String(body.email ?? ''), () => identityStore.bootstrap(body.setupToken, body));
-          for (const appId of staticApps) identityStore.grantAppAccess({ userId: user.id, appId, localUserId: user.id });
+          for (const appId of (organizationStore ? [] : staticApps)) identityStore.grantAppAccess({ userId: user.id, appId, localUserId: user.id });
           await identity.establishSession(req, res, user.id); send(res, 201, { authenticated: true, user: userView(user) });
         } else if (route === '/api/suite/invitations/accept') {
           const user = await broker.credentialWork(req, 'accept-invitation', () => identityStore.acceptInvitation(body.token, body));
@@ -127,6 +134,25 @@ export function createAccountService({ origin, issuer = origin, clients, identit
         } else {
           const { parent, user } = await authenticated(req, route.startsWith('/api/suite/admin/'));
           if (route === '/api/suite/account') send(res, 200, account(user));
+          else if (route === '/api/suite/organizations') {
+            if (!organizationStore) throw new ServiceError(503,'unavailable');
+            send(res,200,{organizations:organizationStore.organizationsFor(user.id)});
+          }
+          else if (route === '/api/suite/organization/overview') {
+            if (!organizationStore) throw new ServiceError(503,'unavailable');
+            send(res,200,organizationStore.overview(body.organizationId,user.id));
+          }
+          else if (route === '/api/suite/organization/user/save') {
+            if (!organizationStore) throw new ServiceError(503,'unavailable');
+            const target = identityStore.getUser(body.member?.accountId);
+            if (!target || target.state !== 'active' || target.email !== String(body.member.email||'').trim().toLowerCase())
+              throw new ServiceError(400,'invalid_input');
+            // Do not create a central identity or match native accounts based only on e-mail.
+            // Only already verified, active account subjects can receive Workspace roles.
+            const saved = organizationStore.saveMember({organizationId:body.organizationId,actorId:user.id,member:body.member});
+            await authenticated(req);
+            send(res,200,{user:saved});
+          }
           else if (route === '/api/suite/account/logout') { await identity.logout(parent.id); identity.clearCookie(res); send(res, 200, { authenticated: false, loggedOut: true }); }
           else if (route === '/api/suite/account/password') {
             await broker.credentialWork(req, user.email, async () => {
@@ -144,6 +170,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
             send(res, 200, { users });
           } else if (route === '/api/suite/admin/invitations') {
             const appIds = body.appIds ?? [];
+            if(organizationStore && appIds.length) throw new ServiceError(403,'access_denied');
             if (!Array.isArray(appIds) || new Set(appIds).size !== appIds.length || appIds.some(appId => !staticApps.has(appId))) throw new ServiceError(400, 'invalid_input');
             // Reserve UUID first so static account grants refer to the invite's
             // eventual stable subject, never an email or a native app account.
@@ -152,6 +179,9 @@ export function createAccountService({ origin, issuer = origin, clients, identit
             const invitation = new URL('/invite', origin); invitation.searchParams.set('token', invite.token);
             send(res, 201, { invitationUrl: invitation.href, expiresAt: invite.expiresAt });
           } else if (route === '/api/suite/admin/grants') {
+            // Workspace assignments reserve seats but cannot be taken as a native-account mapping.
+            // Until native mapping is verified, forbid all manual app grants in org mode.
+            if (organizationStore) throw new ServiceError(403,'access_denied');
             const target = identityStore.getUser(body.userId);
             if (!target || !APP_NAMES[body.appId]) throw new ServiceError(400, 'invalid_input');
             if (req.method === 'DELETE') identityStore.revokeAppAccess(target.id, body.appId);
