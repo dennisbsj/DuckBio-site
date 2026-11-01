@@ -177,6 +177,28 @@ test('audit trail records committed changes within one organization and never in
  assert(!JSON.stringify(events).includes(invitation.token),'audit never stores bearer invitation token');
  assert(!store.auditLog('two','admin2').some(e=>e.subject==='person'),'audit is tenant scoped');
 });
+test('Stripe test Checkout intents are durable, tenant isolated, idempotent and never grant seats',t=>{
+ const {store}=fixture(t);
+ const draft=store.createSubscriptionDraft({organizationId:'one',actorId:'admin1',plan:'Single',apps:['eel'],seats:3});
+ assert.throws(()=>store.prepareTestCheckout({organizationId:'one',actorId:'admin2',draftId:draft.id,price:'price_test123456'}),/access_denied/);
+ const result=store.prepareTestCheckout({organizationId:'one',actorId:'admin1',draftId:draft.id,price:'price_test123456'});
+ assert.equal(result.draft.seats,3);
+ assert.deepEqual(result.draft.apps,['eel']);
+ assert.equal(result.idempotencyKey,'duckbio-test-'+draft.id);
+ assert.equal(store.prepareTestCheckout({organizationId:'one',actorId:'admin1',draftId:draft.id,price:'price_test123456'}).idempotencyKey,result.idempotencyKey);
+ assert.throws(()=>store.prepareTestCheckout({organizationId:'one',actorId:'admin1',draftId:draft.id,price:'price_other123456'}),/checkout_price_changed/);
+ assert.throws(()=>store.cancelSubscriptionDraft({organizationId:'one',actorId:'admin1',draftId:draft.id}),/checkout_started/);
+ const checkout={id:'cs_test_session_123',url:'https://checkout.stripe.com/c/pay/example'};
+ assert.equal(store.completeTestCheckout({organizationId:'one',actorId:'admin1',draftId:draft.id,session:checkout}).alreadySaved,false);
+ assert.equal(store.completeTestCheckout({organizationId:'one',actorId:'admin1',draftId:draft.id,session:checkout}).alreadySaved,true);
+ assert.throws(()=>store.completeTestCheckout({organizationId:'one',actorId:'admin1',draftId:draft.id,session:{...checkout,id:'cs_test_other'}}),/checkout_conflict/);
+ const list=store.listSubscriptionDrafts('one','admin1');
+ assert.equal(list[0].checkoutState,'ready');
+ assert.equal(list[0].checkoutUrl,checkout.url);
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').purchased,0);
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').assigned,0);
+ assert.equal(store.auditLog('one','admin1').filter(x=>x.action==='checkout.test.started').length,1);
+});
 test('member deactivation is tenant-scoped, revokes access, retains seat and can be reversed',t=>{
  const {store}=fixture(t);
  store.setupOrganization({organizationId:'two',name:'Second laboratory',owner:{accountId:'admin2',name:'Admin Two',nickname:'Two',email:'two@example.test'}});
