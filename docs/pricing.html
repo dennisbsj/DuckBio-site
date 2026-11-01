@@ -813,11 +813,12 @@ function renderSelection(){
  const custom=users>=50,organisationRate=custom?0:users>=20?20:users>=5?10:0;
  const totalEUR=priceEUR*(1-organisationRate/100);
  find("pr-select-total").textContent=custom?"Individual quote":formatEUR(totalEUR)+" / month";
+ const savingsDetails=[];
+ if(count>1)savingsDetails.push("App saving "+pct(bundleDiscount(count))+": "+formatEUR(unitEUR(1)*count*users-priceEUR));
+ if(organisationRate)savingsDetails.push("Team saving "+pct(organisationRate)+": "+formatEUR(priceEUR-totalEUR));
  find("pr-select-breakdown").textContent=custom?
-  "For 50+ users request a custom quote. Bundle-adjusted baseline: "+formatEUR(priceEUR)+" /month. Excl. VAT.":
-  "Standard: "+formatEUR(unitEUR(1)*count*users)+" · App saving: "+formatEUR(unitEUR(1)*count*users-priceEUR)+
-  " ("+pct(bundleDiscount(count))+") · Team saving: "+formatEUR(priceEUR-totalEUR)+
-  " ("+pct(organisationRate)+") · Excl. VAT.";
+  "50+ users: request a custom quote. Bundle-adjusted baseline "+formatEUR(priceEUR)+" /month · Excl. VAT.":
+  (savingsDetails.length?savingsDetails.join(" · "):"Standard price")+" · Excl. VAT.";
  selectionEstimate={apps:count,users,custom,baseEUR:unitEUR(1)*count*users,suiteEUR:priceEUR,finalEUR:totalEUR,orgRate:organisationRate};
 }
 find("pr-select-all").addEventListener("click",()=>{
