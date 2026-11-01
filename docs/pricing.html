@@ -728,8 +728,7 @@ body:not(.homepage-exact) #choose-apps.section{padding:clamp(33px,4vw,56px) 0}
 const find=(id)=>document.getElementById(id);
 
 
-const eurNormal=[0,30,48,72,96,120,126];
-const earlyDiscount=0.20;
+const eurNormal=[0,35,56,84,112,140,147];
 const fxPerEUR={EUR:1,DKK:7.47384,USD:1.11952}; // Reference rates 30 October 2026
 const currencyButtons=[...document.querySelectorAll("[data-currency]")];
 let currency="EUR";
@@ -742,13 +741,13 @@ const display=(n)=>{
   maximumFractionDigits:2}).format(amount);
 };
 const formatEUR=(eur)=>display(converted(eur));
-const unitEUR=(apps,early=false)=>eurNormal[apps]*(early?1-earlyDiscount:1);
+const unitEUR=(apps)=>eurNormal[apps];
 const pct=(n)=>new Intl.NumberFormat("en-US",{maximumFractionDigits:1}).format(n)+"%";
 const bundleDiscount=(apps)=>100*(1-unitEUR(apps)/(unitEUR(1)*apps));
 function renderStaticPrices(){
  document.querySelectorAll("[data-eur-apps]").forEach(el=>{
   const apps=Number(el.dataset.eurApps);
-  el.textContent=formatEUR(unitEUR(apps,el.dataset.priceKind==="early"));
+  el.textContent=formatEUR(el.dataset.priceKind==="undiscounted"?unitEUR(1)*apps:unitEUR(apps));
  });
  document.querySelectorAll("[data-eur-savings]").forEach(el=>{
   el.textContent=formatEUR(unitEUR(1)*6-unitEUR(6));
@@ -759,7 +758,6 @@ function renderStaticPrices(){
  document.querySelectorAll("[data-bundle-save]").forEach(el=>{
   el.textContent="Additional saving: "+pct(bundleDiscount(Number(el.dataset.bundleSave)));
  });
- document.querySelectorAll(".pr-save").forEach(el=>{el.textContent="Save 20%";});
 }
 currencyButtons.forEach(btn=>btn.addEventListener("click",()=>{
  currency=btn.dataset.currency;
@@ -774,10 +772,8 @@ function recalculate(){
   label.textContent="Enter a valid team size";totalElement.textContent="Use 1–10,000 users";find("pr-copy").disabled=true;estimate=null;return;
  }
  const baseEUR=unitEUR(1)*apps*users,suiteEUR=unitEUR(apps)*users;
- const orgRate=users>=20?20:users>=5?10:0,custom=users>=50;
- const orgTotalEUR=suiteEUR*(1-orgRate/100),earlyTotalEUR=unitEUR(apps,true)*users;
- const useEarly=earlyTotalEUR<=orgTotalEUR+1e-8;
- const finalEUR=useEarly?earlyTotalEUR:orgTotalEUR;
+ const custom=users>=50,orgRate=custom?0:users>=20?20:users>=5?10:0;
+ const finalEUR=suiteEUR*(1-orgRate/100);
  /* All arithmetic is performed in EUR. Currency conversion happens once, at display. */
  const baseShown=round2(converted(baseEUR)),suiteShown=round2(converted(suiteEUR)),finalShown=round2(converted(finalEUR));
  label.textContent=custom?"Indicative total before custom quote":"Estimated monthly total";
@@ -785,14 +781,13 @@ function recalculate(){
  find("pr-base").textContent=formatEUR(baseEUR);
  find("pr-bundle-label").textContent="Multi-app discount ("+pct(bundleDiscount(apps))+")";
  find("pr-bundle").textContent="− "+display(baseShown-suiteShown);
- find("pr-extra-label").textContent=useEarly?"Early adopter discount (20%)":"Organisation discount ("+orgRate+"%)";
+ find("pr-extra-label").textContent="Organisation discount ("+pct(orgRate)+")";
  find("pr-extra").textContent=custom?"Custom quote":"− "+display(suiteShown-finalShown);
  find("pr-saved").textContent=custom?"To be confirmed":display(baseShown-finalShown);
  find("pr-hint").textContent=custom?
   "*For 50+ users, the figure shown is the bundle-adjusted baseline, not a final offer. Contact DuckBio for individual pricing. Excluding VAT.":
-  useEarly?"The early adopter discount is applied to EUR prices before converting to the selected currency. It replaces the organisation discount for the first 12 months of eligible subscriptions. Excluding VAT.":
-  "Organisation discounts are applied to EUR prices before converting to the selected currency. Prices exclude VAT.";
- find("pr-copy").disabled=false;estimate={apps,users,custom,baseEUR,suiteEUR,finalEUR,useEarly,orgRate};
+  "Organisation discounts are applied after the multi-app discount in EUR, before converting to the selected currency. Prices exclude VAT.";
+ find("pr-copy").disabled=false;estimate={apps,users,custom,baseEUR,suiteEUR,finalEUR,orgRate};
 }
 ["pr-app-count","pr-users"].forEach(id=>{find(id).addEventListener("input",recalculate);find(id).addEventListener("change",recalculate)});
 
@@ -807,9 +802,6 @@ function exportPriceRows(info,chosenApps){
   ["Normal total without bundle savings (EUR/month)",info.baseEUR],
   ["Total after bundle savings (EUR/month)",info.suiteEUR],
   ["Bundle savings",pct(bundleDiscount(info.apps))],
-  ["Early adopter offer",info.useEarly?"Automatically applied – 20%":"Organisation discount takes precedence"],
-  ["Early adopter eligible start dates","1 January – 31 March 2027"],
-  ["Early adopter discount duration","First 12 months for eligible subscriptions"],
   ["Organisation discount",pct(info.orgRate)],
   ["Total monthly estimate (EUR)",info.custom?"Individual quote required":round2(info.finalEUR)],
   ["Total monthly estimate ("+currency+")",info.custom?"Individual quote required":round2(converted(info.finalEUR))],
@@ -857,18 +849,15 @@ function renderSelection(){
  if(!count){selectionEstimate=null;find("pr-select-total").textContent="Choose an app";find("pr-select-breakdown").textContent="EUR reference prices; excludes VAT.";return;}
  if(!valid){selectionEstimate=null;find("pr-select-total").textContent="Invalid user count";find("pr-select-breakdown").textContent="Enter between 1 and 10,000 licensed users.";return;}
  const priceEUR=unitEUR(count)*users;
- const organisationRate=users>=20?20:users>=5?10:0;
- const earlyEUR=priceEUR*.8,organisationEUR=priceEUR*(1-organisationRate/100);
- const useEarly=earlyEUR<=organisationEUR+1e-8;
- const totalEUR=useEarly?earlyEUR:organisationEUR;
- const custom=users>=50;
+ const custom=users>=50,organisationRate=custom?0:users>=20?20:users>=5?10:0;
+ const totalEUR=priceEUR*(1-organisationRate/100);
  find("pr-select-total").textContent=custom?"Individual quote":formatEUR(totalEUR)+" / month";
  find("pr-select-breakdown").textContent=
   "Plan: "+selectedLabel(count)+" · "+count+" "+(count===1?"app":"apps")+" · "+users+" "+(users===1?"user":"users")+
   " · Additional saving: "+pct(bundleDiscount(count))+
-  " · "+(useEarly?"Early adopter: 20%": "Organisation discount: "+organisationRate+"%")+
+  " · Organisation discount: "+organisationRate+"%"+
   (custom?" · 50+ users require custom pricing.":" · Excl. VAT.");
- selectionEstimate={apps:count,users,custom,baseEUR:unitEUR(1)*count*users,suiteEUR:priceEUR,finalEUR:totalEUR,useEarly,orgRate:organisationRate};
+ selectionEstimate={apps:count,users,custom,baseEUR:unitEUR(1)*count*users,suiteEUR:priceEUR,finalEUR:totalEUR,orgRate:organisationRate};
 }
 find("pr-select-all").addEventListener("click",()=>{
  if(selectedAppIds.size===appSelections.length)selectedAppIds.clear();
