@@ -232,6 +232,24 @@ test('removing a member from admin roster revokes their org access without delet
  assert.equal(org.accessFor({organizationId:'lab-a',accountId:worker.id,appId:'eel'}),null);
 });
 
+test('admin deactivates and reactivates one member from the roster',{timeout:45000},async t=>{
+ const {page,org,owner,worker}=await fixture(t);
+ await signIn(page);
+ const row=page.locator('#members tr').filter({hasText:'worker@example.test'});
+ assert.match(await row.textContent(),/Active/);
+ page.once('dialog',dialog=>dialog.accept());
+ await row.getByRole('button',{name:'Deactivate'}).click();
+ await page.waitForFunction(()=>document.querySelector('#members')?.textContent.includes('Deactivated'));
+ assert.equal(org.accessFor({organizationId:'lab-a',accountId:worker.id,appId:'eel'}),null);
+ assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').assigned,1);
+ await page.locator('#audit-events').getByText('Member Deactivated').waitFor();
+ const suspended=page.locator('#members tr').filter({hasText:'worker@example.test'});
+ page.once('dialog',dialog=>dialog.accept());
+ await suspended.getByRole('button',{name:'Reactivate'}).click();
+ await page.waitForFunction(()=>document.querySelector('#members')?.textContent.includes('Reactivate')===false);
+ assert.equal(org.accessFor({organizationId:'lab-a',accountId:worker.id,appId:'eel'}).role,'scientist');
+ await page.locator('#audit-events').getByText('Member Reactivated').waitFor();
+});
 test('admin saves and cancels subscription drafts without minting paid seats',{timeout:45000},async t=>{
  const {page,org,owner}=await fixture(t);
  await signIn(page);

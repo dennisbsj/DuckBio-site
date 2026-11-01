@@ -44,24 +44,25 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     'CREATE TABLE IF NOT EXISTS organization_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,org TEXT NOT NULL REFERENCES organizations(id),actor TEXT NOT NULL,action TEXT NOT NULL,subject TEXT NOT NULL,details TEXT NOT NULL CHECK(json_valid(details)),recorded_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS subscription_drafts(id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),status TEXT NOT NULL CHECK(status IN (\'draft\',\'canceled\')),created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)'
   ].join(';')+';');
+  if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
   for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))chmodSync(databasePath+suffix,0o600);
   const tx=work=>{db.exec('BEGIN IMMEDIATE');try{const result=work();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
   function requireAdmin(org,actor){
-    if(!safeId(org)||!safeId(actor)||!db.prepare('SELECT 1 FROM members WHERE org=? AND account=? AND admin=1').get(org,actor))fail('access_denied');
+    if(!safeId(org)||!safeId(actor)||!db.prepare('SELECT 1 FROM members WHERE org=? AND account=? AND admin=1 AND active=1').get(org,actor))fail('access_denied');
   }
   // Append inside the same write transaction so rolled-back changes leave no audit event.
   const audit=(org,actor,action,subject,details={})=>db.prepare('INSERT INTO organization_audit(org,actor,action,subject,details,recorded_at) VALUES(?,?,?,?,?,?)').run(org,actor,action,subject,JSON.stringify(details),clock());
   const pendingSeats=(org,app)=>db.prepare("SELECT count(*) AS n FROM organization_invites WHERE org=? AND expires_at>? AND json_type(roles, '$.' || ?) IS NOT NULL").get(org,clock(),app).n;
   const roles=(org,account)=>Object.fromEntries(db.prepare('SELECT app,role FROM assignments WHERE org=? AND account=?').all(org,account).map(x=>[x.app,x.role]));
-  const view=(org,row)=>({accountId:row.account,name:row.name,nickname:row.nickname,email:row.email,admin:Boolean(row.admin),roles:roles(org,row.account)});
+  const view=(org,row)=>({accountId:row.account,name:row.name,nickname:row.nickname,email:row.email,admin:Boolean(row.admin),active:Boolean(row.active),roles:roles(org,row.account)});
   return Object.freeze({
     setupOrganization({organizationId,name,owner}){
       if(!safeId(organizationId)||!safeText(name,200)||!owner||!safeId(owner.accountId)||!safeText(owner.name)||!safeText(owner.nickname)||!safeEmail(owner.email))fail('invalid_organization');
       return tx(()=>{
         if(db.prepare('SELECT 1 FROM organizations WHERE id=?').get(organizationId))fail('organization_exists');
         db.prepare('INSERT INTO organizations VALUES(?,?)').run(organizationId,name.trim());
-        db.prepare('INSERT INTO members VALUES(?,?,?,?,?,1)').run(organizationId,owner.accountId,owner.name.trim(),owner.nickname.trim(),owner.email.trim().toLowerCase());
+        db.prepare('INSERT INTO members(org,account,name,nickname,email,admin) VALUES(?,?,?,?,?,1)').run(organizationId,owner.accountId,owner.name.trim(),owner.nickname.trim(),owner.email.trim().toLowerCase());
         for(const app of APPLICATIONS)db.prepare('INSERT INTO seats VALUES(?,?,0)').run(organizationId,app.id);
         audit(organizationId,owner.accountId,'organization.created',organizationId,{name:name.trim()});
         return {id:organizationId,name:name.trim()};
@@ -74,12 +75,12 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     },
     organizationsFor(account){
       if(!safeId(account))return [];
-      return db.prepare('SELECT o.id,o.name,m.admin FROM members m JOIN organizations o ON o.id=m.org WHERE m.account=? ORDER BY o.name').all(account).map(x=>({id:x.id,name:x.name,admin:Boolean(x.admin)}));
+      return db.prepare('SELECT o.id,o.name,m.admin FROM members m JOIN organizations o ON o.id=m.org WHERE m.account=? AND m.active=1 ORDER BY o.name').all(account).map(x=>({id:x.id,name:x.name,admin:Boolean(x.admin)}));
     },
     selectSessionOrganization({sessionId,accountId,organizationId}){
       if(!safeId(sessionId)||!safeId(accountId)||!safeId(organizationId))fail('access_denied');
       return tx(()=>{
-        const member=db.prepare('SELECT 1 FROM members WHERE org=? AND account=?').get(organizationId,accountId);
+        const member=db.prepare('SELECT 1 FROM members WHERE org=? AND account=? AND active=1').get(organizationId,accountId);
         if(!member)fail('access_denied');
         const selected=db.prepare('SELECT account,org FROM session_organizations WHERE session_id=?').get(sessionId);
         if(selected){
@@ -92,7 +93,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     },
     currentSessionOrganization({sessionId,accountId}){
       if(!safeId(sessionId)||!safeId(accountId))return null;
-      const row=db.prepare('SELECT o.id,o.name,m.admin FROM session_organizations s JOIN organizations o ON o.id=s.org JOIN members m ON m.org=s.org AND m.account=s.account WHERE s.session_id=? AND s.account=?').get(sessionId,accountId);
+      const row=db.prepare('SELECT o.id,o.name,m.admin FROM session_organizations s JOIN organizations o ON o.id=s.org JOIN members m ON m.org=s.org AND m.account=s.account AND m.active=1 WHERE s.session_id=? AND s.account=?').get(sessionId,accountId);
       return row?{id:row.id,name:row.name,admin:Boolean(row.admin)}:null;
     },
     clearSessionOrganization(sessionId){
@@ -126,7 +127,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         requireAdmin(organizationId,actorId);
         const prior=db.prepare('SELECT * FROM members WHERE org=? AND account=?').get(organizationId,member.accountId);
         const previousRoles=prior?roles(organizationId,member.accountId):{};
-        if(prior?.admin&&!member.admin&&db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1').get(organizationId).n===1)fail('last_organization_admin');
+        if(prior?.admin&&prior.active&&!member.admin&&db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1 AND active=1').get(organizationId).n===1)fail('last_organization_admin');
         const collision=db.prepare('SELECT account FROM members WHERE org=? AND email=?').get(organizationId,email);
         if(collision&&collision.account!==member.accountId)fail('duplicate_organization_email');
         for(const app of Object.keys(requested)){
@@ -171,13 +172,27 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         return {id:draftId,status:'canceled'};
       });
     },
+    setMemberActive({organizationId,actorId,accountId,active}){
+      if(!safeId(accountId)||typeof active!=='boolean')fail('invalid_member');
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        const row=db.prepare('SELECT admin,active FROM members WHERE org=? AND account=?').get(organizationId,accountId);
+        if(!row)fail('member_not_found');
+        if(Boolean(row.active)===active)return {accountId,active,changed:false};
+        if(!active && row.admin && db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1 AND active=1').get(organizationId).n===1)fail('last_organization_admin');
+        db.prepare('UPDATE members SET active=? WHERE org=? AND account=?').run(active?1:0,organizationId,accountId);
+        audit(organizationId,actorId,active?'member.reactivated':'member.deactivated',accountId);
+        // A suspended user retains the licensed seat to prevent over-allocation on reactivation.
+        return {accountId,active,changed:true};
+      });
+    },
     removeMember({organizationId,actorId,accountId}){
       if(!safeId(accountId))fail('invalid_member');
       return tx(()=>{
         requireAdmin(organizationId,actorId);
-        const row=db.prepare('SELECT admin FROM members WHERE org=? AND account=?').get(organizationId,accountId);
+        const row=db.prepare('SELECT admin,active FROM members WHERE org=? AND account=?').get(organizationId,accountId);
         if(!row)fail('member_not_found');
-        if(row.admin && db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1').get(organizationId).n===1)fail('last_organization_admin');
+        if(row.admin && row.active && db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1 AND active=1').get(organizationId).n===1)fail('last_organization_admin');
         const removedRoles=roles(organizationId,accountId);
         db.prepare('DELETE FROM members WHERE org=? AND account=?').run(organizationId,accountId);
         audit(organizationId,actorId,'member.removed',accountId,{roles:removedRoles});
@@ -266,7 +281,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     },
     effectivePermissions({organizationId,accountId,appId}){
       if(!safeId(organizationId)||!safeId(accountId)||!byId.has(appId))return [];
-      const assigned=db.prepare('SELECT role FROM assignments WHERE org=? AND account=? AND app=?').get(organizationId,accountId,appId);
+      const assigned=db.prepare('SELECT a.role FROM assignments a JOIN members m ON m.org=a.org AND m.account=a.account WHERE a.org=? AND a.account=? AND a.app=? AND m.active=1').get(organizationId,accountId,appId);
       if(!assigned)return [];
       const app=byId.get(appId),base=app.rolePermissions[assigned.role]||[];
       const allowed=new Set(base.includes('*')?app.permissions:base);
@@ -277,7 +292,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     },
     accessFor({organizationId,accountId,appId}){
       if(!safeId(organizationId)||!safeId(accountId)||!byId.has(appId))return null;
-      const grant=db.prepare('SELECT role FROM assignments WHERE org=? AND account=? AND app=?').get(organizationId,accountId,appId);
+      const grant=db.prepare('SELECT a.role FROM assignments a JOIN members m ON m.org=a.org AND m.account=a.account WHERE a.org=? AND a.account=? AND a.app=? AND m.active=1').get(organizationId,accountId,appId);
       return grant?{organizationId,accountId,appId,role:grant.role}:null;
     },
     close(){db.close();}

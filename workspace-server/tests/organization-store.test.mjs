@@ -177,6 +177,42 @@ test('audit trail records committed changes within one organization and never in
  assert(!JSON.stringify(events).includes(invitation.token),'audit never stores bearer invitation token');
  assert(!store.auditLog('two','admin2').some(e=>e.subject==='person'),'audit is tenant scoped');
 });
+test('member deactivation is tenant-scoped, revokes access, retains seat and can be reversed',t=>{
+ const {store}=fixture(t);
+ store.setupOrganization({organizationId:'two',name:'Second laboratory',owner:{accountId:'admin2',name:'Admin Two',nickname:'Two',email:'two@example.test'}});
+ buy(store,'suspend-seat-a','Single',['eel']);
+ buy(store,'suspend-seat-b','Single',['eel'],1,'two');
+ store.saveMember({organizationId:'one',actorId:'admin1',member:member('person',{eel:'scientist'})});
+ store.saveMember({organizationId:'two',actorId:'admin2',member:member('person',{eel:'reviewer'})});
+ store.selectSessionOrganization({sessionId:'test-session',accountId:'person',organizationId:'one'});
+ assert.throws(()=>store.setMemberActive({organizationId:'one',actorId:'admin1',accountId:'admin1',active:false}),/last_organization_admin/);
+ assert.throws(()=>store.setMemberActive({organizationId:'one',actorId:'admin2',accountId:'person',active:false}),/access_denied/);
+ assert.deepEqual(store.setMemberActive({organizationId:'one',actorId:'admin1',accountId:'person',active:false}),{accountId:'person',active:false,changed:true});
+ assert.equal(store.currentSessionOrganization({sessionId:'test-session',accountId:'person'}),null);
+ assert.throws(()=>store.selectSessionOrganization({sessionId:'test-session',accountId:'person',organizationId:'two'}),/organization_locked/,'cannot switch organizations in same session');
+ assert.deepEqual(store.organizationsFor('person').map(x=>x.id),['two']);
+ assert.equal(store.accessFor({organizationId:'one',accountId:'person',appId:'eel'}),null);
+ assert.deepEqual(store.effectivePermissions({organizationId:'one',accountId:'person',appId:'eel'}),[]);
+ assert.equal(store.accessFor({organizationId:'two',accountId:'person',appId:'eel'}).role,'reviewer');
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').assigned,1,'deactivated user still occupies purchased seat');
+ assert.equal(store.overview('one','admin1').users.find(x=>x.accountId==='person').active,false);
+ assert.deepEqual(store.setMemberActive({organizationId:'one',actorId:'admin1',accountId:'person',active:true}),{accountId:'person',active:true,changed:true});
+ assert.equal(store.currentSessionOrganization({sessionId:'test-session',accountId:'person'}).id,'one');
+ assert.equal(store.accessFor({organizationId:'one',accountId:'person',appId:'eel'}).role,'scientist');
+ assert.deepEqual(store.setMemberActive({organizationId:'one',actorId:'admin1',accountId:'person',active:true}),{accountId:'person',active:true,changed:false});
+ assert.equal(store.auditLog('one','admin1').filter(x=>x.action==='member.deactivated').length,1);
+ assert.equal(store.auditLog('one','admin1').filter(x=>x.action==='member.reactivated').length,1);
+});
+test('suspended admins cannot manage their organization and the last active admin cannot be removed',t=>{
+ const {store}=fixture(t);
+ store.saveMember({organizationId:'one',actorId:'admin1',member:member('admin2',{}, {admin:true})});
+ store.setMemberActive({organizationId:'one',actorId:'admin1',accountId:'admin2',active:false});
+ assert.throws(()=>store.overview('one','admin2'),/access_denied/);
+ assert.throws(()=>store.removeMember({organizationId:'one',actorId:'admin1',accountId:'admin1'}),/last_organization_admin/);
+ assert.throws(()=>store.saveMember({organizationId:'one',actorId:'admin1',member:member('admin1',{}, {name:'Admin A',nickname:'A',email:'admin@example.test',admin:false})}),/last_organization_admin/);
+ store.setMemberActive({organizationId:'one',actorId:'admin1',accountId:'admin2',active:true});
+ assert.equal(store.removeMember({organizationId:'one',actorId:'admin2',accountId:'admin1'}).removed,true);
+});
 test('removing a user revokes only this org, while other organization membership persists',t=>{
  const {store}=fixture(t);
  store.setupOrganization({organizationId:'two',name:'Other lab',owner:{accountId:'admin2',name:'Admin Two',nickname:'Two',email:'two@example.test'}});
