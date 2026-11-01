@@ -81,7 +81,7 @@ test('responsive Workspace still refuses to create unverified central accounts',
  await signIn(page);
  const sizes=await page.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth}));
  assert.ok(sizes.width<=sizes.viewport+2,'mobile viewport has no horizontal overflow: '+JSON.stringify(sizes));
- await page.getByRole('button',{name:'Create account access'}).click();
+ await page.getByRole('button',{name:'Add existing account'}).click();
  await page.locator('#account-id').fill('unverified-person');
  await page.locator('#name').fill('Unknown');
  await page.locator('#nickname').fill('No link');
