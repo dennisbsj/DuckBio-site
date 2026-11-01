@@ -95,3 +95,37 @@ test('permission toggles are tenant scoped, persisted and removed when the app r
  assert.deepEqual(store.effectivePermissions({organizationId:'one',accountId:'scientist',appId:'eel'}),[]);
  assert.throws(()=>store.setPermission({organizationId:'one',actorId:'admin1',accountId:'scientist',appId:'eel',permission:'document.review',enabled:true}),/app_access_required/);
 });
+
+test('organization invitation is opaque, one-use, expires, and does not pre-grant application access',t=>{
+ const {store}=fixture(t);
+ const invitation=store.issueInvitation({organizationId:'one',actorId:'admin1',name:'New member',nickname:'N',email:'NEW@example.test'});
+ assert.match(invitation.token,/^[A-Za-z0-9_-]{43}$/);
+ const preview=store.previewInvitation(invitation.token);
+ assert.equal(preview.email,'new@example.test');
+ assert.equal(preview.organizationId,'one');
+ assert.equal(preview.admin,false);
+ assert.equal(store.overview('one','admin1').users.length,1);
+ assert.throws(()=>store.issueInvitation({organizationId:'one',actorId:'admin1',name:'Dup',nickname:'D',email:'new@example.test'}),/invitation_exists/);
+ assert.throws(()=>store.issueInvitation({organizationId:'one',actorId:'stranger',name:'Bad',nickname:'B',email:'other@example.test'}),/access_denied/);
+ assert.throws(()=>store.acceptInvitation({token:invitation.token,accountId:'person',email:'incorrect@example.test'}),/invalid_invitation/);
+ const accepted=store.acceptInvitation({token:invitation.token,accountId:'person',email:'new@example.test'});
+ assert.equal(accepted.organizationId,'one');
+ assert.deepEqual(store.overview('one','admin1').users.find(u=>u.accountId==='person').roles,{});
+ assert.equal(store.previewInvitation(invitation.token),null);
+ assert.throws(()=>store.acceptInvitation({token:invitation.token,accountId:'other',email:'new@example.test'}),/invalid_invitation/);
+});
+test('removing a user revokes only this org, while other organization membership persists',t=>{
+ const {store}=fixture(t);
+ store.setupOrganization({organizationId:'two',name:'Other lab',owner:{accountId:'admin2',name:'Admin Two',nickname:'Two',email:'two@example.test'}});
+ buy(store,'one-seat','Single',['goflo']);
+ buy(store,'two-seat','Single',['goflo'],1,'two');
+ store.saveMember({organizationId:'one',actorId:'admin1',member:member('researcher',{goflo:'Analyst'})});
+ store.saveMember({organizationId:'two',actorId:'admin2',member:member('researcher',{goflo:'Reviewer'})});
+ assert.throws(()=>store.removeMember({organizationId:'one',actorId:'admin1',accountId:'admin1'}),/last_organization_admin/);
+ assert.throws(()=>store.removeMember({organizationId:'two',actorId:'admin1',accountId:'researcher'}),/access_denied/);
+ assert.equal(store.removeMember({organizationId:'one',actorId:'admin1',accountId:'researcher'}).removed,true);
+ assert.equal(store.accessFor({organizationId:'one',accountId:'researcher',appId:'goflo'}),null);
+ assert.equal(store.accessFor({organizationId:'two',accountId:'researcher',appId:'goflo'}).role,'Reviewer');
+ assert.deepEqual(store.organizationsFor('researcher').map(x=>x.id),['two']);
+ assert.equal(store.overview('one','admin1').apps.find(a=>a.id==='goflo').assigned,0);
+});
