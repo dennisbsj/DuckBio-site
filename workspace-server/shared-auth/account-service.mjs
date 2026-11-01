@@ -24,7 +24,7 @@ function userView(user) { return { id: user.id, email: user.email, displayName: 
 
 /** Account service is independent of all business-data apps. It never migrates
  * their passwords/users, links by email, or promotes a central role to an app role. */
-export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
+export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, invitationMailer = null, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
   const url = new URL(origin);
   const identity = createLocalIdentityAdapter({ store: identityStore, origin });
   const broker = createAuthBroker({ origin, issuer, clients, identity, store: authStore, clock, getClientAddress });
@@ -208,7 +208,19 @@ export function createAccountService({ origin, issuer = origin, clients, identit
             requireSelection(body.organizationId);
             const issued=organizationStore.issueInvitation({organizationId:body.organizationId,actorId:user.id,email:body.email,name:body.name,nickname:body.nickname,admin:body.admin===true,roles:body.roles??{}});
             const inviteUrl=new URL('/workspace',origin);inviteUrl.searchParams.set('invite',issued.token);
-            send(res,201,{invitationUrl:inviteUrl.href,expiresAt:issued.expiresAt});
+            if(invitationMailer){
+              try{
+                const invite=organizationStore.previewInvitation(issued.token);
+                await invitationMailer.sendInvitation({email:invite.email,name:invite.name,organizationName:invite.organizationName,invitationUrl:inviteUrl.href,expiresAt:issued.expiresAt});
+              }catch{
+                // If provider confirmation fails, revoke the pending secret and release seats.
+                // On an ambiguous timeout a delivered email may have an unusable link;
+                // a fresh invitation must then be issued by the administrator.
+                organizationStore.revokeInvitation({organizationId:body.organizationId,actorId:user.id,email:body.email});
+                throw new ServiceError(503,'email_unavailable');
+              }
+              send(res,201,{delivery:'email',expiresAt:issued.expiresAt});
+            }else send(res,201,{delivery:'manual',invitationUrl:inviteUrl.href,expiresAt:issued.expiresAt});
           }
           else if (route === '/api/suite/organization/user/active') {
             requireSelection(body.organizationId);
