@@ -24,7 +24,7 @@ function userView(user) { return { id: user.id, email: user.email, displayName: 
 
 /** Account service is independent of all business-data apps. It never migrates
  * their passwords/users, links by email, or promotes a central role to an app role. */
-export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, invitationMailer = null, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
+export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, invitationMailer = null, stripeTestCheckout = null, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
   const url = new URL(origin);
   const identity = createLocalIdentityAdapter({ store: identityStore, origin });
   const broker = createAuthBroker({ origin, issuer, clients, identity, store: authStore, clock, getClientAddress });
@@ -90,9 +90,9 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     let status = error.status ?? 503; let code = error.code ?? 'unavailable';
     if (error instanceof OrganizationError) {
       status = ['access_denied','invalid_invitation'].includes(code) ? 403
-        : ['app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required','invitation_exists','member_exists'].includes(code) ? 409
+        : ['app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required','invitation_exists','member_exists','checkout_started','checkout_price_changed','checkout_conflict'].includes(code) ? 409
         : 400;
-      if (!['access_denied','app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required','invitation_exists','member_exists','member_not_found','invalid_invitation','invalid_subscription','subscription_not_found','invalid_permission','invalid_roles','invalid_member'].includes(code)) code = 'invalid_input';
+      if (!['access_denied','app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required','invitation_exists','member_exists','member_not_found','invalid_invitation','invalid_subscription','subscription_not_found','invalid_permission','invalid_roles','invalid_member','checkout_started','checkout_price_changed','checkout_conflict','invalid_checkout','checkout_not_found'].includes(code)) code = 'invalid_input';
     }
     if (error instanceof IdentityStoreError) {
       if (code === 'invalid_setup_token') status = 403;
@@ -116,7 +116,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           send(res, 200, { status: 'ok', mode: 'local', buildVersion, configured: identityStore.listUsers().length > 0 }); return true;
         }
         if (!route.startsWith('/api/suite/')) return staticFile(req, res, route);
-        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/user/active': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST' };
+        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/user/active': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST', '/api/suite/organization/subscription/test-checkout': 'POST' };
         if (!methods[route]) return false;
         if (![methods[route]].flat().includes(req.method)) throw new ServiceError(405, 'method_not_allowed');
         if (!['/api/suite/admin/native-users','/api/suite/organization/invite/preview'].includes(route) && parsed.search) throw new ServiceError(400, 'invalid_input');
@@ -184,12 +184,30 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           }
           else if (route === '/api/suite/organization/subscriptions') {
             requireSelection(body.organizationId);
-            send(res,200,{drafts:organizationStore.listSubscriptionDrafts(body.organizationId,user.id)});
+            send(res,200,{drafts:organizationStore.listSubscriptionDrafts(body.organizationId,user.id),testCheckoutEnabled:Boolean(stripeTestCheckout)});
           }
           else if (route === '/api/suite/organization/subscription/draft') {
             requireSelection(body.organizationId);
             const draft=organizationStore.createSubscriptionDraft({...body,actorId:user.id});
             send(res,201,{draft});
+          }
+          else if (route === '/api/suite/organization/subscription/test-checkout') {
+            requireSelection(body.organizationId);
+            if(!stripeTestCheckout)throw new ServiceError(503,'checkout_unavailable');
+            const draft=organizationStore.listSubscriptionDrafts(body.organizationId,user.id).find(x=>x.id===body.draftId&&x.status==='draft');
+            if(!draft)throw new ServiceError(400,'invalid_checkout');
+            const price=stripeTestCheckout.priceFor(draft);
+            if(!price)throw new ServiceError(503,'checkout_price_unconfigured');
+            const intent=organizationStore.prepareTestCheckout({organizationId:body.organizationId,actorId:user.id,draftId:draft.id,price});
+            if(intent.checkout)send(res,200,{checkoutUrl:intent.checkout.url,mode:'test',licensesGranted:false});
+            else{
+              let session;
+              try{session=await stripeTestCheckout.createSession(intent);}
+              catch{throw new ServiceError(503,'checkout_unavailable');}
+              requireSelection(body.organizationId);
+              const saved=organizationStore.completeTestCheckout({organizationId:body.organizationId,actorId:user.id,draftId:draft.id,session});
+              send(res,200,{checkoutUrl:saved.url,mode:'test',licensesGranted:false});
+            }
           }
           else if (route === '/api/suite/organization/subscription/cancel') {
             requireSelection(body.organizationId);
