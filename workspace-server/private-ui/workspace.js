@@ -11,7 +11,7 @@ async function request(route,data){
  if(!res.ok)throw Object.assign(new Error(errorMessage(res.status)),{status:res.status});
  return body;
 }
-function showPortal(visible){$('portal').hidden=!visible;$('sign-in').hidden=visible;$('logout').hidden=!visible;}
+function showPortal(visible){$('portal').hidden=!visible;$('sign-in').hidden=visible;$('organization-choice').hidden=true;$('logout').hidden=!visible;}
 async function csrf(){
  const response=await fetch('/api/suite/auth/session',{credentials:'same-origin',cache:'no-store'});
  const body=await response.json();
@@ -60,16 +60,48 @@ async function overview(orgId){
  renderSeats();renderMembers();$('edit-panel').hidden=true;$('buy-panel').hidden=true;
  status('Workspace data loaded from the private server.');
 }
+async function chooseOrganization(orgId){
+ try {
+  const chosen=await request('/api/suite/organization/select',{organizationId:orgId});
+  if(!chosen.selectedOrganization?.id)throw new Error('Could not select this organization.');
+  state.selected=chosen.selectedOrganization.id;
+  $('organizations').replaceChildren();
+  const option=el('option',chosen.selectedOrganization.name);option.value=chosen.selectedOrganization.id;
+  $('organizations').append(option);
+  $('organization-choice').hidden=true;
+  if(!chosen.selectedOrganization.admin){
+   $('portal').hidden=true;$('sign-in').hidden=true;$('logout').hidden=false;
+   status('Signed in. You do not have organization administrator rights.');return;
+  }
+  showPortal(true);await overview(state.selected);
+ }catch(e){status(e.message);}
+}
 async function load(){
  await csrf();
  try{
   const data=await request('/api/suite/organizations');
   state.orgs=data.organizations||[];
-  showPortal(true);
-  const select=$('organizations');select.replaceChildren();
-  for(const org of state.orgs.filter(o=>o.admin)){const option=el('option',org.name);option.value=org.id;select.append(option);}
-  if(!select.options.length){$('portal').hidden=true;status('Your account is not an administrator of any organization.');return;}
-  state.selected=select.value;await overview(state.selected);
+  $('logout').hidden=false;
+  $('sign-in').hidden=true;
+  $('portal').hidden=true;
+  if(data.selectedOrganization){
+   state.selected=data.selectedOrganization.id;
+   $('organizations').replaceChildren();
+   const option=el('option',data.selectedOrganization.name);option.value=data.selectedOrganization.id;
+   $('organizations').append(option);
+   if(data.selectedOrganization.admin){showPortal(true);await overview(state.selected);}
+   else status('Signed in. You do not have organization administrator rights.');
+   return;
+  }
+  if(!state.orgs.length){status('This account does not belong to an organization. Contact your administrator.');return;}
+  if(state.orgs.length===1){await chooseOrganization(state.orgs[0].id);return;}
+  const root=$('organization-options');root.replaceChildren();
+  for(const org of state.orgs){
+   const btn=button(org.name+(org.admin?' · Admin':''),()=>chooseOrganization(org.id));
+   btn.className='role-card';root.append(btn);
+  }
+  $('organization-choice').hidden=false;
+  status('Choose one organization for this login session.');
  }catch(e){if(e.status===401){showPortal(false);status('Sign in to your private DuckBio account.');}else{showPortal(false);status(e.message);}}
 }
 $('login-form').addEventListener('submit',async event=>{
@@ -81,8 +113,8 @@ $('login-form').addEventListener('submit',async event=>{
   $('password').value='';await load();
  }catch(e){status(e.message);}finally{state.busy=false;}
 });
-$('logout').addEventListener('click',async()=>{try{await request('/api/suite/account/logout',{});state.overview=null;showPortal(false);status('Signed out.');}catch(e){status(e.message);}});
-$('organizations').addEventListener('change',async e=>{state.selected=e.target.value;try{await overview(state.selected);}catch(err){status(err.message);}});
+$('logout').addEventListener('click',async()=>{try{await request('/api/suite/account/logout',{});state.overview=null;state.selected=null;showPortal(false);status('Signed out. Sign in again to choose an organization.');}catch(e){status(e.message);}});
+// Organization switching is intentionally not available during an authenticated session.
 $('create').addEventListener('click',()=>edit(null));
 $('cancel-edit').addEventListener('click',()=>{$('edit-panel').hidden=true;});
 $('member-form').addEventListener('submit',async e=>{
