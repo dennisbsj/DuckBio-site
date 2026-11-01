@@ -195,10 +195,11 @@ function renderMatrix(){
     checkbox.addEventListener('change',async()=>{
      checkbox.disabled=true;
      try{
-      await request('/api/suite/organization/permission/set',{organizationId:state.selected,accountId:user.accountId,appId:app.id,permission,enabled:checkbox.checked});
-      $('matrix-info').textContent='Saved '+permission+' for '+user.name+' in '+app.name+'.';
-      // Re-read the server, including any normalization of baseline permissions.
+      const enabled=checkbox.checked;
+      await request('/api/suite/organization/permission/set',{organizationId:state.selected,accountId:user.accountId,appId:app.id,permission,enabled});
+      // Re-read server state first; show an enduring confirmation for browser users and tests.
       await loadMatrix();
+      $('matrix-info').textContent='Saved '+permission+' ('+(enabled?'enabled':'disabled')+') for '+user.name+' in '+app.name+'.';
      }catch(e){checkbox.checked=!checkbox.checked;checkbox.disabled=false;$('matrix-info').textContent=e.message;}
     });
     td.append(checkbox);
