@@ -60,6 +60,7 @@ test('Workspace organization APIs require a live account, CSRF and organization 
  const owner=(await setup.json()).user;
  assert.equal((await (await admin.call('/api/suite/account')).json()).apps.some(a=>a.enabled),false,'new org mode must not create bypass grants');
  f.organizationStore.setupOrganization({organizationId:'org-a',name:'Lab A',owner:{accountId:owner.id,name:'Owner',nickname:'O',email:'owner@example.test'}});
+ assert.equal((await admin.call('/api/suite/organization/select',{organizationId:'org-a'})).status,200);
  const verified=f.organizationStore.applyVerifiedSeatPurchase({reference:'verified-event-1',organizationId:'org-a',plan:'Mixed',apps:['eel','limsman'],seats:1});
  assert.equal(verified.applied,true);
  const target=await f.identityStore.createUser({email:'worker@example.test',displayName:'Worker',password:'Worker password 12345'});
@@ -88,6 +89,7 @@ test('workspace API must reject absent paid seats, unknown identity, bad role an
  const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
  f.organizationStore.setupOrganization({organizationId:'org-a',name:'A',owner:{accountId:owner.id,name:'Owner',nickname:'O',email:'owner@example.test'}});
  f.organizationStore.setupOrganization({organizationId:'org-b',name:'B',owner:{accountId:'other-account',name:'Else',nickname:'E',email:'else@example.test'}});
+ assert.equal((await admin.call('/api/suite/organization/select',{organizationId:'org-a'})).status,200);
  const target=await f.identityStore.createUser({email:'worker@example.test',displayName:'Worker',password:'Worker password 12345'});
  const request={organizationId:'org-a',member:{accountId:target.id,name:'Worker',nickname:'W',email:'worker@example.test',admin:false,roles:{eel:'scientist'}}};
  assert.equal((await admin.call('/api/suite/organization/user/save',request)).status,409,'no purchased seats');
@@ -95,4 +97,31 @@ test('workspace API must reject absent paid seats, unknown identity, bad role an
  assert.equal((await admin.call('/api/suite/organization/user/save',{...request,member:{...request.member,email:'other@example.test'}})).status,400,'email must match authenticated central account');
  assert.equal((await admin.call('/api/suite/organization/user/save',{...request,member:{...request.member,accountId:'missing'}})).status,400,'unknown central subject cannot gain roles');
  assert.equal((await f.organizationStore.overview('org-a',owner.id)).users.length,1);
+});
+
+test('multi-organization login choice is bound to one session until logout and supports independent next login',async t=>{
+ const f=await fixture(t),client=f.browser();
+ await client.preflight();
+ const setup=await client.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'});
+ const owner=(await setup.json()).user;
+ for(const [id,name] of [['alpha','Alpha'],['beta','Beta']])f.organizationStore.setupOrganization({organizationId:id,name,owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:'owner@example.test'}});
+ const initial=await (await client.call('/api/suite/organizations')).json();
+ assert.equal(initial.organizations.length,2);
+ assert.equal(initial.selectedOrganization,null);
+ assert.equal((await client.call('/api/suite/organization/overview',{organizationId:'alpha'})).status,403);
+ assert.equal((await client.call('/api/suite/organization/select',{organizationId:'alpha'},'POST',false)).status,403,'CSRF binding required');
+ assert.equal((await client.call('/api/suite/organization/select',{organizationId:'alpha'})).status,200);
+ assert.equal((await client.call('/api/suite/organization/select',{organizationId:'alpha'})).status,200,'idempotent reselect');
+ assert.equal((await client.call('/api/suite/organization/overview',{organizationId:'alpha'})).status,200);
+ assert.equal((await client.call('/api/suite/organization/overview',{organizationId:'beta'})).status,403);
+ assert.equal((await client.call('/api/suite/organization/select',{organizationId:'beta'})).status,409,'cannot switch before logout');
+ assert.equal((await (await client.call('/api/suite/organizations')).json()).selectedOrganization.id,'alpha');
+ assert.equal((await client.call('/api/suite/account/logout',{})).status,200);
+ const login=await client.call('/api/suite/account/login',{email:'owner@example.test',password:'Owner password 12345'});
+ assert.equal(login.status,200);
+ assert.equal((await (await client.call('/api/suite/organizations')).json()).selectedOrganization,null);
+ assert.equal((await client.call('/api/suite/organization/select',{organizationId:'beta'})).status,200);
+ assert.equal((await client.call('/api/suite/organization/overview',{organizationId:'beta'})).status,200);
+ assert.equal((await client.call('/api/suite/organization/overview',{organizationId:'alpha'})).status,403);
+ assert.equal((await client.call('/api/suite/admin/users')).status,403,'global admin roster cannot bypass organization scope');
 });
