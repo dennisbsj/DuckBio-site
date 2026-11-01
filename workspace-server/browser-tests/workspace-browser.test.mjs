@@ -12,7 +12,7 @@ import {createSqliteAuthStores} from '../shared-auth/sqlite-store.mjs';
 import {createOrganizationStore} from '../organization-store.mjs';
 import {createAccountService} from '../shared-auth/account-service.mjs';
 
-async function fixture(t, {multi=false}={}) {
+async function fixture(t, {multi=false, invitationMailer=null}={}) {
  const temp=mkdtempSync(path.join(os.tmpdir(),'duckbio-workspace-browser-'));
  const identity=createIdentityStore({databasePath:path.join(temp,'identity.sqlite')});
  const auth=createSqliteAuthStores({databasePath:path.join(temp,'auth.sqlite')});
@@ -35,7 +35,7 @@ async function fixture(t, {multi=false}={}) {
  // Register cleanup before service/browser creation, including constructor failures.
  t.after(async()=>{await browser?.close();server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));identity.close();auth.close();org.close();rmSync(temp,{recursive:true,force:true});assert.deepEqual(errors,[],'uncaught browser errors');});
  const assetRoot=fileURLToPath(new URL('../private-ui/',import.meta.url));
- service=createAccountService({origin,issuer:'https://login.example.invalid',clients:registrations,identityStore:identity,organizationStore:org,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
+ service=createAccountService({invitationMailer,origin,issuer:'https://login.example.invalid',clients:registrations,identityStore:identity,organizationStore:org,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:1280,height:800}});
  const page=await context.newPage();
@@ -378,6 +378,22 @@ test('end-to-end administrator lifecycle: two organizations, invitations, rights
  assert.deepEqual(org.organizationsFor(user.id).map(x=>x.id),['lab-b','lab-a']);
 });
 
+test('configured mail delivery creates a pending invitation without displaying a token in Chromium',{timeout:45000},async t=>{
+ const mail=[];
+ const {page,org,owner}=await fixture(t,{invitationMailer:{async sendInvitation(v){mail.push(v);return {accepted:true}}}});
+ await signIn(page);
+ await page.getByRole('button',{name:'Invite user'}).click();
+ await page.locator('#invite-name').fill('Email scientist');
+ await page.locator('#invite-nickname').fill('Email');
+ await page.locator('#invite-email').fill('mail@example.test');
+ await page.getByRole('button',{name:'Create invitation'}).click();
+ await page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('accepted by the mail provider'));
+ assert.equal(await page.locator('#invite-result').isVisible(),false);
+ assert.equal(await page.locator('#invitation-link').inputValue(),'');
+ assert.equal(mail.length,1);
+ assert.equal(mail[0].email,'mail@example.test');
+ assert.equal(org.listPendingInvitations('lab-a',owner.id).length,1);
+});
 test('admin saves and cancels subscription drafts without minting paid seats',{timeout:45000},async t=>{
  const {page,org,owner}=await fixture(t);
  await signIn(page);

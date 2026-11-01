@@ -10,7 +10,7 @@ import { createSqliteAuthStores } from '../shared-auth/sqlite-store.mjs';
 import { createAccountService } from '../shared-auth/account-service.mjs';
 import { createOrganizationStore } from '../organization-store.mjs';
 
-async function fixture(t, { allNative = false, beforeRoster } = {}) {
+async function fixture(t, { allNative = false, beforeRoster, invitationMailer = null } = {}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'suite-service-'));
   const identityStore = createIdentityStore({ databasePath: path.join(directory, 'identity.sqlite') });
   const stores = createSqliteAuthStores({ databasePath: path.join(directory, 'auth.sqlite') });
@@ -24,7 +24,7 @@ async function fixture(t, { allNative = false, beforeRoster } = {}) {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const nativeCalls = [];
-  service = createAccountService({ origin, issuer: 'https://login.celluloidconsulting.net', clients, identityStore, organizationStore, authStore: stores.brokerStore, assetRoot: directory, buildVersion: 'test-local-service', getClientAddress: req => req.socket.remoteAddress,
+  service = createAccountService({ invitationMailer, origin, issuer: 'https://login.celluloidconsulting.net', clients, identityStore, organizationStore, authStore: stores.brokerStore, assetRoot: directory, buildVersion: 'test-local-service', getClientAddress: req => req.socket.remoteAddress,
     fetchImpl: async (url, options) => {
       nativeCalls.push({ url, options });
       const appId = clients.find(client => client.nativeOrigin && url === `${client.nativeOrigin}/api/suite/native-users`)?.appId;
@@ -264,6 +264,35 @@ test('organization member status API revokes only the selected tenant and requir
  assert.equal((await admin.call('/api/suite/organization/user/active',{organizationId:'org-a',accountId:worker.id,active:true})).status,200);
  const after=(await (await workerBrowser.call('/api/suite/organizations')).json()).organizations;
  assert.deepEqual(after.map(x=>x.id),['org-a','org-b']);
+});
+test('private email invitation submission does not expose tokens in the HTTP response',async t=>{
+ const messages=[];
+ const f=await fixture(t,{invitationMailer:{async sendInvitation(value){messages.push(value);return {accepted:true}}}});
+ const admin=f.browser();await admin.preflight();
+ const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
+ f.organizationStore.setupOrganization({organizationId:'org-a',name:'Alpha',owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:owner.email}});
+ await admin.call('/api/suite/organization/select',{organizationId:'org-a'});
+ const response=await admin.call('/api/suite/organization/invite',{organizationId:'org-a',name:'Scientist',nickname:'Sci',email:'new@example.test'});
+ assert.equal(response.status,201);
+ const data=await response.json();
+ assert.equal(data.delivery,'email');
+ assert.equal(data.invitationUrl,undefined);
+ assert.equal(messages.length,1);
+ assert.equal(messages[0].email,'new@example.test');
+ assert.match(messages[0].invitationUrl,/invite=/);
+});
+test('provider failure revokes pending invitations and releases licensed reservations',async t=>{
+ const f=await fixture(t,{invitationMailer:{async sendInvitation(){throw new Error('remote provider details')}}});
+ const admin=f.browser();await admin.preflight();
+ const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
+ f.organizationStore.setupOrganization({organizationId:'org-a',name:'Alpha',owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:owner.email}});
+ f.organizationStore.applyVerifiedSeatPurchase({reference:'trusted',organizationId:'org-a',plan:'Single',apps:['eel'],seats:1});
+ await admin.call('/api/suite/organization/select',{organizationId:'org-a'});
+ const response=await admin.call('/api/suite/organization/invite',{organizationId:'org-a',name:'Scientist',nickname:'Sci',email:'new@example.test',roles:{eel:'scientist'}});
+ assert.equal(response.status,503);
+ assert.deepEqual(await response.json(),{error:'email_unavailable'});
+ assert.equal(f.organizationStore.listPendingInvitations('org-a',owner.id).length,0);
+ assert.equal(f.organizationStore.overview('org-a',owner.id).apps.find(x=>x.id==='eel').reserved,0);
 });
 test('subscription draft HTTP API is CSRF protected, org locked and cannot mint seats',async t=>{
  const f=await fixture(t),admin=f.browser();await admin.preflight();

@@ -8,6 +8,7 @@ import { createAccountService } from './account-service.mjs';
 import { createIdentityStore } from './identity-store.mjs';
 import { createSqliteAuthStores } from './sqlite-store.mjs';
 import { createOrganizationStore } from '../organization-store.mjs';
+import { createResendInvitationMailer } from '../invitation-mailer.mjs';
 import { createSharedAuthGateway, createProtectedStaticHandler } from './gateway.mjs';
 
 function privatePath(value, label) {
@@ -59,7 +60,9 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
       identityStore = createIdentityStore({ databasePath: privatePath(actual.SUITE_IDENTITY_DB_PATH, 'identity database'), clock });
       if(actual.SUITE_ORGANIZATION_DB_PATH) organizationStore = createOrganizationStore({databasePath:privatePath(actual.SUITE_ORGANIZATION_DB_PATH,'organization database'),clock});
       if (actual.SUITE_SETUP_TOKEN) identityStore.configureBootstrapToken(actual.SUITE_SETUP_TOKEN, { expiresAt: clock() + 7 * 24 * 60 * 60_000 });
-      const service = createAccountService({ origin: actual.SUITE_ORIGIN, issuer: actual.SUITE_ISSUER || actual.SUITE_ORIGIN, clients: JSON.parse(actual.SUITE_CLIENTS || 'null'), identityStore, organizationStore, authStore: auth.brokerStore, assetRoot: privatePath(actual.SUITE_ASSET_ROOT, 'login frontend'), buildVersion, clock, fetchImpl,
+      const invitationMailer=(actual.SUITE_RESEND_API_KEY||actual.SUITE_INVITATION_FROM)
+        ?createResendInvitationMailer({apiKey:actual.SUITE_RESEND_API_KEY,from:actual.SUITE_INVITATION_FROM,fetchImpl}):null;
+      const service = createAccountService({ invitationMailer, origin: actual.SUITE_ORIGIN, issuer: actual.SUITE_ISSUER || actual.SUITE_ORIGIN, clients: JSON.parse(actual.SUITE_CLIENTS || 'null'), identityStore, organizationStore, authStore: auth.brokerStore, assetRoot: privatePath(actual.SUITE_ASSET_ROOT, 'login frontend'), buildVersion, clock, fetchImpl,
         // Passenger supplies the request socket; arbitrary forwarded headers do
         // not select limiter buckets. Account+address buckets isolate users.
         getClientAddress: req => req.socket.remoteAddress,

@@ -353,10 +353,14 @@ $('invite-form').addEventListener('submit',async event=>{
   const result=await request('/api/suite/organization/invite',{
    organizationId:state.selected,name:$('invite-name').value.trim(),nickname:$('invite-nickname').value.trim(),
    email:$('invite-email').value.trim(),admin:$('invite-admin').checked,roles});
-  $('invitation-link').value=result.invitationUrl;
-  $('invite-result').hidden=false;await refreshInvitations();
+  if(result.delivery==='email'){
+   $('invitation-link').value='';$('invite-result').hidden=true;
+  }else{
+   $('invitation-link').value=result.invitationUrl||'';$('invite-result').hidden=false;
+  }
+  await refreshInvitations();
   state.overview=await request('/api/suite/organization/overview',{organizationId:state.selected});renderSeats();await refreshAudit();
-  status('Invitation created. Selected app seats are reserved until acceptance, revocation or expiry.');
+  status(result.delivery==='email'?'Invitation accepted by the mail provider for delivery.':'Invitation created. Share its activation link securely.');
  }catch(e){status(e.message);}finally{state.busy=false;}
 });
 $('copy-invitation').addEventListener('click',async()=>{
