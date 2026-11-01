@@ -42,7 +42,8 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     'CREATE TABLE IF NOT EXISTS permission_overrides(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,permission TEXT NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),PRIMARY KEY(org,account,app,permission),FOREIGN KEY(org,account,app) REFERENCES assignments(org,account,app) ON DELETE CASCADE)',
     'CREATE TABLE IF NOT EXISTS organization_invites(token_hash TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),issued_by TEXT NOT NULL,email TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),expires_at INTEGER NOT NULL,UNIQUE(org,email))',
     'CREATE TABLE IF NOT EXISTS organization_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,org TEXT NOT NULL REFERENCES organizations(id),actor TEXT NOT NULL,action TEXT NOT NULL,subject TEXT NOT NULL,details TEXT NOT NULL CHECK(json_valid(details)),recorded_at INTEGER NOT NULL)',
-    'CREATE TABLE IF NOT EXISTS subscription_drafts(id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),status TEXT NOT NULL CHECK(status IN (\'draft\',\'canceled\')),created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)'
+    'CREATE TABLE IF NOT EXISTS subscription_drafts(id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),status TEXT NOT NULL CHECK(status IN (\'draft\',\'canceled\')),created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)',
+    'CREATE TABLE IF NOT EXISTS stripe_test_checkouts(draft TEXT PRIMARY KEY REFERENCES subscription_drafts(id),org TEXT NOT NULL REFERENCES organizations(id),price TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN (\'pending\',\'ready\')),session_id TEXT UNIQUE,url TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)'
   ].join(';')+';');
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
@@ -147,10 +148,47 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         return view(organizationId,db.prepare('SELECT * FROM members WHERE org=? AND account=?').get(organizationId,member.accountId));
       });
     },
+    prepareTestCheckout({organizationId,actorId,draftId,price}){
+      if(!safeId(draftId)||typeof price!=='string'||!/^price_[A-Za-z0-9_]{5,}$/.test(price))fail('invalid_checkout');
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        const draft=db.prepare("SELECT * FROM subscription_drafts WHERE id=? AND org=? AND status='draft'").get(draftId,organizationId);
+        if(!draft)fail('subscription_not_found');
+        const existing=db.prepare('SELECT * FROM stripe_test_checkouts WHERE draft=? AND org=?').get(draftId,organizationId);
+        if(existing&&existing.price!==price)fail('checkout_price_changed');
+        if(!existing){
+          const now=clock();
+          db.prepare("INSERT INTO stripe_test_checkouts(draft,org,price,state,created_at,updated_at) VALUES(?,?,?,'pending',?,?)").run(draftId,organizationId,price,now,now);
+          audit(organizationId,actorId,'checkout.test.started',draftId,{price});
+        }
+        const row=existing||db.prepare('SELECT * FROM stripe_test_checkouts WHERE draft=? AND org=?').get(draftId,organizationId);
+        return {draft:{id:draft.id,organizationId,plan:draft.plan,apps:JSON.parse(draft.apps),seats:draft.seats},
+          price:row.price,idempotencyKey:'duckbio-test-'+draft.id,
+          ...(row.state==='ready'?{checkout:{id:row.session_id,url:row.url}}:{})};
+      });
+    },
+    completeTestCheckout({organizationId,actorId,draftId,session}){
+      if(!safeId(draftId)||!session||typeof session.id!=='string'||!/^cs_test_[A-Za-z0-9_]+$/.test(session.id))fail('invalid_checkout');
+      let url;try{url=new URL(session.url);}catch{fail('invalid_checkout');}
+      if(url.protocol!=='https:'||url.hostname!=='checkout.stripe.com'||url.username||url.password)fail('invalid_checkout');
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        const row=db.prepare('SELECT * FROM stripe_test_checkouts WHERE draft=? AND org=?').get(draftId,organizationId);
+        if(!row)fail('checkout_not_found');
+        if(row.state==='ready'){
+          if(row.session_id!==session.id||row.url!==url.href)fail('checkout_conflict');
+          return {id:row.session_id,url:row.url,alreadySaved:true};
+        }
+        db.prepare("UPDATE stripe_test_checkouts SET state='ready',session_id=?,url=?,updated_at=? WHERE draft=? AND org=?").run(session.id,url.href,clock(),draftId,organizationId);
+        audit(organizationId,actorId,'checkout.test.prepared',draftId,{sessionId:session.id});
+        return {id:session.id,url:url.href,alreadySaved:false};
+      });
+    },
     listSubscriptionDrafts(organizationId,actorId){
       requireAdmin(organizationId,actorId);
-      return db.prepare('SELECT * FROM subscription_drafts WHERE org=? ORDER BY created_at DESC,id').all(organizationId)
-        .map(x=>({id:x.id,plan:x.plan,apps:JSON.parse(x.apps),seats:x.seats,status:x.status,createdAt:x.created_at,updatedAt:x.updated_at}));
+      return db.prepare('SELECT d.*,c.state AS checkout_state,c.url AS checkout_url FROM subscription_drafts d LEFT JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org WHERE d.org=? ORDER BY d.created_at DESC,d.id').all(organizationId)
+        .map(x=>({id:x.id,plan:x.plan,apps:JSON.parse(x.apps),seats:x.seats,status:x.status,createdAt:x.created_at,updatedAt:x.updated_at,
+          checkoutState:x.checkout_state??null,checkoutUrl:x.checkout_state==='ready'?x.checkout_url:null}));
     },
     createSubscriptionDraft({organizationId,actorId,plan,apps,seats}){
       if(!['Single','Mixed','Bundle'].includes(plan)||!Array.isArray(apps)||!Number.isSafeInteger(seats)||seats<1||seats>10000||new Set(apps).size!==apps.length||apps.some(id=>!byId.has(id)))fail('invalid_subscription');
@@ -168,6 +206,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         requireAdmin(organizationId,actorId);
         const existing=db.prepare('SELECT status FROM subscription_drafts WHERE id=? AND org=?').get(draftId,organizationId);
         if(!existing)fail('subscription_not_found');
+        if(db.prepare('SELECT 1 FROM stripe_test_checkouts WHERE draft=? AND org=?').get(draftId,organizationId))fail('checkout_started');
         if(existing.status!=='canceled')db.prepare('UPDATE subscription_drafts SET status=\'canceled\',updated_at=? WHERE id=? AND org=?').run(clock(),draftId,organizationId);
         return {id:draftId,status:'canceled'};
       });
