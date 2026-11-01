@@ -35,7 +35,7 @@ async function fixture(t) {
  const context=await browser.newContext({viewport:{width:1280,height:800}});
  const page=await context.newPage();
  const errors=[];page.on('pageerror',e=>errors.push(String(e)));
- t.after(async()=>{await browser.close();await new Promise(resolve=>server.close(resolve));identity.close();auth.close();org.close();rmSync(temp,{recursive:true,force:true});assert.deepEqual(errors,[],'uncaught browser errors');});
+ t.after(async()=>{await browser.close();server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));identity.close();auth.close();org.close();rmSync(temp,{recursive:true,force:true});assert.deepEqual(errors,[],'uncaught browser errors');});
  await page.goto(origin+'/workspace');
  await page.locator('#sign-in:not([hidden])').waitFor();
  return {page,origin,org,owner,worker,context};
@@ -47,7 +47,7 @@ async function signIn(page,email='owner@example.test',password='Example passphra
  await page.locator('#portal:not([hidden])').waitFor();
 }
 
-test('real Chromium Workspace login shows per-app seats and enforces edits without payment',async t=>{
+test('real Chromium Workspace login shows per-app seats and enforces edits without payment',{timeout:45000},async t=>{
  const f=await fixture(t),page=f.page;
  await signIn(page);
  assert.match(await page.locator('#organization-name').textContent(),/Synthetic laboratory/);
@@ -71,7 +71,7 @@ test('real Chromium Workspace login shows per-app seats and enforces edits witho
  assert.equal(f.org.accessFor({organizationId:'lab-a',accountId:f.worker.id,appId:'eel'}).role,'reviewer');
 });
 
-test('responsive Workspace still refuses to create unverified central accounts',async t=>{
+test('responsive Workspace still refuses to create unverified central accounts',{timeout:45000},async t=>{
  const {page,context}=await fixture(t);
  await page.setViewportSize({width:390,height:720});
  await signIn(page);
@@ -84,5 +84,5 @@ test('responsive Workspace still refuses to create unverified central accounts',
  await page.locator('#member-email').fill('unknown@example.test');
  await page.locator('#role-fields select[name=eel]').selectOption('scientist');
  await page.locator('#member-form button[type=submit]').click();
- await page.locator('#status').getByText('Check the account, email and app roles.').waitFor();
+ await page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('Check the account, email and app roles.'),null,{timeout:10000});
 });
