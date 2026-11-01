@@ -90,9 +90,9 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     let status = error.status ?? 503; let code = error.code ?? 'unavailable';
     if (error instanceof OrganizationError) {
       status = code === 'access_denied' ? 403
-        : ['app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked'].includes(code) ? 409
+        : ['app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required'].includes(code) ? 409
         : 400;
-      if (!['access_denied','app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','invalid_roles','invalid_member'].includes(code)) code = 'invalid_input';
+      if (!['access_denied','app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required','invalid_permission','invalid_roles','invalid_member'].includes(code)) code = 'invalid_input';
     }
     if (error instanceof IdentityStoreError) {
       if (code === 'invalid_setup_token') status = 403;
@@ -116,7 +116,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           send(res, 200, { status: 'ok', mode: 'local', buildVersion, configured: identityStore.listUsers().length > 0 }); return true;
         }
         if (!route.startsWith('/api/suite/')) return staticFile(req, res, route);
-        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/user/save': 'POST' };
+        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST' };
         if (!methods[route]) return false;
         if (![methods[route]].flat().includes(req.method)) throw new ServiceError(405, 'method_not_allowed');
         if (route !== '/api/suite/admin/native-users' && parsed.search) throw new ServiceError(400, 'invalid_input');
@@ -156,6 +156,16 @@ export function createAccountService({ origin, issuer = origin, clients, identit
             if (!organizationStore) throw new ServiceError(503,'unavailable');
             requireSelection(body.organizationId);
             send(res,200,organizationStore.overview(body.organizationId,user.id));
+          }
+          else if (route === '/api/suite/organization/matrix') {
+            requireSelection(body.organizationId);
+            send(res,200,organizationStore.matrix(body.organizationId,user.id));
+          }
+          else if (route === '/api/suite/organization/permission/set') {
+            requireSelection(body.organizationId);
+            const result=organizationStore.setPermission({...body,actorId:user.id});
+            await authenticated(req);
+            send(res,200,{permission:result});
           }
           else if (route === '/api/suite/organization/user/save') {
             if (!organizationStore) throw new ServiceError(503,'unavailable');
