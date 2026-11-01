@@ -1,6 +1,6 @@
 // Private same-origin Workspace UI. Server owns roles, license counts and identity.
 const $=id=>document.getElementById(id);
-const state={csrf:'',orgs:[],selected:null,overview:null,busy:false};
+const state={csrf:'',orgs:[],selected:null,overview:null,matrix:null,busy:false};
 const errorMessage=(status)=>status===401?'Sign in again.':status===403?'Your role does not allow this action.':status===409?'There are not enough app licences, or the data changed. Reload the organization.':status===400?'Check the account, email and app roles.':'The private Workspace service is unavailable.';
 function status(message){$('status').textContent=message;}
 function el(tag,text,cls){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
@@ -20,9 +20,11 @@ async function csrf(){
 }
 function renderSeats(){
  const root=$('seats');root.replaceChildren();
+ const subscriptions=$('subscription-seats');subscriptions.replaceChildren();
  for(const app of state.overview.apps){
   const card=el('div',undefined,'seat-card');card.append(el('div',app.name),el('strong',app.assigned+' / '+app.purchased),el('small','Assigned / purchased'));
   root.append(card);
+  const copy=card.cloneNode(true);subscriptions.append(copy);
  }
 }
 function renderMembers(){
@@ -58,6 +60,7 @@ async function overview(orgId){
  const view=await request('/api/suite/organization/overview',{organizationId:orgId});
  state.overview=view;$('organization-name').textContent=view.organization.name;
  renderSeats();renderMembers();$('edit-panel').hidden=true;$('buy-panel').hidden=true;
+ state.matrix=null;
  status('Workspace data loaded from the private server.');
 }
 async function chooseOrganization(orgId){
@@ -126,7 +129,7 @@ $('member-form').addEventListener('submit',async e=>{
  catch(err){status(err.message);}finally{state.busy=false;}
 });
 $('buy').addEventListener('click',()=>{
- $('edit-panel').hidden=true;$('buy-panel').hidden=false;
+ showTab('subscriptions');$('edit-panel').hidden=true;$('buy-panel').hidden=false;
  const root=$('buy-fields');root.replaceChildren();
  for(const app of state.overview.apps){
   const card=el('div',undefined,'role-card'),label=el('label',app.name),input=el('input');
@@ -143,4 +146,73 @@ $('review-buy').addEventListener('click',()=>{
  $('buy-summary').textContent=selected.length?'Selection: '+selected.join(' · ')+'. Checkout is not connected; no licences were purchased.':'Choose at least one app.';
 });
 $('cancel-buy').addEventListener('click',()=>{$('buy-panel').hidden=true;});
+$('open-buy').addEventListener('click',()=>$('buy').click());
+
+function showTab(tab){
+ for(const button of document.querySelectorAll('[data-tab]')){
+  const active=button.dataset.tab===tab;
+  button.classList.toggle('active',active);
+  button.setAttribute('aria-selected',String(active));
+ }
+ for(const name of ['users','subscriptions','matrix'])$('tab-'+name).hidden=name!==tab;
+ if(tab==='matrix')loadMatrix().catch(e=>{$('matrix-info').textContent=e.message;});
+}
+async function loadMatrix(){
+ if(!state.selected)return;
+ const result=await request('/api/suite/organization/matrix',{organizationId:state.selected});
+ state.matrix=result;
+ const list=$('matrix-app'),old=list.value;
+ list.replaceChildren();
+ const all=el('option','All apps');all.value='';list.append(all);
+ for(const app of result.apps){const o=el('option',app.name);o.value=app.id;list.append(o);}
+ list.value=old;renderMatrix();
+}
+function renderMatrix(){
+ if(!state.matrix)return;
+ const query=$('matrix-search').value.trim().toLowerCase(),selectedApp=$('matrix-app').value,sort=$('matrix-sort').value;
+ const apps=state.matrix.apps.filter(app=>!selectedApp||selectedApp===app.id);
+ const users=state.matrix.users.filter(user=>(user.name+' '+user.nickname+' '+user.email).toLowerCase().includes(query));
+ const permissions=[...new Set(apps.flatMap(app=>app.permissions))].sort();
+ const head=$('matrix-head'),body=$('matrix-body');head.replaceChildren();body.replaceChildren();
+ const row=el('tr');
+ for(const label of ['User','App','Role',...permissions])row.append(el('th',label));
+ head.append(row);
+ const entries=apps.flatMap(app=>users.map(user=>({app,user})));
+ entries.sort((a,b)=>sort==='app' ? a.app.name.localeCompare(b.app.name)||a.user.name.localeCompare(b.user.name)
+   : sort==='email' ? a.user.email.localeCompare(b.user.email)||a.app.name.localeCompare(b.app.name)
+   : a.user.name.localeCompare(b.user.name)||a.app.name.localeCompare(b.app.name));
+ for(const {app,user} of entries){
+  const tr=el('tr');
+  tr.append(el('td',user.name+' · '+user.email),el('td',app.name),el('td',user.roles[app.id]||'No access'));
+  const permissionsByRole=app.rolePermissions[user.roles[app.id]]||[];
+  const wildcard=permissionsByRole.includes('*'), overrides=user.overrides?.[app.id]||{};
+  for(const permission of permissions){
+   const td=el('td');
+   if(user.roles[app.id]&&app.permissions.includes(permission)){
+    const base=wildcard||permissionsByRole.includes(permission);
+    const checkbox=el('input');checkbox.type='checkbox';checkbox.checked=Object.hasOwn(overrides,permission)?overrides[permission]:base;
+    checkbox.setAttribute('aria-label',user.name+' '+app.name+' '+permission);
+    checkbox.addEventListener('change',async()=>{
+     checkbox.disabled=true;
+     try{
+      const enabled=checkbox.checked;
+      await request('/api/suite/organization/permission/set',{organizationId:state.selected,accountId:user.accountId,appId:app.id,permission,enabled});
+      // Re-read server state first; show an enduring confirmation for browser users and tests.
+      await loadMatrix();
+      $('matrix-info').textContent='Saved '+permission+' ('+(enabled?'enabled':'disabled')+') for '+user.name+' in '+app.name+'.';
+     }catch(e){checkbox.checked=!checkbox.checked;checkbox.disabled=false;$('matrix-info').textContent=e.message;}
+    });
+    td.append(checkbox);
+   }else td.textContent='—';
+   tr.append(td);
+  }
+  body.append(tr);
+ }
+ $('matrix-info').textContent=entries.length+' user/app rows shown. Changes are stored in Workspace; native app enforcement is not connected.';
+}
+document.querySelectorAll('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>showTab(btn.dataset.tab)));
+$('matrix-search').addEventListener('input',renderMatrix);
+$('matrix-app').addEventListener('change',renderMatrix);
+$('matrix-sort').addEventListener('change',renderMatrix);
+
 load().catch(e=>status(e.message));

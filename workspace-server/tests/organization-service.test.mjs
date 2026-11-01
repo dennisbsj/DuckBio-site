@@ -125,3 +125,23 @@ test('multi-organization login choice is bound to one session until logout and s
  assert.equal((await client.call('/api/suite/organization/overview',{organizationId:'alpha'})).status,403);
  assert.equal((await client.call('/api/suite/admin/users')).status,403,'global admin roster cannot bypass organization scope');
 });
+
+test('permission matrix API requires the selected organization and rejects unrelated users',async t=>{
+ const f=await fixture(t),admin=f.browser();
+ await admin.preflight();
+ const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
+ f.organizationStore.setupOrganization({organizationId:'org-a',name:'Lab A',owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:'owner@example.test'}});
+ f.organizationStore.applyVerifiedSeatPurchase({reference:'verified1',organizationId:'org-a',plan:'Single',apps:['eel'],seats:1});
+ const scientist=await f.identityStore.createUser({email:'worker@example.test',displayName:'Worker',password:'Worker password 12345'});
+ f.organizationStore.saveMember({organizationId:'org-a',actorId:owner.id,member:{accountId:scientist.id,name:'Worker',nickname:'Worker',email:scientist.email,admin:false,roles:{eel:'scientist'}}});
+ assert.equal((await admin.call('/api/suite/organization/matrix',{organizationId:'org-a'})).status,403,'an organization must first be chosen');
+ await admin.call('/api/suite/organization/select',{organizationId:'org-a'});
+ const matrix=await (await admin.call('/api/suite/organization/matrix',{organizationId:'org-a'})).json();
+ assert(matrix.apps.find(x=>x.id==='eel').permissions.includes('document.review'));
+ const data={organizationId:'org-a',accountId:scientist.id,appId:'eel',permission:'document.review',enabled:true};
+ assert.equal((await admin.call('/api/suite/organization/permission/set',data,'POST',false)).status,403);
+ assert.equal((await admin.call('/api/suite/organization/permission/set',{...data,permission:'invalid.permission'})).status,400);
+ assert.equal((await admin.call('/api/suite/organization/permission/set',data)).status,200);
+ assert(f.organizationStore.effectivePermissions({organizationId:'org-a',accountId:scientist.id,appId:'eel'}).includes('document.review'));
+ assert.equal((await admin.call('/api/suite/organization/matrix',{organizationId:'org-b'})).status,403);
+});

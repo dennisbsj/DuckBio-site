@@ -71,3 +71,27 @@ test('private SQLite root and file permissions',t=>{
  assert.throws(()=>createOrganizationStore({databasePath:'relative.sqlite'}),/private_path_required/);
  assert.throws(()=>createOrganizationStore({databasePath:path.resolve('docs/private.sqlite')}),/private_path_required/);
 });
+
+test('permission toggles are tenant scoped, persisted and removed when the app role changes',t=>{
+ const {store}=fixture(t);
+ buy(store,'permission-seat','Single',['eel']);
+ store.saveMember({organizationId:'one',actorId:'admin1',member:member('scientist',{eel:'scientist'})});
+ const original=store.effectivePermissions({organizationId:'one',accountId:'scientist',appId:'eel'});
+ assert(original.includes('document.edit'));
+ assert(!original.includes('document.review'));
+ assert.throws(()=>store.setPermission({organizationId:'one',actorId:'admin1',accountId:'scientist',appId:'eel',permission:'does.not.exist',enabled:true}),/invalid_permission/);
+ assert.throws(()=>store.setPermission({organizationId:'one',actorId:'other',accountId:'scientist',appId:'eel',permission:'document.edit',enabled:false}),/access_denied/);
+ store.setPermission({organizationId:'one',actorId:'admin1',accountId:'scientist',appId:'eel',permission:'document.edit',enabled:false});
+ store.setPermission({organizationId:'one',actorId:'admin1',accountId:'scientist',appId:'eel',permission:'document.review',enabled:true});
+ assert(!store.effectivePermissions({organizationId:'one',accountId:'scientist',appId:'eel'}).includes('document.edit'));
+ assert(store.effectivePermissions({organizationId:'one',accountId:'scientist',appId:'eel'}).includes('document.review'));
+ const row=store.matrix('one','admin1').users.find(u=>u.accountId==='scientist');
+ assert.equal(row.overrides.eel['document.edit'],false);
+ assert.equal(row.overrides.eel['document.review'],true);
+ store.saveMember({organizationId:'one',actorId:'admin1',member:member('scientist',{eel:'reviewer'})});
+ assert.deepEqual(store.matrix('one','admin1').users.find(u=>u.accountId==='scientist').overrides.eel,{});
+ assert(store.effectivePermissions({organizationId:'one',accountId:'scientist',appId:'eel'}).includes('document.review'));
+ store.saveMember({organizationId:'one',actorId:'admin1',member:member('scientist',{})});
+ assert.deepEqual(store.effectivePermissions({organizationId:'one',accountId:'scientist',appId:'eel'}),[]);
+ assert.throws(()=>store.setPermission({organizationId:'one',actorId:'admin1',accountId:'scientist',appId:'eel',permission:'document.review',enabled:true}),/app_access_required/);
+});
