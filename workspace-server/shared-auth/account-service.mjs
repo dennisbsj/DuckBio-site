@@ -7,7 +7,7 @@ import { OrganizationError } from '../organization-store.mjs';
 
 const APP_NAMES = Object.freeze({ goflo: 'GoFlo', eel: 'EEL', methpipe: 'MethPipe', mantrain: 'ManTrain', duckman: 'DuckMan', limsman: 'LIMSMan' });
 const STATIC_APPS = new Set(['goflo', 'methpipe', 'mantrain']);
-const NATIVE_ORIGINS = Object.freeze(Object.fromEntries(Object.keys(APP_NAMES).map(id => [id, `https://${id}.celluloidconsulting.net`])));
+// Each native app must have an explicit private client origin; retired domains are not fallbacks.
 const FILES = new Set(['index.html', 'login.css', 'app.js', 'app-registry.mjs', 'auth-client.mjs', 'config.mjs', 'admin.html', 'admin.js', 'admin.css', 'workspace.html', 'workspace.css', 'workspace.js', ...Object.keys(APP_NAMES).map(id => `assets/${id}.svg`), 'assets/favicon.svg']);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
 class ServiceError extends Error { constructor(status, code) { super(code); this.status = status; this.code = code; } }
@@ -49,7 +49,8 @@ export function createAccountService({ origin, issuer = origin, clients, identit
   async function roster(appId) {
     const client = registrations.get(appId);
     if (!nativeApps.has(appId) || !client) throw new ServiceError(400, 'invalid_input');
-    const expected = client.nativeOrigin || NATIVE_ORIGINS[appId];
+    const expected = client.nativeOrigin;
+    if(typeof expected !== 'string') throw new ServiceError(400,'invalid_input');
     const native = new URL(expected);
     if (native.origin !== expected || native.protocol !== 'https:' || native.username || native.password || native.search || native.hash || !client.redirectUris.some(value => new URL(value).origin === expected)) throw new ServiceError(400, 'invalid_input');
     const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 10_000);
