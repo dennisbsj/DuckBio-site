@@ -85,13 +85,13 @@ html[data-theme="dark"] body.support-faq-page .support-faq-heading h2{color:#f0f
 }
 
 /* Support hero height matches homepage image: 788/1400 width, minus 5.263158% top crop = 51.02256vw. */
-/* DuckBio puzzled scientist — support hero, aligned beside "Ducking out?". */
+/* DuckBio support hero: entire original illustration shown without cover cropping. */
 body.support-faq-page main .page-hero.support-hero{position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;height:51.02256vw;min-height:0;padding:0;box-sizing:border-box;background:#071d32 !important}
-body.support-faq-page .support-hero-art{position:absolute;z-index:-2;top:0;right:0;bottom:0;left:auto;width:78%;height:100%;object-fit:cover;object-position:center 41%}
+body.support-faq-page .support-hero-art{position:absolute;z-index:-2;inset:0;width:100%;height:100%;object-fit:contain;object-position:right center}
 body.support-faq-page .support-hero::before{content:"";position:absolute;z-index:-1;inset:0;pointer-events:none;background:linear-gradient(90deg,#061d32 0%,rgba(6,29,50,.93) 19%,rgba(6,29,50,.38) 43%,transparent 68%)}
 body.support-faq-page .support-hero>.wrap{position:relative;z-index:1}
 body.support-faq-page .support-hero h1{max-width:48%;margin:0;color:#f5fcff !important;font-size:clamp(39px,5vw,64px);text-shadow:0 2px 16px rgba(4,17,31,.8)}
-@media(max-width:650px){body.support-faq-page main .page-hero.support-hero{height:51.02256vw;min-height:0;padding:0}body.support-faq-page .support-hero-art{object-position:50% 43%}body.support-faq-page .support-hero h1{max-width:49%;font-size:clamp(32px,8vw,44px)}}
+@media(max-width:650px){body.support-faq-page main .page-hero.support-hero{height:51.02256vw;min-height:0;padding:0}body.support-faq-page .support-hero-art{object-position:right center}body.support-faq-page .support-hero h1{max-width:49%;font-size:clamp(32px,8vw,44px)}}
 
 /* Support hero copy: same aqua accent as the DuckBio home hero. */
 body.support-faq-page .support-hero .support-hero-copy{max-width:49%}
