@@ -10,7 +10,7 @@ import { createSqliteAuthStores } from '../shared-auth/sqlite-store.mjs';
 import { createAccountService } from '../shared-auth/account-service.mjs';
 import { createOrganizationStore } from '../organization-store.mjs';
 
-async function fixture(t, { allNative = false, beforeRoster, invitationMailer = null } = {}) {
+async function fixture(t, { allNative = false, beforeRoster, invitationMailer = null, stripeTestCheckout = null } = {}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'suite-service-'));
   const identityStore = createIdentityStore({ databasePath: path.join(directory, 'identity.sqlite') });
   const stores = createSqliteAuthStores({ databasePath: path.join(directory, 'auth.sqlite') });
@@ -24,7 +24,7 @@ async function fixture(t, { allNative = false, beforeRoster, invitationMailer = 
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const nativeCalls = [];
-  service = createAccountService({ invitationMailer, origin, issuer: 'https://login.celluloidconsulting.net', clients, identityStore, organizationStore, authStore: stores.brokerStore, assetRoot: directory, buildVersion: 'test-local-service', getClientAddress: req => req.socket.remoteAddress,
+  service = createAccountService({ invitationMailer, stripeTestCheckout, origin, issuer: 'https://login.celluloidconsulting.net', clients, identityStore, organizationStore, authStore: stores.brokerStore, assetRoot: directory, buildVersion: 'test-local-service', getClientAddress: req => req.socket.remoteAddress,
     fetchImpl: async (url, options) => {
       nativeCalls.push({ url, options });
       const appId = clients.find(client => client.nativeOrigin && url === `${client.nativeOrigin}/api/suite/native-users`)?.appId;
@@ -293,6 +293,27 @@ test('provider failure revokes pending invitations and releases licensed reserva
  assert.deepEqual(await response.json(),{error:'email_unavailable'});
  assert.equal(f.organizationStore.listPendingInvitations('org-a',owner.id).length,0);
  assert.equal(f.organizationStore.overview('org-a',owner.id).apps.find(x=>x.id==='eel').reserved,0);
+});
+test('organization test Checkout HTTP API requires selected admin and reuses a saved session',async t=>{
+ const calls=[],fake={priceFor:()=> 'price_test123456',async createSession(value){calls.push(value);return {id:'cs_test_mock123',url:'https://checkout.stripe.com/c/pay/example'};}};
+ const f=await fixture(t,{stripeTestCheckout:fake}),admin=f.browser(),outsider=f.browser();
+ await admin.preflight();await outsider.preflight();
+ const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
+ for(const id of ['org-a','org-b'])f.organizationStore.setupOrganization({organizationId:id,name:id,owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:owner.email}});
+ const draft=f.organizationStore.createSubscriptionDraft({organizationId:'org-a',actorId:owner.id,plan:'Single',apps:['eel'],seats:3});
+ const input={organizationId:'org-a',draftId:draft.id};
+ assert.equal((await admin.call('/api/suite/organization/subscription/test-checkout',input)).status,403);
+ await admin.call('/api/suite/organization/select',{organizationId:'org-a'});
+ assert.equal((await admin.call('/api/suite/organization/subscription/test-checkout',input,'POST',false)).status,403);
+ assert.equal((await outsider.call('/api/suite/organization/subscription/test-checkout',input)).status,401);
+ assert.equal((await admin.call('/api/suite/organization/subscription/test-checkout',{...input,organizationId:'org-b'})).status,403);
+ const first=await admin.call('/api/suite/organization/subscription/test-checkout',input);
+ assert.equal(first.status,200);
+ assert.deepEqual(await first.json(),{checkoutUrl:'https://checkout.stripe.com/c/pay/example',mode:'test',licensesGranted:false});
+ assert.equal((await admin.call('/api/suite/organization/subscription/test-checkout',input)).status,200);
+ assert.equal(calls.length,1);
+ assert.equal(f.organizationStore.overview('org-a',owner.id).apps.find(x=>x.id==='eel').purchased,0);
+ assert.equal((await admin.call('/api/suite/organization/subscription/cancel',input)).status,409);
 });
 test('subscription draft HTTP API is CSRF protected, org locked and cannot mint seats',async t=>{
  const f=await fixture(t),admin=f.browser();await admin.preflight();

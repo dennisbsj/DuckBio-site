@@ -229,7 +229,7 @@ $('buy').addEventListener('click',()=>{
   card.append(label,el('small',app.purchased+' purchased · '+app.assigned+' assigned'));root.append(card);
  }
  applyPlan();
- $('buy-summary').textContent='No real payment or licence change is possible yet.';
+ $('buy-summary').textContent='Only Stripe TEST Checkout can be prepared from saved drafts. Live payments and licence activation remain disabled.';
  $('buy-panel').scrollIntoView({behavior:'smooth',block:'start'});
 });
 $('review-buy').addEventListener('click',()=>{
@@ -258,7 +258,19 @@ async function refreshSubscriptions(){
   const labels=draft.apps.map(id=>state.overview.apps.find(a=>a.id===id)?.name||id);
   card.append(el('strong',draft.plan+' · '+draft.seats+' users per app'),el('small',labels.join(', ')+' · '+draft.status));
   if(draft.status==='draft'){
-   card.append(button('Cancel draft',async()=>{
+   if(draft.checkoutState==='ready'&&draft.checkoutUrl){
+    card.append(button('Open Stripe test checkout',()=>window.location.assign(draft.checkoutUrl)));
+   }else if(result.testCheckoutEnabled){
+    card.append(button(draft.checkoutState==='pending'?'Retry test checkout':'Start test checkout',async()=>{
+     try{
+      const checkout=await request('/api/suite/organization/subscription/test-checkout',{organizationId:state.selected,draftId:draft.id});
+      if(checkout.mode!=='test'||checkout.licensesGranted!==false)throw new Error('Unexpected checkout state');
+      await refreshSubscriptions();
+      status('Stripe test Checkout prepared. No real payment or licence activation.');
+     }catch(e){status(e.message);}
+    }));
+   }
+   if(!draft.checkoutState)card.append(button('Cancel draft',async()=>{
     if(!window.confirm('Cancel this draft? This does not change purchased subscriptions or licences.'))return;
     try{await request('/api/suite/organization/subscription/cancel',{organizationId:state.selected,draftId:draft.id});await refreshSubscriptions();}
     catch(e){status(e.message);}

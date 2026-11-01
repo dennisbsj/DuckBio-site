@@ -12,7 +12,7 @@ import {createSqliteAuthStores} from '../shared-auth/sqlite-store.mjs';
 import {createOrganizationStore} from '../organization-store.mjs';
 import {createAccountService} from '../shared-auth/account-service.mjs';
 
-async function fixture(t, {multi=false, invitationMailer=null}={}) {
+async function fixture(t, {multi=false, invitationMailer=null, stripeTestCheckout=null}={}) {
  const temp=mkdtempSync(path.join(os.tmpdir(),'duckbio-workspace-browser-'));
  const identity=createIdentityStore({databasePath:path.join(temp,'identity.sqlite')});
  const auth=createSqliteAuthStores({databasePath:path.join(temp,'auth.sqlite')});
@@ -35,7 +35,7 @@ async function fixture(t, {multi=false, invitationMailer=null}={}) {
  // Register cleanup before service/browser creation, including constructor failures.
  t.after(async()=>{await browser?.close();server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));identity.close();auth.close();org.close();rmSync(temp,{recursive:true,force:true});assert.deepEqual(errors,[],'uncaught browser errors');});
  const assetRoot=fileURLToPath(new URL('../private-ui/',import.meta.url));
- service=createAccountService({invitationMailer,origin,issuer:'https://login.example.invalid',clients:registrations,identityStore:identity,organizationStore:org,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
+ service=createAccountService({invitationMailer,stripeTestCheckout,origin,issuer:'https://login.example.invalid',clients:registrations,identityStore:identity,organizationStore:org,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:1280,height:800}});
  const page=await context.newPage();
@@ -393,6 +393,23 @@ test('configured mail delivery creates a pending invitation without displaying a
  assert.equal(mail.length,1);
  assert.equal(mail[0].email,'mail@example.test');
  assert.equal(org.listPendingInvitations('lab-a',owner.id).length,1);
+});
+test('admin prepares Stripe test Checkout from a saved draft with zero entitlement changes',{timeout:45000},async t=>{
+ const fake={priceFor:()=> 'price_test123456',async createSession(){return {id:'cs_test_browser123',url:'https://checkout.stripe.com/c/pay/browser'}}};
+ const {page,org,owner}=await fixture(t,{stripeTestCheckout:fake});
+ await signIn(page);
+ const before=org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased;
+ await page.getByRole('button',{name:'Subscriptions'}).click();
+ await page.getByRole('button',{name:'Prepare subscription'}).click();
+ await page.locator('#draft-plan').selectOption('Single');
+ await page.locator('#draft-seats').fill('2');
+ await page.locator('#buy-fields input[name=eel]').check();
+ await page.getByRole('button',{name:'Save subscription draft'}).click();
+ await page.locator('#subscription-drafts').getByText('Single · 2 users per app').waitFor();
+ await page.getByRole('button',{name:'Start test checkout'}).click();
+ await page.getByRole('button',{name:'Open Stripe test checkout'}).waitFor();
+ assert.equal(org.listSubscriptionDrafts('lab-a',owner.id)[0].checkoutState,'ready');
+ assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased,before);
 });
 test('admin saves and cancels subscription drafts without minting paid seats',{timeout:45000},async t=>{
  const {page,org,owner}=await fixture(t);
