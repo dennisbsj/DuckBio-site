@@ -112,3 +112,26 @@ test('two organizations require explicit login-time selection and a fresh login 
  await page.locator('#portal:not([hidden])').waitFor();
  assert.equal(await page.locator('#organization-name').textContent(),'Second laboratory');
 });
+
+test('admin can search and filter a real permission matrix, then persist and revoke a checkbox',{timeout:45000},async t=>{
+ const {page,org,worker}=await fixture(t);
+ await signIn(page);
+ await page.getByRole('button',{name:'Permission matrix'}).click();
+ await page.locator('#tab-matrix:not([hidden])').waitFor();
+ await page.locator('#matrix-app').selectOption('eel');
+ await page.locator('#matrix-search').fill('worker@example.test');
+ const toggle=page.getByRole('checkbox',{name:'Lab worker DuckNote document.review'});
+ await toggle.waitFor();
+ assert.equal(await toggle.isChecked(),false);
+ await toggle.check();
+ await page.waitForFunction(()=>document.getElementById('matrix-info')?.textContent.includes('user/app rows shown'));
+ assert(org.effectivePermissions({organizationId:'lab-a',accountId:worker.id,appId:'eel'}).includes('document.review'));
+ await page.getByRole('checkbox',{name:'Lab worker DuckNote document.review'}).uncheck();
+ await page.waitForFunction(()=>document.getElementById('matrix-info')?.textContent.includes('user/app rows shown'));
+ assert(!org.effectivePermissions({organizationId:'lab-a',accountId:worker.id,appId:'eel'}).includes('document.review'));
+ await page.locator('#matrix-search').fill('no-such-user');
+ assert.equal(await page.locator('#matrix-body tr').count(),0);
+ await page.locator('#matrix-search').fill('');
+ await page.locator('#matrix-sort').selectOption('app');
+ assert(await page.locator('#matrix-body tr').count()>=2);
+});
