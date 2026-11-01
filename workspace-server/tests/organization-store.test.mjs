@@ -1,0 +1,73 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,rmSync,statSync} from 'node:fs';
+import os from 'node:os';import path from 'node:path';
+import {createOrganizationStore,APPLICATIONS} from '../organization-store.mjs';
+function fixture(t){
+ const directory=mkdtempSync(path.join(os.tmpdir(),'duckbio-org-'));
+ const dbPath=path.join(directory,'private','org.sqlite');
+ const store=createOrganizationStore({databasePath:dbPath,clock:()=>1000});
+ t.after(()=>{store.close();rmSync(directory,{recursive:true,force:true});});
+ store.setupOrganization({organizationId:'one',name:'Lab A',owner:{accountId:'admin1',name:'Admin A',nickname:'A',email:'ADMIN@EXAMPLE.TEST'}});
+ return {store,dbPath};
+}
+const member=(accountId,roles={},extra={})=>({accountId,name:'Scientist',nickname:'Sci',email:accountId+'@example.test',admin:false,roles,...extra});
+const buy=(store,reference,plan,apps,seats=1,organizationId='one')=>store.applyVerifiedSeatPurchase({reference,organizationId,plan,apps,seats});
+test('canonical list has exactly six apps and per-app role catalogs',()=>{
+ assert.deepEqual(APPLICATIONS.map(x=>x.name),['LabDuck','CytoDuck','DuckPipe','DuckNote','DuckMan','DuckTrain']);
+ assert(APPLICATIONS.find(x=>x.id==='eel').roles.includes('scientist'));assert(APPLICATIONS.find(x=>x.id==='limsman').roles.includes('QC'));
+});
+test('verified Single Mixed Bundle seat events are idempotent',t=>{
+ const {store}=fixture(t);
+ assert.deepEqual(store.overview('one','admin1').apps.map(x=>x.purchased),[0,0,0,0,0,0]);
+ assert.equal(buy(store,'evt1','Single',['eel'],2).applied,true);
+ assert.equal(buy(store,'evt1','Single',['eel'],2).applied,false);
+ assert.throws(()=>buy(store,'evt1','Single',['eel'],1),/purchase_reference_conflict/);
+ assert.throws(()=>buy(store,'wrong','Single',['eel','goflo']),/invalid_purchase/);
+ assert.throws(()=>buy(store,'wrong2','Bundle',['eel']),/invalid_purchase/);
+ buy(store,'evt2','Mixed',['goflo','mantrain'],1);
+ buy(store,'evt3','Bundle',APPLICATIONS.map(a=>a.id),1);
+ assert.equal(store.overview('one','admin1').apps.find(a=>a.id==='eel').purchased,3);
+ assert.equal(store.overview('one','admin1').apps.find(a=>a.id==='duckman').purchased,1);
+});
+test('per-app capacity, role changes and atomic failures',t=>{
+ const {store}=fixture(t);
+ assert.throws(()=>store.saveMember({organizationId:'one',actorId:'admin1',member:member('person',{eel:'scientist'})}),/app_seats_exhausted/);
+ buy(store,'evt','Single',['eel']);
+ assert.equal(store.saveMember({organizationId:'one',actorId:'admin1',member:member('person',{eel:'scientist'})}).roles.eel,'scientist');
+ assert.throws(()=>store.saveMember({organizationId:'one',actorId:'admin1',member:member('other',{eel:'scientist'})}),/app_seats_exhausted/);
+ assert.throws(()=>store.saveMember({organizationId:'one',actorId:'admin1',member:member('other',{eel:'fake'})}),/invalid_roles/);
+ assert.equal(store.overview('one','admin1').users.length,2);
+ assert.equal(store.saveMember({organizationId:'one',actorId:'admin1',member:member('person',{eel:'reviewer'})}).roles.eel,'reviewer');
+ assert.equal(store.accessFor({organizationId:'one',accountId:'person',appId:'eel'}).role,'reviewer');
+ store.saveMember({organizationId:'one',actorId:'admin1',member:member('person',{})});
+ assert.equal(store.accessFor({organizationId:'one',accountId:'person',appId:'eel'}),null);
+ assert.equal(store.saveMember({organizationId:'one',actorId:'admin1',member:member('other',{eel:'scientist'})}).roles.eel,'scientist');
+});
+test('organization isolation and last admin invariants',t=>{
+ const {store}=fixture(t);
+ store.setupOrganization({organizationId:'two',name:'Lab B',owner:{accountId:'admin2',name:'Admin B',nickname:'B',email:'admin2@example.test'}});
+ assert.throws(()=>store.overview('one','admin2'),/access_denied/);
+ assert.throws(()=>store.saveMember({organizationId:'two',actorId:'admin1',member:member('nope',{})}),/access_denied/);
+ assert.throws(()=>store.saveMember({organizationId:'one',actorId:'admin1',member:member('admin1',{}, {name:'Admin A',nickname:'A',email:'admin@example.test',admin:false})}),/last_organization_admin/);
+ store.saveMember({organizationId:'one',actorId:'admin1',member:member('newadmin',{}, {admin:true})});
+ store.saveMember({organizationId:'one',actorId:'newadmin',member:member('admin1',{}, {name:'Admin A',nickname:'A',email:'admin@example.test',admin:false})});
+ assert.equal(store.overview('one','newadmin').users.filter(x=>x.admin).length,1);
+ assert.equal(store.organizationsFor('admin2')[0].id,'two');
+});
+test('same account in separate organizations has independent roles and seats',t=>{
+ const {store}=fixture(t);
+ store.setupOrganization({organizationId:'two',name:'Lab B',owner:{accountId:'admin2',name:'Admin B',nickname:'B',email:'admin2@example.test'}});
+ buy(store,'evt-one','Single',['goflo']);
+ store.saveMember({organizationId:'one',actorId:'admin1',member:member('scientist',{goflo:'Analyst'})});
+ assert.throws(()=>store.saveMember({organizationId:'two',actorId:'admin2',member:member('scientist',{goflo:'Reviewer'})}),/app_seats_exhausted/);
+ buy(store,'evt-two','Single',['goflo'],1,'two');
+ store.saveMember({organizationId:'two',actorId:'admin2',member:member('scientist',{goflo:'Reviewer'})});
+ assert.equal(store.accessFor({organizationId:'one',accountId:'scientist',appId:'goflo'}).role,'Analyst');
+ assert.equal(store.accessFor({organizationId:'two',accountId:'scientist',appId:'goflo'}).role,'Reviewer');
+});
+test('private SQLite root and file permissions',t=>{
+ const {dbPath}=fixture(t);assert.equal(statSync(dbPath).mode&0o077,0);
+ assert.throws(()=>createOrganizationStore({databasePath:'relative.sqlite'}),/private_path_required/);
+ assert.throws(()=>createOrganizationStore({databasePath:path.resolve('docs/private.sqlite')}),/private_path_required/);
+});
