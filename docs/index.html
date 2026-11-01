@@ -19,19 +19,6 @@ html:not([data-theme="dark"]) body.homepage-exact .header .nav .nav-apps-panel a
   -webkit-text-fill-color:#006d89;
 }
 
-/* Correct the embedded tagline in the approved homepage hero without changing the artwork.
-   The screenshot-based hero has rasterized type; this covers and replaces only its second caption line. */
-body.homepage-exact .home-mockup-exact .home-mockup-copy-fix {
- position:absolute;z-index:2;
- left:5.4%;top:39.15%;width:34.5%;height:3.8%;
- background:linear-gradient(90deg,#001d32 0%,#011e34 48%,#021d35 80%,#021d33 100%);
- -webkit-mask-image:linear-gradient(90deg,#000 0%,#000 96%,transparent 100%);
- mask-image:linear-gradient(90deg,#000 0%,#000 96%,transparent 100%);
- display:block;white-space:nowrap;
- font:400 1.17vw/1.6 Inter,ui-sans-serif,system-ui,sans-serif;
- letter-spacing:0;color:#e3e8ed;pointer-events:none;
-}
-
 /* Contact section separator: echo the Discover the apps cyan strokes and sparkle. */
 body.homepage-exact #contact .contact-decor-divider{
  position:relative;display:flex;align-items:center;gap:12px;
@@ -68,9 +55,8 @@ body.homepage-exact #contact .contact-decor-rays{
  body.homepage-exact #contact .contact-decor-rays{left:calc(100% - 56px);top:-16px;width:47px;height:32px}
 }
 </style><script src="assets/site.js?v=duckbio-contact-subject-20261031-1" defer></script><link rel="icon" type="image/svg+xml" sizes="any" media="(prefers-color-scheme: light)" href="assets/duckbio-favicon-v2.svg"><link rel="icon" type="image/svg+xml" sizes="any" media="(prefers-color-scheme: dark)" href="assets/duckbio-favicon-v2-dark.svg"><script src="assets/contact.js?v=duckbio-contact-send-20261029" defer></script></head><body class="homepage-exact"><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="support.html">Support</a><a href="index.html#contact">Contact</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main"><section class="home-mockup-exact" aria-label="DuckBio homepage hero">
-<img class="home-mockup-image" src="assets/duckbio-hero-no-gloves-20261101.avif" width="1400" height="788" alt="" fetchpriority="high" decoding="async">
+<img class="home-mockup-image" src="assets/duckbio-hero-realistic-20261101.avif" width="1400" height="788" alt="" fetchpriority="high" decoding="async">
 <div class="sr-only"><h1>Time to get ducked up.</h1><p>Simple browser-based apps. Suitable for organisations of any size, and single users looking to simplify their work.</p><h2>Suitable for:</h2><ul><li>Sample management</li><li>Flow cytometry analysis</li><li>Lab notebooks</li><li>Method validation</li><li>Document control</li><li>Training</li></ul></div>
-<span class="home-mockup-copy-fix" aria-hidden="true">of any size, and single users looking to simplify their work.</span>
 <a class="home-mockup-hotspot home-mockup-contact" href="#contact" aria-label="Contact DuckBio"></a>
 </section>
 
