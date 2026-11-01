@@ -2509,3 +2509,18 @@ html:not([data-theme="dark"]) body:not(.homepage-exact) .footer strong{color:#14
 html:not([data-theme="dark"]) body:not(.homepage-exact) .footer p,
 html:not([data-theme="dark"]) body:not(.homepage-exact) .footer a,
 html:not([data-theme="dark"]) body:not(.homepage-exact) .footer small{color:#426779}
+
+/* 2026-11-01 day footer contrast: retain dark footer to suit white DuckBio mark */
+html:not([data-theme="dark"]) body:not(.homepage-exact) .footer{
+ background:linear-gradient(113deg,#071d35,#0c3752 66%,#08516a);
+ color:#e3f4fa;border-top:2px solid #209bb1;
+}
+html:not([data-theme="dark"]) body:not(.homepage-exact) .footer .brand,
+html:not([data-theme="dark"]) body:not(.homepage-exact) .footer h4,
+html:not([data-theme="dark"]) body:not(.homepage-exact) .footer strong{color:#f5ffff}
+html:not([data-theme="dark"]) body:not(.homepage-exact) .footer .brand em{color:#7fe6f0}
+html:not([data-theme="dark"]) body:not(.homepage-exact) .footer p,
+html:not([data-theme="dark"]) body:not(.homepage-exact) .footer nav a,
+html:not([data-theme="dark"]) body:not(.homepage-exact) .footer small,
+html:not([data-theme="dark"]) body:not(.homepage-exact) .footer .footer-bottom{color:#b7d7e5}
+html:not([data-theme="dark"]) body:not(.homepage-exact) .footer nav a:hover{color:#84fcf1}
