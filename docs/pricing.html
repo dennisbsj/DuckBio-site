@@ -696,10 +696,59 @@ body:not(.homepage-exact) .pr-hero.pr-plans-first .pr-compact-header h1 .pr-head
  }
  .pr-plans-first .pr-compact-header{margin-bottom:16px}
 }
+
+/* DuckBio Pricing accent: illustrated rays and swoosh beneath the turquoise word. */
+.pr-hero .pr-compact-header h1 .pr-heading-ducks{
+ display:inline-block;position:relative;white-space:nowrap;
+}
+.pr-hero .pr-compact-header h1 .pr-heading-ducks::after{
+ content:"";position:absolute;left:-3%;bottom:-.145em;
+ width:108%;height:clamp(4px,.12em,9px);
+ background:linear-gradient(90deg,#16bbcf,#82fbeb 77%,transparent);
+ border-radius:70% 35% 65% 30%;transform:rotate(-3deg);
+ pointer-events:none;
+}
+.pr-hero .pr-compact-header h1 .pr-heading-rays{
+ position:absolute;width:.62em;height:.51em;
+ right:-.37em;top:-.41em;
+ color:#70efe9;overflow:visible;
+ pointer-events:none;
+}
+.pr-hero .pr-compact-header{padding-top:clamp(15px,1.5vw,24px)}
+/* Highlight actual savings while users choose apps; avoid displaying a discount for 1 app. */
+#choose-apps .pr-toolbar-discount{
+ display:inline-flex;align-items:center;
+ border:1px solid #65f3e6;border-radius:999px;
+ background:#a8fff0;color:#053d4b;
+ padding:7px 12px;font-size:12px;font-weight:900;
+ letter-spacing:.025em;line-height:1.2;
+ box-shadow:0 0 16px rgba(88,244,225,.17);
+}
+#choose-apps .pr-select-toolbar{flex-wrap:wrap}
+#choose-apps .pr-select-savings{
+ display:flex;flex-direction:column;gap:4px;
+ margin:13px 0 12px;padding:15px 17px;
+ border:1px solid #5aeee1;border-radius:13px;
+ background:linear-gradient(116deg,#b7fff1,#69e8df);
+ color:#073b4e;
+ box-shadow:0 9px 24px rgba(7,165,175,.15);
+}
+#choose-apps .pr-select-savings-label{font-size:10px;font-weight:900;letter-spacing:.11em;color:#155968}
+#choose-apps .pr-select-savings strong#pr-select-savings-amount{
+ font-size:clamp(25px,3vw,36px);line-height:1.12;
+ color:#07354b;letter-spacing:-.025em;
+}
+#choose-apps .pr-select-savings-detail{font-size:12px;font-weight:800;color:#155968;line-height:1.5}
+#choose-apps .pr-toolbar-discount[hidden],#choose-apps .pr-select-savings[hidden]{display:none!important}
+@media(max-width:760px){
+ #choose-apps .pr-toolbar-discount{font-size:10px;padding:6px 9px}
+ #choose-apps .pr-select-savings{padding:12px 13px;margin:10px 0}
+ .pr-hero .pr-compact-header h1 .pr-heading-rays{right:-.31em;top:-.36em}
+}
 </style></head><body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="wrap head"><a class="brand" href="index.html" aria-label="DuckBio home"><img class="brand-mark brand-mark--light" src="assets/duckbio-brand-nofill.svg" alt="" width="43" height="43"><img class="brand-mark brand-mark--dark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><nav class="nav" id="nav" aria-label="Main navigation"><a href="index.html">Home</a><details class="nav-apps-menu"><summary>Apps</summary><div class="nav-apps-panel"><a href="apps.html">Workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a></div></details><a href="pricing.html">Pricing</a><a href="index.html#contact">Contact</a><a href="support.html">Support</a></nav><div class="head-actions"><button class="small-btn menu-btn" aria-label="Toggle navigation" aria-controls="nav" aria-expanded="false" data-menu>☰</button><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" title="Switch to night mode" aria-pressed="false"><span class="theme-icon" data-theme-icon aria-hidden="true">☾</span></button></div></div></header><main id="main">
 <section class="pr-hero pr-plans-first" id="plans"><div class="wrap">
  <div class="pr-compact-header">
- <h1>Get your <span class="pr-heading-ducks">ducks</span> in a row.</h1>
+ <h1>Get your <span class="pr-heading-ducks">ducks<svg class="pr-heading-rays" viewBox="0 0 94 72" fill="none" aria-hidden="true" focusable="false"><path d="M13 44 L4 31 M37 24 L37 7 M64 29 L78 12 M75 52 L91 48" stroke="currentColor" stroke-width="7" stroke-linecap="round"/></svg></span> in a row.</h1>
  
 </div>
 <div class="pr-currency-top"><div class="pr-currency-toggle" role="group" aria-label="Choose display currency"><button type="button" data-currency="DKK" aria-pressed="false">DKK</button><button type="button" data-currency="EUR" aria-pressed="true">EUR</button><button type="button" data-currency="USD" aria-pressed="false">USD</button></div></div>
@@ -714,8 +763,7 @@ body:not(.homepage-exact) .pr-hero.pr-plans-first .pr-compact-header h1 .pr-head
 </div></section>
 
 <section class="section" id="choose-apps"><div class="wrap">
- <div class="pr-compact-discounts-heading"><div><h2>Choose your apps</h2><p>Select your apps and licensed users to calculate one monthly price.</p></div></div>
- <div class="pr-select-toolbar"><button type="button" id="pr-select-all" class="pr-select-all" aria-pressed="false">Select all apps</button><span id="pr-select-selection-count" role="status" aria-live="polite">0 of 6 apps selected</span></div>
+ <div class="pr-select-toolbar"><button type="button" id="pr-select-all" class="pr-select-all" aria-pressed="false">Select all apps</button><span id="pr-select-selection-count" role="status" aria-live="polite">0 of 6 apps selected</span><span class="pr-toolbar-discount" id="pr-toolbar-discount" hidden></span></div>
  <div class="pr-select-layout">
  <div class="pr-select-grid" role="group" aria-label="Choose DuckBio apps">
  <div class="pr-select-card"><button type="button" class="pr-select-button" data-select-app="labduck" data-app-name="LabDuck" aria-pressed="false" aria-label="Select LabDuck"><span class="pr-select-check" aria-hidden="true">✓</span><img class="suite-sprite logo-limsduck" src="assets/icons/transparent.svg" alt=""><span class="pr-select-category"><b>LAB</b>ORATORY INFORMATION MANAGEMENT SYSTEM</span><span class="pr-select-name"><b>Lab</b>Duck</span></button><a class="pr-select-details" href="labduck.html" aria-label="Learn more about LabDuck">Learn more →</a></div>
@@ -734,6 +782,11 @@ body:not(.homepage-exact) .pr-hero.pr-plans-first .pr-compact-header h1 .pr-head
 <span class="pr-select-kicker">Estimated monthly price</span>
 <strong id="pr-select-total">Choose an app</strong>
 <p id="pr-select-breakdown">Prices exclude VAT.</p>
+<div class="pr-select-savings" id="pr-select-savings" hidden>
+ <span class="pr-select-savings-label">YOUR MONTHLY SAVINGS</span>
+ <strong id="pr-select-savings-amount"></strong>
+ <span class="pr-select-savings-detail" id="pr-select-savings-detail"></span>
+</div>
 <div class="pr-select-actions"><button class="btn btn-secondary" type="button" id="pr-select-copy" disabled>Export estimate .xlsx</button></div>
 <p class="pr-select-note" id="pr-select-note">Estimate only. Checkout is not live; no payment or subscription is created. <a href="support.html#pricing-and-subscriptions">Subscription FAQs</a></p>
 <span class="pr-copy-status" role="status" id="pr-select-status"></span>
@@ -826,6 +879,11 @@ let selectionEstimate=null;
 const selectedLabel=(count)=>count===1?"Single":count===6?"Bundle":count>=2?"Mixed":"No apps selected";
 function renderSelection(){
  const count=selectedAppIds.size;
+ const savingsBox=find("pr-select-savings");
+ savingsBox.hidden=true;
+ const appBadge=find("pr-toolbar-discount");
+ appBadge.hidden=count<2;
+ if(count>=2)appBadge.textContent=pct(bundleDiscount(count))+" OFF · APP SAVING";
  const allSelected=count===appSelections.length;
  const selectAllButton=find("pr-select-all");
  selectAllButton.textContent=allSelected?"Deselect all apps":"Select all apps";
@@ -848,12 +906,20 @@ function renderSelection(){
  const custom=users>=50,organisationRate=custom?0:users>=20?20:users>=5?10:0;
  const totalEUR=priceEUR*(1-organisationRate/100);
  find("pr-select-total").textContent=custom?"Individual quote":formatEUR(totalEUR)+" / month";
- const savingsDetails=[];
- if(count>1)savingsDetails.push("App saving "+pct(bundleDiscount(count))+": "+formatEUR(unitEUR(1)*count*users-priceEUR));
- if(organisationRate)savingsDetails.push("Team saving "+pct(organisationRate)+": "+formatEUR(priceEUR-totalEUR));
+ const appSavingsEUR=unitEUR(1)*count*users-priceEUR;
+ const teamSavingsEUR=priceEUR-totalEUR;
+ const monthlySavingsEUR=custom?appSavingsEUR:appSavingsEUR+teamSavingsEUR;
+ if(monthlySavingsEUR>0.001){
+  savingsBox.hidden=false;
+  find("pr-select-savings-amount").textContent=formatEUR(monthlySavingsEUR);
+  const labels=[];
+  if(count>1)labels.push(pct(bundleDiscount(count))+" app discount");
+  if(organisationRate)labels.push(pct(organisationRate)+" team discount");
+  find("pr-select-savings-detail").textContent=labels.join(" + ")+(custom?" · Before custom quote":"");
+ }
  find("pr-select-breakdown").textContent=custom?
-  "50+ users: request a custom quote. Bundle-adjusted baseline "+formatEUR(priceEUR)+" /month · Excl. VAT.":
-  (savingsDetails.length?savingsDetails.join(" · "):"Standard price")+" · Excl. VAT.";
+  "50+ users: contact us for your final custom price. Excl. VAT.":
+  "Plan: "+selectedLabel(count)+" · "+users+" "+(users===1?"user":"users")+" · Excl. VAT.";
  selectionEstimate={apps:count,users,custom,baseEUR:unitEUR(1)*count*users,suiteEUR:priceEUR,finalEUR:totalEUR,orgRate:organisationRate};
 }
 find("pr-select-all").addEventListener("click",()=>{
