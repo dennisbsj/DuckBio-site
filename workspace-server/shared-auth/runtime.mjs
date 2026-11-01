@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createAccountService } from './account-service.mjs';
 import { createIdentityStore } from './identity-store.mjs';
 import { createSqliteAuthStores } from './sqlite-store.mjs';
+import { createOrganizationStore } from '../organization-store.mjs';
 import { createSharedAuthGateway, createProtectedStaticHandler } from './gateway.mjs';
 
 function privatePath(value, label) {
@@ -51,12 +52,13 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
   const buildVersion = String(actual.SUITE_BUILD_SHA || 'development');
   if (!/^[A-Za-z0-9._-]{1,80}$/.test(buildVersion)) throw new Error('Invalid reviewed build identity');
   const auth = createSqliteAuthStores({ databasePath: privatePath(actual.SUITE_AUTH_DB_PATH, 'session database'), clock });
-  let identityStore; let nativeStore; let requestHandler;
+  let identityStore; let nativeStore; let organizationStore; let requestHandler;
   try {
     if (actual.SUITE_MODE === 'broker') {
       identityStore = createIdentityStore({ databasePath: privatePath(actual.SUITE_IDENTITY_DB_PATH, 'identity database'), clock });
+      if(actual.SUITE_ORGANIZATION_DB_PATH) organizationStore = createOrganizationStore({databasePath:privatePath(actual.SUITE_ORGANIZATION_DB_PATH,'organization database'),clock});
       if (actual.SUITE_SETUP_TOKEN) identityStore.configureBootstrapToken(actual.SUITE_SETUP_TOKEN, { expiresAt: clock() + 7 * 24 * 60 * 60_000 });
-      const service = createAccountService({ origin: actual.SUITE_ORIGIN, issuer: actual.SUITE_ISSUER || actual.SUITE_ORIGIN, clients: JSON.parse(actual.SUITE_CLIENTS || 'null'), identityStore, authStore: auth.brokerStore, assetRoot: privatePath(actual.SUITE_ASSET_ROOT, 'login frontend'), buildVersion, clock, fetchImpl,
+      const service = createAccountService({ origin: actual.SUITE_ORIGIN, issuer: actual.SUITE_ISSUER || actual.SUITE_ORIGIN, clients: JSON.parse(actual.SUITE_CLIENTS || 'null'), identityStore, organizationStore, authStore: auth.brokerStore, assetRoot: privatePath(actual.SUITE_ASSET_ROOT, 'login frontend'), buildVersion, clock, fetchImpl,
         // Passenger supplies the request socket; arbitrary forwarded headers do
         // not select limiter buckets. Account+address buckets isolate users.
         getClientAddress: req => req.socket.remoteAddress,
@@ -104,13 +106,13 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
         await staticHandler(req, res);
       };
     } else throw new Error('Explicit suite runtime mode required');
-  } catch (error) { identityStore?.close(); nativeStore?.close(); auth.close(); throw error; }
+  } catch (error) { identityStore?.close(); organizationStore?.close(); nativeStore?.close(); auth.close(); throw error; }
   const server = http.createServer(async (req, res) => {
     try { await requestHandler(req, res); }
     catch { if (!res.headersSent) json(res, 503, { error: 'unavailable' }); else if (!res.writableEnded) res.end(); }
   });
   server.requestTimeout = 15_000; server.headersTimeout = 10_000; server.maxHeadersCount = 64;
-  return Object.freeze({ server, close() { identityStore?.close(); nativeStore?.close(); auth.close(); } });
+  return Object.freeze({ server, close() { identityStore?.close(); organizationStore?.close(); nativeStore?.close(); auth.close(); } });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
