@@ -664,6 +664,67 @@ html[data-theme="dark"] .settings-menu>summary:hover{
 @media(max-width:700px){
  .app .action{font-size:11px;padding:5px 10px}
 }
+
+/* 2026-11-01 daylight Workspace: truly light app canvas and cards */
+/* Previously the mockup used one combined night/day selector. Override
+   daylight only, preserving dark mode and all interactive/modal behaviors. */
+html:not([data-theme="dark"]){background:#e7f7fc;color-scheme:light}
+html:not([data-theme="dark"]) body{background:#e7f7fc;color:#143b54}
+html:not([data-theme="dark"]) .shell{
+ background:
+  radial-gradient(ellipse at 95% 0%,rgba(30,181,199,.2),transparent 40%),
+  linear-gradient(132deg,#e4f9fc,#cfeef7 65%,#ebf9fc);
+ color:#143b54;
+}
+html:not([data-theme="dark"]) .bar{
+ background:linear-gradient(108deg,#144665,#1b6883 62%,#20889a);
+ border-bottom:2px solid #4bd2d4;
+}
+html:not([data-theme="dark"]) .bar .brand{color:#fff}
+html:not([data-theme="dark"]) .bar .brand em{color:#a1fcf2}
+html:not([data-theme="dark"]) .main-title h1{color:#123a52}
+html:not([data-theme="dark"]) .main-title p{color:#476b80}
+html:not([data-theme="dark"]) .kicker{color:#0a7e9b}
+html:not([data-theme="dark"]) .count{
+ background:#fff;color:#0c6984;
+ border:1px solid #8bcbd7;
+}
+html:not([data-theme="dark"]) .app{
+ background:linear-gradient(146deg,#fff,#e9f7fc);
+ color:#1a4159;
+ border:1px solid #9bcddd;
+ box-shadow:0 8px 23px rgba(18,103,143,.13);
+}
+html:not([data-theme="dark"]) .app:hover,
+html:not([data-theme="dark"]) .app:focus-visible{
+ background:linear-gradient(147deg,#fff,#d9f7fa);
+ border-color:#2fb3c4;
+ box-shadow:0 12px 27px rgba(24,114,159,.19);
+}
+html:not([data-theme="dark"]) .app .launcher-app-name,
+html:not([data-theme="dark"]) .app .launcher-app-name b{color:#143c55}
+html:not([data-theme="dark"]) .app .launcher-app-category{color:#087e9b}
+html:not([data-theme="dark"]) .app small{color:#4d6e7e}
+html:not([data-theme="dark"]) .app .action{
+ color:#0a4960;background:#a0f0e9;border:1px solid #70d5d7;
+}
+html:not([data-theme="dark"]) .notice{
+ color:#476a7e;background:#f5fdff;border:1px solid #b1dce5;
+}
+html:not([data-theme="dark"]) .bar-icon-button,
+html:not([data-theme="dark"]) .settings-menu>summary{
+ border-color:#9adce5;color:#fff;background:rgba(9,63,91,.27);
+}
+html:not([data-theme="dark"]) .bar-icon-button:hover,
+html:not([data-theme="dark"]) .settings-menu>summary:hover{
+ background:rgba(9,63,91,.51);border-color:#c5fafa;
+}
+/* Preserve the existing legible pale settings and dialog surfaces in day. */
+html:not([data-theme="dark"]) .settings-panel{
+ background:#fff;color:#143d57;border-color:#9ccbd9;
+}
+html:not([data-theme="dark"]) .settings-panel button{color:#165069}
+html:not([data-theme="dark"]) .settings-panel button:hover{background:#e5f6fa}
 </style>
 </head>
 <body data-workspace-mode="preview">
