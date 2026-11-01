@@ -89,10 +89,10 @@ export function createAccountService({ origin, issuer = origin, clients, identit
   function errorResponse(res, error) {
     let status = error.status ?? 503; let code = error.code ?? 'unavailable';
     if (error instanceof OrganizationError) {
-      status = code === 'access_denied' ? 403
-        : ['app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required'].includes(code) ? 409
+      status = ['access_denied','invalid_invitation'].includes(code) ? 403
+        : ['app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required','invitation_exists','member_exists'].includes(code) ? 409
         : 400;
-      if (!['access_denied','app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required','invalid_permission','invalid_roles','invalid_member'].includes(code)) code = 'invalid_input';
+      if (!['access_denied','app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required','invitation_exists','member_exists','member_not_found','invalid_invitation','invalid_permission','invalid_roles','invalid_member'].includes(code)) code = 'invalid_input';
     }
     if (error instanceof IdentityStoreError) {
       if (code === 'invalid_setup_token') status = 403;
@@ -116,13 +116,34 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           send(res, 200, { status: 'ok', mode: 'local', buildVersion, configured: identityStore.listUsers().length > 0 }); return true;
         }
         if (!route.startsWith('/api/suite/')) return staticFile(req, res, route);
-        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST' };
+        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST' };
         if (!methods[route]) return false;
         if (![methods[route]].flat().includes(req.method)) throw new ServiceError(405, 'method_not_allowed');
-        if (route !== '/api/suite/admin/native-users' && parsed.search) throw new ServiceError(400, 'invalid_input');
+        if (!['/api/suite/admin/native-users','/api/suite/organization/invite/preview'].includes(route) && parsed.search) throw new ServiceError(400, 'invalid_input');
         if (req.method !== 'GET') await broker.verifyCsrf(req);
         const body = req.method === 'GET' ? null : await jsonBody(req);
-        if (route === '/api/suite/setup') {
+        if (route === '/api/suite/organization/invite/preview') {
+          if(!organizationStore || parsed.searchParams.getAll('token').length!==1 || [...parsed.searchParams.keys()].some(x=>x!=='token'))throw new ServiceError(400,'invalid_input');
+          const invite=organizationStore.previewInvitation(parsed.searchParams.get('token'));
+          if(!invite)throw new ServiceError(403,'invalid_invitation');
+          send(res,200,{invitation:invite});
+        } else if (route === '/api/suite/organization/invite/accept') {
+          if(!organizationStore)throw new ServiceError(503,'unavailable');
+          const invite=organizationStore.previewInvitation(body.token);
+          if(!invite)throw new ServiceError(403,'invalid_invitation');
+          const existingSession=await identity.getSession(req);
+          const existing=existingSession?identityStore.getUser(existingSession.subject):null;
+          if(existing && (existing.state!=='active'||existing.email!==invite.email))throw new ServiceError(403,'access_denied');
+          if(existing && organizationStore.currentSessionOrganization({sessionId:existingSession.id,accountId:existing.id}))throw new ServiceError(409,'organization_locked');
+          if(!existing && identityStore.findUserByEmail(invite.email))throw new ServiceError(409,'login_required');
+          // A new central account has no app grants. An existing central account keeps its identity.
+          // A failed organization binding leaves an account without access, never an app privilege.
+          const account=existing||await broker.credentialWork(req,invite.email,
+            ()=>identityStore.createUser({email:invite.email,displayName:invite.name,password:body.password}));
+          const assigned=organizationStore.acceptInvitation({token:body.token,accountId:account.id,email:account.email});
+          await identity.establishSession(req,res,account.id);
+          send(res,201,{account:userView(account),organization:assigned});
+        } else if (route === '/api/suite/setup') {
           const user = await broker.credentialWork(req, String(body.email ?? ''), () => identityStore.bootstrap(body.setupToken, body));
           for (const appId of (organizationStore ? [] : staticApps)) identityStore.grantAppAccess({ userId: user.id, appId, localUserId: user.id });
           await identity.establishSession(req, res, user.id); send(res, 201, { authenticated: true, user: userView(user) });
@@ -156,6 +177,17 @@ export function createAccountService({ origin, issuer = origin, clients, identit
             if (!organizationStore) throw new ServiceError(503,'unavailable');
             requireSelection(body.organizationId);
             send(res,200,organizationStore.overview(body.organizationId,user.id));
+          }
+          else if (route === '/api/suite/organization/invite') {
+            requireSelection(body.organizationId);
+            const issued=organizationStore.issueInvitation({organizationId:body.organizationId,actorId:user.id,email:body.email,name:body.name,nickname:body.nickname,admin:body.admin===true});
+            const inviteUrl=new URL('/workspace',origin);inviteUrl.searchParams.set('invite',issued.token);
+            send(res,201,{invitationUrl:inviteUrl.href,expiresAt:issued.expiresAt});
+          }
+          else if (route === '/api/suite/organization/user/remove') {
+            requireSelection(body.organizationId);
+            const removed=organizationStore.removeMember({organizationId:body.organizationId,actorId:user.id,accountId:body.accountId});
+            send(res,200,removed);
           }
           else if (route === '/api/suite/organization/matrix') {
             requireSelection(body.organizationId);
