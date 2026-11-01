@@ -49,6 +49,7 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
     if (!config || typeof config !== 'object' || Array.isArray(config) || Object.entries(config).some(([key, value]) => !/^SUITE_[A-Z0-9_]+$/.test(key) || typeof value !== 'string')) throw new Error('Invalid private suite configuration');
     actual = { ...env, ...config };
   }
+  if (actual.SUITE_MODE === 'broker' && actual.NODE_ENV === 'production' && !actual.SUITE_ORGANIZATION_DB_PATH) throw new Error('A private organization database is required for production Workspace login');
   const buildVersion = String(actual.SUITE_BUILD_SHA || 'development');
   if (!/^[A-Za-z0-9._-]{1,80}$/.test(buildVersion)) throw new Error('Invalid reviewed build identity');
   const auth = createSqliteAuthStores({ databasePath: privatePath(actual.SUITE_AUTH_DB_PATH, 'session database'), clock });
