@@ -62,6 +62,22 @@ function renderInviteRoleFields(){
   root.append(card);
  }
 }
+function renderAudit(events){
+ const root=$('audit-events');root.replaceChildren();
+ for(const event of events){
+  const action=event.action.split('.').map(x=>x.charAt(0).toUpperCase()+x.slice(1)).join(' ');
+  const actor=state.overview.users.find(u=>u.accountId===event.actorId)?.name||event.actorId;
+  const subject=state.overview.users.find(u=>u.accountId===event.subject)?.name||event.subject;
+  const row=el('tr');
+  row.append(el('td',new Date(event.at).toLocaleString('en-GB')),el('td',actor),el('td',action),el('td',subject));
+  root.append(row);
+ }
+ if(!events.length){const row=el('tr'),cell=el('td','No recorded changes yet.');cell.colSpan=4;row.append(cell);root.append(row);}
+}
+async function refreshAudit(){
+ const data=await request('/api/suite/organization/audit',{organizationId:state.selected});
+ renderAudit(data.events);
+}
 async function refreshInvitations(){
  const data=await request('/api/suite/organization/invite/list',{organizationId:state.selected});
  renderInvitations(data.invitations);
@@ -101,7 +117,7 @@ function edit(user){
 async function overview(orgId){
  const view=await request('/api/suite/organization/overview',{organizationId:orgId});
  state.overview=view;$('organization-name').textContent=view.organization.name;
- renderSeats();renderMembers();await refreshInvitations();$('edit-panel').hidden=true;$('buy-panel').hidden=true;$('invite-panel').hidden=true;
+ renderSeats();renderMembers();await refreshInvitations();await refreshAudit();$('edit-panel').hidden=true;$('buy-panel').hidden=true;$('invite-panel').hidden=true;
  state.matrix=null;
  status('Workspace data loaded from the private server.');
 }
@@ -329,7 +345,7 @@ $('invite-form').addEventListener('submit',async event=>{
    email:$('invite-email').value.trim(),admin:$('invite-admin').checked,roles});
   $('invitation-link').value=result.invitationUrl;
   $('invite-result').hidden=false;await refreshInvitations();
-  state.overview=await request('/api/suite/organization/overview',{organizationId:state.selected});renderSeats();
+  state.overview=await request('/api/suite/organization/overview',{organizationId:state.selected});renderSeats();await refreshAudit();
   status('Invitation created. Selected app seats are reserved until acceptance, revocation or expiry.');
  }catch(e){status(e.message);}finally{state.busy=false;}
 });

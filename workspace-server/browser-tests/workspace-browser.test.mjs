@@ -208,6 +208,18 @@ test('admin selects a DuckNote app role while inviting and it is assigned only a
  assert.equal(org.accessFor({organizationId:'lab-a',accountId:created.id,appId:'eel'}).role,'scientist');
  assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').reserved,0);
 });
+test('audit history is visible to admins after invitation changes in the real browser',{timeout:45000},async t=>{
+ const {page,org,owner}=await fixture(t);
+ await signIn(page);
+ await page.getByRole('button',{name:'Invite user'}).click();
+ await page.locator('#invite-name').fill('Audit researcher');
+ await page.locator('#invite-nickname').fill('Audit');
+ await page.locator('#invite-email').fill('audit@example.test');
+ await page.getByRole('button',{name:'Create invitation'}).click();
+ await page.locator('#invite-result:not([hidden])').waitFor();
+ await page.locator('#audit-events').getByText('Invitation Issued').waitFor();
+ assert(org.auditLog('lab-a',owner.id).some(event=>event.action==='invitation.issued'));
+});
 test('removing a member from admin roster revokes their org access without deleting central identity',{timeout:45000},async t=>{
  const {page,org,identity,worker,owner}=await fixture(t);
  await signIn(page);

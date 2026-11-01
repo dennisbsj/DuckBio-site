@@ -41,6 +41,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     'CREATE TABLE IF NOT EXISTS session_organizations(session_id TEXT PRIMARY KEY,account TEXT NOT NULL,org TEXT NOT NULL,selected_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS permission_overrides(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,permission TEXT NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),PRIMARY KEY(org,account,app,permission),FOREIGN KEY(org,account,app) REFERENCES assignments(org,account,app) ON DELETE CASCADE)',
     'CREATE TABLE IF NOT EXISTS organization_invites(token_hash TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),issued_by TEXT NOT NULL,email TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),expires_at INTEGER NOT NULL,UNIQUE(org,email))',
+    'CREATE TABLE IF NOT EXISTS organization_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,org TEXT NOT NULL REFERENCES organizations(id),actor TEXT NOT NULL,action TEXT NOT NULL,subject TEXT NOT NULL,details TEXT NOT NULL CHECK(json_valid(details)),recorded_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS subscription_drafts(id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),status TEXT NOT NULL CHECK(status IN (\'draft\',\'canceled\')),created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)'
   ].join(';')+';');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
@@ -49,6 +50,8 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
   function requireAdmin(org,actor){
     if(!safeId(org)||!safeId(actor)||!db.prepare('SELECT 1 FROM members WHERE org=? AND account=? AND admin=1').get(org,actor))fail('access_denied');
   }
+  // Append inside the same write transaction so rolled-back changes leave no audit event.
+  const audit=(org,actor,action,subject,details={})=>db.prepare('INSERT INTO organization_audit(org,actor,action,subject,details,recorded_at) VALUES(?,?,?,?,?,?)').run(org,actor,action,subject,JSON.stringify(details),clock());
   const pendingSeats=(org,app)=>db.prepare("SELECT count(*) AS n FROM organization_invites WHERE org=? AND expires_at>? AND json_type(roles, '$.' || ?) IS NOT NULL").get(org,clock(),app).n;
   const roles=(org,account)=>Object.fromEntries(db.prepare('SELECT app,role FROM assignments WHERE org=? AND account=?').all(org,account).map(x=>[x.app,x.role]));
   const view=(org,row)=>({accountId:row.account,name:row.name,nickname:row.nickname,email:row.email,admin:Boolean(row.admin),roles:roles(org,row.account)});
@@ -60,8 +63,14 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         db.prepare('INSERT INTO organizations VALUES(?,?)').run(organizationId,name.trim());
         db.prepare('INSERT INTO members VALUES(?,?,?,?,?,1)').run(organizationId,owner.accountId,owner.name.trim(),owner.nickname.trim(),owner.email.trim().toLowerCase());
         for(const app of APPLICATIONS)db.prepare('INSERT INTO seats VALUES(?,?,0)').run(organizationId,app.id);
+        audit(organizationId,owner.accountId,'organization.created',organizationId,{name:name.trim()});
         return {id:organizationId,name:name.trim()};
       });
+    },
+    auditLog(organizationId,actorId){
+      requireAdmin(organizationId,actorId);
+      return db.prepare('SELECT id,actor,action,subject,details,recorded_at FROM organization_audit WHERE org=? ORDER BY id DESC LIMIT 50').all(organizationId)
+        .map(row=>({id:row.id,actorId:row.actor,action:row.action,subject:row.subject,details:JSON.parse(row.details),at:row.recorded_at}));
     },
     organizationsFor(account){
       if(!safeId(account))return [];
@@ -133,6 +142,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
           if(requested[app.id])db.prepare('INSERT INTO assignments(org,account,app,role) VALUES(?,?,?,?) ON CONFLICT(org,account,app) DO UPDATE SET role=excluded.role').run(organizationId,member.accountId,app.id,requested[app.id]);
           else db.prepare('DELETE FROM assignments WHERE org=? AND account=? AND app=?').run(organizationId,member.accountId,app.id);
         }
+        audit(organizationId,actorId,prior?'member.updated':'member.added',member.accountId,{before:prior?{roles:previousRoles,admin:Boolean(prior.admin)}:null,after:{roles:requested,admin:member.admin}});
         return view(organizationId,db.prepare('SELECT * FROM members WHERE org=? AND account=?').get(organizationId,member.accountId));
       });
     },
@@ -168,7 +178,9 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         const row=db.prepare('SELECT admin FROM members WHERE org=? AND account=?').get(organizationId,accountId);
         if(!row)fail('member_not_found');
         if(row.admin && db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1').get(organizationId).n===1)fail('last_organization_admin');
+        const removedRoles=roles(organizationId,accountId);
         db.prepare('DELETE FROM members WHERE org=? AND account=?').run(organizationId,accountId);
+        audit(organizationId,actorId,'member.removed',accountId,{roles:removedRoles});
         return {removed:true,accountId};
       });
     },
@@ -187,6 +199,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         }
         const token=randomBytes(32).toString('base64url'),expiresAt=clock()+7*24*60*60*1000;
         db.prepare('INSERT INTO organization_invites(token_hash,org,issued_by,email,name,nickname,admin,expires_at,roles) VALUES(?,?,?,?,?,?,?,?,?)').run(inviteHash(token),organizationId,actorId,normalized,name.trim(),nickname.trim(),admin?1:0,expiresAt,JSON.stringify(requested));
+        audit(organizationId,actorId,'invitation.issued',normalized,{roles:requested,admin,expiresAt});
         return {token,expiresAt};
       });
     },
@@ -199,7 +212,9 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
       if(!safeEmail(email))fail('invalid_invitation');
       return tx(()=>{
         requireAdmin(organizationId,actorId);
-        const result=db.prepare('DELETE FROM organization_invites WHERE org=? AND email=? AND expires_at>?').run(organizationId,email.trim().toLowerCase(),clock());
+        const normalized=email.trim().toLowerCase();
+        const result=db.prepare('DELETE FROM organization_invites WHERE org=? AND email=? AND expires_at>?').run(organizationId,normalized,clock());
+        if(result.changes===1)audit(organizationId,actorId,'invitation.revoked',normalized);
         return {revoked:result.changes===1};
       });
     },
@@ -221,6 +236,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         db.prepare('INSERT INTO members(org,account,name,nickname,email,admin) VALUES(?,?,?,?,?,?)').run(invitation.organizationId,accountId,invitation.name,invitation.nickname,invitation.email,invitation.admin?1:0);
         for(const [app,role] of Object.entries(assignedRoles))
           db.prepare('INSERT INTO assignments(org,account,app,role) VALUES(?,?,?,?)').run(invitation.organizationId,accountId,app,role);
+        audit(invitation.organizationId,accountId,'invitation.accepted',accountId,{roles:assignedRoles,admin:invitation.admin});
         return {organizationId:invitation.organizationId,accountId,admin:invitation.admin,roles:assignedRoles};
       });
     },
@@ -244,6 +260,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         const baseline=allowed.includes('*')||allowed.includes(permission);
         if(enabled===baseline)db.prepare('DELETE FROM permission_overrides WHERE org=? AND account=? AND app=? AND permission=?').run(organizationId,accountId,appId,permission);
         else db.prepare('INSERT INTO permission_overrides(org,account,app,permission,enabled) VALUES(?,?,?,?,?) ON CONFLICT(org,account,app,permission) DO UPDATE SET enabled=excluded.enabled').run(organizationId,accountId,appId,permission,enabled?1:0);
+        audit(organizationId,actorId,'permission.updated',accountId,{appId,permission,enabled});
         return {organizationId,accountId,appId,permission,enabled};
       });
     },
