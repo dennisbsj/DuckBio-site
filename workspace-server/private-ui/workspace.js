@@ -34,8 +34,9 @@ function renderMembers(){
   name.append(el('strong',user.name),el('small',user.email));
   roles.textContent=Object.entries(user.roles).map(([id,role])=>state.overview.apps.find(a=>a.id===id)?.name+' ('+role+')').join(', ')||'No access';
   controls.append(button('Edit permissions',()=>edit(user)));
+  controls.append(button(user.active?'Deactivate':'Reactivate',()=>changeUserStatus(user)));
   controls.append(button('Remove',()=>removeUser(user)));
-  row.append(name,el('td',user.nickname),el('td',user.admin?'Organization admin':'User'),roles,controls);root.append(row);
+  row.append(name,el('td',user.nickname),el('td',user.admin?'Organization admin':'User'),el('td',user.active?'Active':'Deactivated'),roles,controls);root.append(row);
  }
 }
 function renderInvitations(invitations){
@@ -88,6 +89,15 @@ async function revokeInvitation(invite){
   const result=await request('/api/suite/organization/invite/revoke',{organizationId:state.selected,email:invite.email});
   await overview(state.selected);
   status(result.revoked?'Invitation revoked for '+invite.email+'.':'This invitation was already inactive.');
+ }catch(e){status(e.message);}
+}
+async function changeUserStatus(user){
+ const verb=user.active?'deactivate':'reactivate';
+ if(!window.confirm('Do you want to '+verb+' '+user.name+' in this organization? Their other organization memberships are unaffected.'))return;
+ try{
+  await request('/api/suite/organization/user/active',{organizationId:state.selected,accountId:user.accountId,active:!user.active});
+  await overview(state.selected);
+  status(user.name+(user.active?' deactivated. Existing app seats remain reserved.':' reactivated.') );
  }catch(e){status(e.message);}
 }
 async function removeUser(user){

@@ -116,7 +116,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           send(res, 200, { status: 'ok', mode: 'local', buildVersion, configured: identityStore.listUsers().length > 0 }); return true;
         }
         if (!route.startsWith('/api/suite/')) return staticFile(req, res, route);
-        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST' };
+        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/user/active': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST' };
         if (!methods[route]) return false;
         if (![methods[route]].flat().includes(req.method)) throw new ServiceError(405, 'method_not_allowed');
         if (!['/api/suite/admin/native-users','/api/suite/organization/invite/preview'].includes(route) && parsed.search) throw new ServiceError(400, 'invalid_input');
@@ -209,6 +209,11 @@ export function createAccountService({ origin, issuer = origin, clients, identit
             const issued=organizationStore.issueInvitation({organizationId:body.organizationId,actorId:user.id,email:body.email,name:body.name,nickname:body.nickname,admin:body.admin===true,roles:body.roles??{}});
             const inviteUrl=new URL('/workspace',origin);inviteUrl.searchParams.set('invite',issued.token);
             send(res,201,{invitationUrl:inviteUrl.href,expiresAt:issued.expiresAt});
+          }
+          else if (route === '/api/suite/organization/user/active') {
+            requireSelection(body.organizationId);
+            const updated=organizationStore.setMemberActive({...body,actorId:user.id});
+            send(res,200,{user:updated});
           }
           else if (route === '/api/suite/organization/user/remove') {
             requireSelection(body.organizationId);

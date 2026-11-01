@@ -238,6 +238,33 @@ test('organization audit read API is CSRF protected and cannot expose a differen
  assert(!JSON.stringify(events).includes(token));
  assert(!events.some(event=>event.subject==='org-b'));
 });
+test('organization member status API revokes only the selected tenant and requires live admin and CSRF',async t=>{
+ const f=await fixture(t),admin=f.browser(),workerBrowser=f.browser();
+ await admin.preflight();await workerBrowser.preflight();
+ const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
+ const worker=await f.identityStore.createUser({email:'worker@example.test',displayName:'Worker',password:'Worker password 12345'});
+ for(const [id,name] of [['org-a','A'],['org-b','B']]){
+  f.organizationStore.setupOrganization({organizationId:id,name,owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:owner.email}});
+  f.organizationStore.applyVerifiedSeatPurchase({reference:'trusted-'+id,organizationId:id,plan:'Single',apps:['eel'],seats:1});
+  f.organizationStore.saveMember({organizationId:id,actorId:owner.id,member:{accountId:worker.id,name:'Worker',nickname:'Worker',email:worker.email,admin:false,roles:{eel:'scientist'}}});
+ }
+ assert.equal((await admin.call('/api/suite/organization/user/active',{organizationId:'org-a',accountId:worker.id,active:false})).status,403);
+ await admin.call('/api/suite/organization/select',{organizationId:'org-a'});
+ assert.equal((await admin.call('/api/suite/organization/user/active',{organizationId:'org-a',accountId:worker.id,active:false},'POST',false)).status,403);
+ assert.equal((await admin.call('/api/suite/organization/user/active',{organizationId:'org-b',accountId:worker.id,active:false})).status,403);
+ assert.equal((await admin.call('/api/suite/organization/user/active',{organizationId:'org-a',accountId:owner.id,active:false})).status,409);
+ assert.equal((await admin.call('/api/suite/organization/user/active',{organizationId:'org-a',accountId:worker.id,active:false})).status,200);
+ assert.equal(f.organizationStore.accessFor({organizationId:'org-a',accountId:worker.id,appId:'eel'}),null);
+ assert.equal(f.organizationStore.accessFor({organizationId:'org-b',accountId:worker.id,appId:'eel'}).role,'scientist');
+ await workerBrowser.call('/api/suite/account/login',{email:'worker@example.test',password:'Worker password 12345'});
+ const list=(await (await workerBrowser.call('/api/suite/organizations')).json()).organizations;
+ assert.deepEqual(list.map(x=>x.id),['org-b']);
+ assert.equal((await workerBrowser.call('/api/suite/organization/select',{organizationId:'org-a'})).status,403);
+ assert.equal((await workerBrowser.call('/api/suite/organization/user/active',{organizationId:'org-a',accountId:worker.id,active:true})).status,403);
+ assert.equal((await admin.call('/api/suite/organization/user/active',{organizationId:'org-a',accountId:worker.id,active:true})).status,200);
+ const after=(await (await workerBrowser.call('/api/suite/organizations')).json()).organizations;
+ assert.deepEqual(after.map(x=>x.id),['org-a','org-b']);
+});
 test('subscription draft HTTP API is CSRF protected, org locked and cannot mint seats',async t=>{
  const f=await fixture(t),admin=f.browser();await admin.preflight();
  const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
