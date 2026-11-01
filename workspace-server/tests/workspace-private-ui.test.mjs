@@ -14,5 +14,6 @@ test('private Workspace page is a real same-origin client, not an embedded publi
  assert(js.includes('.textContent'));
  assert(!js.includes('innerHTML'));
  assert(!/celluloidconsulting\.net|chosting|stripe\.com/i.test(html+js+css));
- assert(html.includes('checkout is not connected'));
+ assert(html.includes('No live billing or licence activation is enabled.'));
+ assert(html.includes('Configured Stripe TEST checkout'));
 });
