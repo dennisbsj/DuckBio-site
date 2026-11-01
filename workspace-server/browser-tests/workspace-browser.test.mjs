@@ -42,7 +42,7 @@ async function fixture(t, {multi=false}={}) {
  page.on('pageerror',e=>errors.push(String(e)));
  await page.goto(origin+'/workspace');
  await page.locator('#sign-in:not([hidden])').waitFor();
- return {page,origin,org,owner,worker,context};
+ return {page,origin,org,identity,owner,worker,context};
 }
 async function signIn(page,email='owner@example.test',password='Example passphrase 123456') {
  await page.locator('#email').fill(email);
@@ -134,4 +134,32 @@ test('admin can search and filter a real permission matrix, then persist and rev
  await page.locator('#matrix-search').fill('');
  await page.locator('#matrix-sort').selectOption('app');
  assert(await page.locator('#matrix-body tr').count()>=2);
+});
+
+test('admin creates a one-use org invitation and recipient activates new account',{timeout:45000},async t=>{
+ const {page,org,identity,owner}=await fixture(t);
+ await signIn(page);
+ await page.getByRole('button',{name:'Invite user'}).click();
+ await page.locator('#invite-name').fill('New scientist');
+ await page.locator('#invite-nickname').fill('New');
+ await page.locator('#invite-email').fill('new@example.test');
+ await page.getByRole('button',{name:'Create invitation'}).click();
+ await page.locator('#invite-result:not([hidden])').waitFor();
+ const link=await page.locator('#invitation-link').inputValue();
+ assert.match(link,/invite=/);
+ await page.getByRole('button',{name:'Sign out'}).click();
+ await page.goto(link);
+ await page.locator('#invite-accept-panel:not([hidden])').waitFor();
+ assert.equal(await page.locator('#invite-email-display').inputValue(),'new@example.test');
+ await page.locator('#invite-password').fill('Long new password 123456');
+ await page.getByRole('button',{name:'Activate invitation'}).click();
+ await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('invitation accepted'));
+ const created=identity.findUserByEmail('new@example.test');
+ assert.equal(created.state,'active');
+ assert.equal(org.organizationsFor(created.id).length,1);
+ assert.equal(org.overview('lab-a',owner.id).users.some(u=>u.accountId===created.id),true);
+ assert.equal(org.overview('lab-a',owner.id).users.find(u=>u.accountId===created.id).roles.eel,undefined);
+ await page.getByRole('button',{name:'Sign out'}).click();
+ await page.goto(link);
+ await page.locator('#sign-in:not([hidden])').waitFor();
 });
