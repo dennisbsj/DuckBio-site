@@ -90,9 +90,9 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     let status = error.status ?? 503; let code = error.code ?? 'unavailable';
     if (error instanceof OrganizationError) {
       status = code === 'access_denied' ? 403
-        : ['app_seats_exhausted','last_organization_admin','duplicate_organization_email'].includes(code) ? 409
+        : ['app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked'].includes(code) ? 409
         : 400;
-      if (!['access_denied','app_seats_exhausted','last_organization_admin','duplicate_organization_email','invalid_roles','invalid_member'].includes(code)) code = 'invalid_input';
+      if (!['access_denied','app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','invalid_roles','invalid_member'].includes(code)) code = 'invalid_input';
     }
     if (error instanceof IdentityStoreError) {
       if (code === 'invalid_setup_token') status = 403;
@@ -116,7 +116,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           send(res, 200, { status: 'ok', mode: 'local', buildVersion, configured: identityStore.listUsers().length > 0 }); return true;
         }
         if (!route.startsWith('/api/suite/')) return staticFile(req, res, route);
-        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/overview': 'POST', '/api/suite/organization/user/save': 'POST' };
+        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/user/save': 'POST' };
         if (!methods[route]) return false;
         if (![methods[route]].flat().includes(req.method)) throw new ServiceError(405, 'method_not_allowed');
         if (route !== '/api/suite/admin/native-users' && parsed.search) throw new ServiceError(400, 'invalid_input');
@@ -135,17 +135,31 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           send(res, 200, { authenticated: true, user: userView(identityStore.getUser(parent.subject)) });
         } else {
           const { parent, user } = await authenticated(req, route.startsWith('/api/suite/admin/'));
+          if (organizationStore && route.startsWith('/api/suite/admin/')) throw new ServiceError(403,'access_denied');
+          const selected = () => organizationStore?.currentSessionOrganization({sessionId:parent.id,accountId:user.id});
+          const requireSelection = organizationId => {
+            if (!organizationStore) throw new ServiceError(503,'unavailable');
+            const active = selected();
+            if (!active || active.id !== organizationId || !active.admin) throw new ServiceError(403,'access_denied');
+          };
           if (route === '/api/suite/account') send(res, 200, account(user));
           else if (route === '/api/suite/organizations') {
             if (!organizationStore) throw new ServiceError(503,'unavailable');
-            send(res,200,{organizations:organizationStore.organizationsFor(user.id)});
+            send(res,200,{organizations:organizationStore.organizationsFor(user.id),selectedOrganization:selected()});
+          }
+          else if (route === '/api/suite/organization/select') {
+            if(!organizationStore)throw new ServiceError(503,'unavailable');
+            const binding=organizationStore.selectSessionOrganization({sessionId:parent.id,accountId:user.id,organizationId:body.organizationId});
+            send(res,200,{selectedOrganization:selected(),alreadySelected:binding.alreadySelected});
           }
           else if (route === '/api/suite/organization/overview') {
             if (!organizationStore) throw new ServiceError(503,'unavailable');
+            requireSelection(body.organizationId);
             send(res,200,organizationStore.overview(body.organizationId,user.id));
           }
           else if (route === '/api/suite/organization/user/save') {
             if (!organizationStore) throw new ServiceError(503,'unavailable');
+            requireSelection(body.organizationId);
             const target = identityStore.getUser(body.member?.accountId);
             if (!target || target.state !== 'active' || target.email !== String(body.member.email||'').trim().toLowerCase())
               throw new ServiceError(400,'invalid_input');
@@ -155,7 +169,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
             await authenticated(req);
             send(res,200,{user:saved});
           }
-          else if (route === '/api/suite/account/logout') { await identity.logout(parent.id); identity.clearCookie(res); send(res, 200, { authenticated: false, loggedOut: true }); }
+          else if (route === '/api/suite/account/logout') { await identity.logout(parent.id); organizationStore?.clearSessionOrganization(parent.id); identity.clearCookie(res); send(res, 200, { authenticated: false, loggedOut: true }); }
           else if (route === '/api/suite/account/password') {
             await broker.credentialWork(req, user.email, async () => {
               const verified = await identityStore.verifyCredentials({ email: user.email, password: body.currentPassword });
