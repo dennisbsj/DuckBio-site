@@ -2543,3 +2543,13 @@ html:not([data-theme="dark"]) body.homepage-exact .header .nav .nav-apps-panel a
  background:#d4f5f7;
  color:#006d89;
 }
+
+/* DuckMan 2026-11-01: approved perspective-centered DuckBio laptop mark. Keep large product art crisp and small app cards efficient. */
+img.suite-sprite.logo-duckman{
+ background-image:url("icons/duckbio-20261101/duckman-centered-approved-1024.jpg") !important;
+ background-position:center center;background-size:100% 100%;background-repeat:no-repeat;
+}
+.product-hero img.suite-sprite.logo-duckman{
+ background-image:url("icons/duckbio-20261101/duckman-centered-approved-1254.png") !important;
+ background-position:center center;background-size:100% 100%;background-repeat:no-repeat;
+}
