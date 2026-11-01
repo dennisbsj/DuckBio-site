@@ -43,11 +43,13 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     'CREATE TABLE IF NOT EXISTS organization_invites(token_hash TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),issued_by TEXT NOT NULL,email TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),expires_at INTEGER NOT NULL,UNIQUE(org,email))',
     'CREATE TABLE IF NOT EXISTS subscription_drafts(id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),status TEXT NOT NULL CHECK(status IN (\'draft\',\'canceled\')),created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)'
   ].join(';')+';');
+  if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
   for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))chmodSync(databasePath+suffix,0o600);
   const tx=work=>{db.exec('BEGIN IMMEDIATE');try{const result=work();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
   function requireAdmin(org,actor){
     if(!safeId(org)||!safeId(actor)||!db.prepare('SELECT 1 FROM members WHERE org=? AND account=? AND admin=1').get(org,actor))fail('access_denied');
   }
+  const pendingSeats=(org,app)=>db.prepare("SELECT count(*) AS n FROM organization_invites WHERE org=? AND expires_at>? AND json_type(roles, '$.' || ?) IS NOT NULL").get(org,clock(),app).n;
   const roles=(org,account)=>Object.fromEntries(db.prepare('SELECT app,role FROM assignments WHERE org=? AND account=?').all(org,account).map(x=>[x.app,x.role]));
   const view=(org,row)=>({accountId:row.account,name:row.name,nickname:row.nickname,email:row.email,admin:Boolean(row.admin),roles:roles(org,row.account)});
   return Object.freeze({
@@ -90,7 +92,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     overview(org,actor){
       requireAdmin(org,actor);
       return {organization:db.prepare('SELECT id,name FROM organizations WHERE id=?').get(org),
-        apps:APPLICATIONS.map(app=>({...app,purchased:db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?').get(org,app.id)?.purchased??0,assigned:db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?').get(org,app.id).n})),
+        apps:APPLICATIONS.map(app=>({...app,purchased:db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?').get(org,app.id)?.purchased??0,assigned:db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?').get(org,app.id).n,reserved:pendingSeats(org,app.id)})),
         users:db.prepare('SELECT * FROM members WHERE org=? ORDER BY name,account').all(org).map(row=>view(org,row))};
     },
     // Only call from a separate VERIFIED billing adapter. No browser purchase endpoint exists.
@@ -122,7 +124,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
           if(db.prepare('SELECT 1 FROM assignments WHERE org=? AND account=? AND app=?').get(organizationId,member.accountId,app))continue;
           const count=db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?').get(organizationId,app).n;
           const limit=db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?').get(organizationId,app)?.purchased??0;
-          if(count>=limit)fail('app_seats_exhausted');
+          if(count+pendingSeats(organizationId,app)>=limit)fail('app_seats_exhausted');
         }
         db.prepare('INSERT INTO members(org,account,name,nickname,email,admin) VALUES(?,?,?,?,?,?) ON CONFLICT(org,account) DO UPDATE SET name=excluded.name,nickname=excluded.nickname,email=excluded.email,admin=excluded.admin').run(organizationId,member.accountId,member.name.trim(),member.nickname.trim(),email,member.admin?1:0);
         for(const app of APPLICATIONS){
@@ -170,23 +172,28 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         return {removed:true,accountId};
       });
     },
-    issueInvitation({organizationId,actorId,email,name,nickname,admin=false}){
+    issueInvitation({organizationId,actorId,email,name,nickname,admin=false,roles={}}){
       if(!safeEmail(email)||!safeText(name)||!safeText(nickname)||typeof admin!=='boolean')fail('invalid_invitation');
-      const normalized=email.trim().toLowerCase();
+      const normalized=email.trim().toLowerCase(),requested=validRoles(roles);
       return tx(()=>{
         requireAdmin(organizationId,actorId);
         if(db.prepare('SELECT 1 FROM members WHERE org=? AND email=?').get(organizationId,normalized))fail('member_exists');
         db.prepare('DELETE FROM organization_invites WHERE expires_at<=?').run(clock());
         if(db.prepare('SELECT 1 FROM organization_invites WHERE org=? AND email=?').get(organizationId,normalized))fail('invitation_exists');
+        for(const app of Object.keys(requested)){
+          const count=db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?').get(organizationId,app).n;
+          const limit=db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?').get(organizationId,app)?.purchased??0;
+          if(count+pendingSeats(organizationId,app)>=limit)fail('app_seats_exhausted');
+        }
         const token=randomBytes(32).toString('base64url'),expiresAt=clock()+7*24*60*60*1000;
-        db.prepare('INSERT INTO organization_invites VALUES(?,?,?,?,?,?,?,?)').run(inviteHash(token),organizationId,actorId,normalized,name.trim(),nickname.trim(),admin?1:0,expiresAt);
+        db.prepare('INSERT INTO organization_invites(token_hash,org,issued_by,email,name,nickname,admin,expires_at,roles) VALUES(?,?,?,?,?,?,?,?,?)').run(inviteHash(token),organizationId,actorId,normalized,name.trim(),nickname.trim(),admin?1:0,expiresAt,JSON.stringify(requested));
         return {token,expiresAt};
       });
     },
     listPendingInvitations(organizationId,actorId){
       requireAdmin(organizationId,actorId);
-      return db.prepare('SELECT email,name,nickname,admin,expires_at FROM organization_invites WHERE org=? AND expires_at>? ORDER BY email').all(organizationId,clock())
-        .map(row=>({email:row.email,name:row.name,nickname:row.nickname,admin:Boolean(row.admin),expiresAt:row.expires_at}));
+      return db.prepare('SELECT email,name,nickname,admin,expires_at,roles FROM organization_invites WHERE org=? AND expires_at>? ORDER BY email').all(organizationId,clock())
+        .map(row=>({email:row.email,name:row.name,nickname:row.nickname,admin:Boolean(row.admin),expiresAt:row.expires_at,roles:JSON.parse(row.roles)}));
     },
     revokeInvitation({organizationId,actorId,email}){
       if(!safeEmail(email))fail('invalid_invitation');
@@ -199,7 +206,7 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     previewInvitation(token){
       if(!safeToken(token))return null;
       const row=db.prepare('SELECT i.*,o.name AS organization_name FROM organization_invites i JOIN organizations o ON o.id=i.org JOIN members m ON m.org=i.org AND m.account=i.issued_by AND m.admin=1 WHERE i.token_hash=? AND i.expires_at>?').get(inviteHash(token),clock());
-      return row?{organizationId:row.org,organizationName:row.organization_name,email:row.email,name:row.name,nickname:row.nickname,admin:Boolean(row.admin),expiresAt:row.expires_at}:null;
+      return row?{organizationId:row.org,organizationName:row.organization_name,email:row.email,name:row.name,nickname:row.nickname,admin:Boolean(row.admin),expiresAt:row.expires_at,roles:JSON.parse(row.roles)}:null;
     },
     acceptInvitation({token,accountId,email}){
       if(!safeToken(token)||!safeId(accountId)||!safeEmail(email))fail('invalid_invitation');
@@ -210,8 +217,11 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         if(db.prepare('SELECT 1 FROM members WHERE org=? AND email=?').get(invitation.organizationId,invitation.email))fail('member_exists');
         const removed=db.prepare('DELETE FROM organization_invites WHERE token_hash=? AND expires_at>? RETURNING token_hash').get(inviteHash(token),clock());
         if(!removed)fail('invalid_invitation');
+        const assignedRoles=validRoles(invitation.roles);
         db.prepare('INSERT INTO members(org,account,name,nickname,email,admin) VALUES(?,?,?,?,?,?)').run(invitation.organizationId,accountId,invitation.name,invitation.nickname,invitation.email,invitation.admin?1:0);
-        return {organizationId:invitation.organizationId,accountId,admin:invitation.admin};
+        for(const [app,role] of Object.entries(assignedRoles))
+          db.prepare('INSERT INTO assignments(org,account,app,role) VALUES(?,?,?,?)').run(invitation.organizationId,accountId,app,role);
+        return {organizationId:invitation.organizationId,accountId,admin:invitation.admin,roles:assignedRoles};
       });
     },
     matrix(organizationId,actorId){

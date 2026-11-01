@@ -186,6 +186,28 @@ test('pending invitation is listed and can be revoked in the real browser',{time
  await page.locator('#sign-in:not([hidden])').waitFor();
  assert.equal(identity.findUserByEmail('temp@example.test'),null);
 });
+test('admin selects a DuckNote app role while inviting and it is assigned only after activation',{timeout:45000},async t=>{
+ const {page,org,owner,identity}=await fixture(t);
+ await signIn(page);
+ await page.getByRole('button',{name:'Invite user'}).click();
+ await page.locator('#invite-name').fill('Role scientist');
+ await page.locator('#invite-nickname').fill('Role');
+ await page.locator('#invite-email').fill('role@example.test');
+ await page.locator('#invite-role-fields select[name=eel]').selectOption('scientist');
+ await page.getByRole('button',{name:'Create invitation'}).click();
+ await page.locator('#invite-result:not([hidden])').waitFor();
+ const link=await page.locator('#invitation-link').inputValue();
+ assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').reserved,1);
+ assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').assigned,1);
+ await page.getByRole('button',{name:'Sign out'}).click();
+ await page.goto(link);
+ await page.locator('#invite-password').fill('Another strong password 12345');
+ await page.getByRole('button',{name:'Activate invitation'}).click();
+ await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('invitation accepted'));
+ const created=identity.findUserByEmail('role@example.test');
+ assert.equal(org.accessFor({organizationId:'lab-a',accountId:created.id,appId:'eel'}).role,'scientist');
+ assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').reserved,0);
+});
 test('removing a member from admin roster revokes their org access without deleting central identity',{timeout:45000},async t=>{
  const {page,org,identity,worker,owner}=await fixture(t);
  await signIn(page);
