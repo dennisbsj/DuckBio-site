@@ -51,6 +51,12 @@
       <div class="table-scroll"><table><thead><tr><th>Organization</th><th>Plan</th><th>Apps</th><th>Seats per app</th><th>State</th></tr></thead><tbody id="owner-drafts"></tbody></table></div>
     </section>
     <section class="panel">
+      <h2>Stripe LIVE events awaiting reconciliation</h2>
+      <p>These are independently recorded signed-event metadata, not verified payments.
+      No organization is inferred and no user access is changed.</p>
+      <div class="table-scroll"><table><thead><tr><th>Event type</th><th>Event time</th><th>Recorded</th><th>Linkage</th></tr></thead><tbody id="owner-live-events"></tbody></table></div>
+    </section>
+    <section class="panel">
       <h2>Recent activity</h2>
       <p>Includes organization membership, invitation, permissions and verified subscription transitions. Stripe TEST observations are marked as TEST.</p>
       <div class="table-scroll"><table><thead><tr><th>When</th><th>Organization</th><th>Actor</th><th>Action</th><th>Subject</th><th>Change</th></tr></thead><tbody id="owner-activity"></tbody></table></div>
