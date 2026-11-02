@@ -28,7 +28,7 @@ const invoice=()=>({
   parent:{subscription_item_details:{subscription:'sub_live_ABCD1234'}}
  }]}
 });
-function fixture({sub=subscription(),inv=invoice(),at=now,responseChange=()=>{}}={}){
+function fixture({sub=subscription(),inv=invoice(),at=now,responseChange=response=>response}={}){
  const calls=[];
  const fetchImpl=async(url,init)=>{
   calls.push({url,init});
