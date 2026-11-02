@@ -288,8 +288,8 @@ function renderMail(message){
  const root=$('mail-detail');root.replaceChildren();
  const card=node('div');card.className='comms-mail-card';
  card.append(node('h2',message.subject),node('p','From: '+message.from),
-  node('p','To: '+message.to),node('p','Sent: '+stamp(message.createdAt)),
-  node('p',message.body));
+  node('p','To: '+message.to),node('p','Sent: '+stamp(message.createdAt)));
+ const body=node('p');renderMessageText(body,message.body);card.append(body);
  root.append(card);
  $('mail-form').hidden=true;root.hidden=false;
  if(state.folder==='inbox'&&!message.readAt)
