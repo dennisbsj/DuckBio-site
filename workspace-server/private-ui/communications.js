@@ -308,6 +308,11 @@ async function start(){
  const data=await request('/api/suite/communications/contacts');
  renderContacts(data.contacts);
  await refreshThreads();await refreshMail();await refreshGroups();await refreshNotifications();
+ const view=new URL(location.href).searchParams.get('view');
+ if(view==='mail')showTab('mail');
+ if(view==='notifications'){
+  $('notifications-panel').scrollIntoView({block:'start'});
+ }
  status('Signed in. Chat messages refresh automatically while this page is open.');
 }
 $('tab-chat').addEventListener('click',()=>showTab('chat'));
