@@ -265,3 +265,42 @@ test('expired TEST billing period stops counting as candidate even without anoth
   'historical payment evidence remains traceable but has no simulated current seats');
  assert.equal(f.store.overview('one','admin1').apps.find(x=>x.id==='eel').purchased,0);
 });
+
+test('test-only transition review detects assigned plus invited seat shortfalls without removing roles',t=>{
+ const f=fixture(t);
+ f.store.applyVerifiedSeatPurchase({reference:'synthetic-existing-seats',organizationId:'one',
+  plan:'Single',apps:['eel'],seats:4});
+ for(let n=1;n<=3;n++)f.store.saveMember({organizationId:'one',actorId:'admin1',member:{
+  accountId:'member'+n,name:'Scientist '+n,nickname:'Sci',email:'m'+n+'@example.test',
+  admin:false,roles:{eel:'scientist'}}});
+ f.store.issueInvitation({organizationId:'one',actorId:'admin1',email:'pending@example.test',
+  name:'Pending scientist',nickname:'Pending',roles:{eel:'scientist'}});
+ const active={subscriptionStatus:'active',cancelAtPeriodEnd:false,cancelAt:null,
+  periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_create'};
+ f.finish(f.start(),{...f.paid,lifecycle:active});
+ const review=f.store.testSeatImpact('one','admin1');
+ assert.equal(review.testOnly,true);
+ assert.equal(review.realSeatChanges,false);
+ const eel=review.apps.find(x=>x.appId==='eel');
+ assert.equal(eel.livePurchased,4);
+ assert.equal(eel.assigned,3);
+ assert.equal(eel.reserved,1);
+ assert.equal(eel.candidateTestSeats,3);
+ assert.equal(eel.status,'assignment_conflict');
+ assert.equal(eel.hypotheticalShortfall,1);
+ assert.equal(review.apps.find(x=>x.appId==='goflo').status,'not_evaluated');
+ assert.throws(()=>f.store.testSeatImpact('one','admin2'),/access_denied/);
+ assert.equal(f.store.overview('one','admin1').users.find(u=>u.accountId==='member1').roles.eel,'scientist');
+ const canceled={subscriptionStatus:'canceled',cancelAtPeriodEnd:false,cancelAt:null,
+  periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_cycle'};
+ f.finish(f.start(),{state:'pending',reason:'subscription_not_active',
+  lifecycle:canceled,licensesGranted:false});
+ const after=f.store.testSeatImpact('one','admin1').apps.find(x=>x.appId==='eel');
+ assert.equal(after.status,'manual_review','cancellation does not silently revoke assigned users');
+ assert.equal(after.candidateTestSeats,0);
+ assert.equal(after.hypotheticalShortfall,0,'unknown billing decisions are not treated as a forced downgrade');
+ assert.equal(f.store.overview('one','admin1').apps.find(x=>x.id==='eel').purchased,4);
+ assert.equal(f.store.overview('one','admin1').users.find(u=>u.accountId==='member1').roles.eel,'scientist');
+ f.reopen();
+ assert.equal(f.store.testSeatImpact('one','admin1').apps.find(x=>x.appId==='eel').status,'manual_review');
+});
