@@ -1,7 +1,7 @@
 // Private same-origin messaging UI. No SMTP, WebSocket or external service.
 // Chat refreshes with bounded polling; all real permissions are server-side.
 const $=id=>document.getElementById(id);
-const state={csrf:null,self:null,contacts:[],directory:new Map(),selectedGroupMembers:new Set(),groupKind:'chat',group:null,groupWritable:true,peer:null,folder:'inbox',busy:false,tab:'chat'};
+const state={csrf:null,self:null,contacts:[],directory:new Map(),selectedGroupMembers:new Set(),groupKind:'chat',group:null,groupWritable:true,peer:null,peerWritable:false,folder:'inbox',busy:false,tab:'chat'};
 const node=(tag,text)=>{const x=document.createElement(tag);if(text!==undefined)x.textContent=String(text);return x;};
 const status=text=>{$('comms-status').textContent=text;};
 function button(label,action){
@@ -31,12 +31,12 @@ function showTab(tab){
 }
 function directoryItem(label,contact){
  return button(label,()=>{
-  state.group=null;state.groupWritable=true;
+  state.group=null;state.groupWritable=true;state.peerWritable=false;
   state.peer={accountId:contact.accountId,displayName:contact.displayName,
    system:contact.system===true};
   $('chat-title').textContent=contact.displayName;
   $('chat-mentions').replaceChildren();
-  $('send-chat').disabled=contact.system===true;
+  $('send-chat').disabled=true; // Wait for the server's current send capability.
   showTab('chat');void refreshChat();
  });
 }
@@ -168,11 +168,11 @@ async function refreshNotifications(){
      if(group){await openGroup(group);focusMessage(m.messageId);}
      else status('That private group is no longer available.');
     }else if(m.source==='chat'){
-     state.group=null;
+     state.group=null;state.peerWritable=false;
      state.peer={accountId:m.senderId,displayName:m.sender.displayName};
      $('chat-title').textContent=m.sender.displayName;
      $('chat-mentions').replaceChildren();
-     $('send-chat').disabled=false;
+     $('send-chat').disabled=true;
      showTab('chat');await refreshChat();focusMessage(m.messageId);
     }else if(m.source==='mail'){
      // Resolve the message only from this account's authenticated inbox.
@@ -196,7 +196,7 @@ async function refreshGroups(){
  }
 }
 async function openGroup(group){
- state.group=group;state.peer=null;
+ state.group=group;state.peer=null;state.peerWritable=false;
  if(group.kind==='chat'){
   showTab('chat');$('chat-title').textContent=group.title;
   $('send-chat').disabled=false;
@@ -239,7 +239,8 @@ async function refreshThreads(){
  const root=$('chat-threads');root.replaceChildren();
  for(const t of result.threads){
   const contact=t.peer;
-  root.append(directoryItem(contact.displayName+(t.unread?' · '+t.unread+' unread':''),contact));
+  root.append(directoryItem(contact.displayName+(t.unread?' · '+t.unread+' unread':'')+
+    (t.canSend===false?' · Read-only':''),contact));
  }
  if(!result.threads.length)root.append(node('p','No conversations yet.'));
 }
@@ -252,6 +253,9 @@ async function refreshChat(){
   request('/api/suite/communications/chat/read',{peerId})
  ]);
  if(!state.peer||state.peer.accountId!==peerId)return;
+ state.peerWritable=history.canSend===true;
+ $('send-chat').disabled=!state.peerWritable;
+ if(!state.peerWritable)status('This conversation is read-only. Use internal mail to reply.');
  const root=$('chat-history');root.replaceChildren();
  for(const m of history.messages){
   const x=node('div');x.id='message-'+m.id;renderMessageText(x,m.body);
@@ -264,7 +268,8 @@ async function refreshChat(){
 async function sendChat(event){
  event.preventDefault();
  if(state.busy||(!state.peer&&!state.group)||state.peer?.system||
-  (state.group?.kind==='chat'&&!state.groupWritable))return;
+  (state.group?.kind==='chat'&&!state.groupWritable)||
+  (!state.group&&!state.peerWritable))return;
  const body=$('chat-body').value.trim();
  if(!body)return;
  state.busy=true;
