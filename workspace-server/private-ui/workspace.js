@@ -183,7 +183,7 @@ $('login-form').addEventListener('submit',async event=>{
  if(!form.reportValidity()||state.busy)return;state.busy=true;
  try{
   await csrf();
-  await request('/api/suite/account/login',{email:$('email').value.trim(),password:$('password').value});
+  await request('/api/suite/account/login',{email:$('email').value.trim(),password:$('password').value,rememberMe:$('remember-me').checked});
   $('password').value='';
   if(state.inviteToken){
    await request('/api/suite/organization/invite/accept',{token:state.inviteToken});
