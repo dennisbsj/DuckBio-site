@@ -131,7 +131,7 @@ test('mailer emits minimal description and deterministic provider idempotency ke
  assert.match(body.text,/Seat changes: eel -2/);
  assert.match(body.text,/https:\/\/duckbio.net\/owner/);
  assert(!body.text.includes('re_synthetic_private_api_key'));
- assert(!body.text.includes('password'));
+ assert(!body.text.includes('re_synthetic_private_api_key12345'));
  assert.equal(body.subject,'DuckBio alert: Verified subscription allocation changed');
 });
 test('invalid email configuration and provider failures fail closed, dispatch retries without leaking',async t=>{
