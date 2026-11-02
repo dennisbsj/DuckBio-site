@@ -2553,3 +2553,19 @@ img.suite-sprite.logo-duckman{
  background-image:url("icons/duckbio-20261101/duckman-centered-approved-1254.png") !important;
  background-position:center center;background-size:100% 100%;background-repeat:no-repeat;
 }
+
+/* Shared marketing banner separator — 2026-11-02.
+   Home already has this 2px line on #applications; carry the identical
+   hero-to-content boundary through to Support (FAQ) and Pricing (plans). */
+body.support-faq-page .support-faq-heading,
+body:not(.homepage-exact) .pr-hero.pr-plans-first{
+  border-top:2px solid #79dcdf;
+}
+html[data-theme="dark"] body.support-faq-page .support-faq-heading,
+html[data-theme="dark"] body:not(.homepage-exact) .pr-hero.pr-plans-first{
+  border-top-color:#257e98;
+}
+html:not([data-theme="dark"]) body.support-faq-page .support-faq-heading,
+html:not([data-theme="dark"]) body:not(.homepage-exact) .pr-hero.pr-plans-first{
+  border-top-color:#9edbe8;
+}
