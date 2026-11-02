@@ -215,7 +215,7 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
         throw new BrokerError(401,'invalid_client');
       const client=authenticateClient(req,body);
       const result=await liveProof(client,body?.sessionToken);
-      return result?.assertion??null;
+      return result?{...result.assertion,appId:client.appId}:null;
     },
     verifyCsrf,
     credentialWork,
