@@ -75,7 +75,7 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
       if(actual.SUITE_ORGANIZATION_DB_PATH) organizationStore = createOrganizationStore({databasePath:privatePath(actual.SUITE_ORGANIZATION_DB_PATH,'organization database'),clock,ownerAlertsOptIn:enableOwnerAlerts});
       if (actual.SUITE_SETUP_TOKEN) identityStore.configureBootstrapToken(actual.SUITE_SETUP_TOKEN, { expiresAt: clock() + 7 * 24 * 60 * 60_000 });
       ownerAlertMailer=enableOwnerAlerts?createResendOwnerAlertMailer({apiKey:actual.SUITE_RESEND_API_KEY,from:actual.SUITE_OWNER_ALERT_FROM,to:actual.SUITE_OWNER_ALERT_EMAIL,origin:actual.SUITE_ORIGIN,fetchImpl}):null;
-      const invitationMailer=(actual.SUITE_RESEND_API_KEY||actual.SUITE_INVITATION_FROM)
+      const invitationMailer=actual.SUITE_INVITATION_FROM
         ?createResendInvitationMailer({apiKey:actual.SUITE_RESEND_API_KEY,from:actual.SUITE_INVITATION_FROM,fetchImpl}):null;
       const stripeTestCheckout=(actual.SUITE_STRIPE_TEST_KEY||actual.SUITE_STRIPE_TEST_PRICES_JSON)
         ?createStripeTestCheckout({secretKey:actual.SUITE_STRIPE_TEST_KEY,priceMap:JSON.parse(actual.SUITE_STRIPE_TEST_PRICES_JSON||'null'),origin:actual.SUITE_ORIGIN,fetchImpl}):null;
