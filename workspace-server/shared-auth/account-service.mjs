@@ -184,7 +184,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           }
           else if (route === '/api/suite/organization/subscriptions') {
             requireSelection(body.organizationId);
-            send(res,200,{drafts:organizationStore.listSubscriptionDrafts(body.organizationId,user.id),testCheckoutEnabled:Boolean(stripeTestCheckout)});
+            send(res,200,{drafts:organizationStore.listSubscriptionDrafts(body.organizationId,user.id),testCheckoutEnabled:Boolean(stripeTestCheckout),testReconciliationEnabled:Boolean(stripeTestReconciler)});
           }
           else if (route === '/api/suite/organization/subscription/draft') {
             requireSelection(body.organizationId);
