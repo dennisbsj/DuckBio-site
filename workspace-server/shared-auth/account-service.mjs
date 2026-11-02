@@ -280,8 +280,11 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           else if (route === '/api/suite/communications/group/members') {
             const members=groupAction(()=>communicationsStore.groupMembers({
               groupId:body.groupId,actorId:user.id}));
+            const group=groupAction(()=>communicationsStore.groupHistory({
+              groupId:body.groupId,actorId:user.id})).group;
             send(res,200,{members:members.map(id=>({
-              ...displayContact(id),mention:'@'+mentionHandleForUser(id)}))});
+              ...displayContact(id),mention:'@'+mentionHandleForUser(id)})),
+              canSend:group.kind!=='chat'||isOwner(user)||!members.includes(ownerAccountId)});
           }
           else if (route === '/api/suite/communications/group/history') {
             const history=groupAction(()=>communicationsStore.groupHistory({
