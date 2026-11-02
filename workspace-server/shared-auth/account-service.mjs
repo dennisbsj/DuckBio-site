@@ -39,6 +39,15 @@ export function createAccountService({ origin, issuer = origin, clients, identit
       throw new ServiceError(400,'recipient_unavailable');
     return target;
   }
+  // Return a conservative UI capability; the POST route retains its own
+  // independent recipient and owner checks on every send.
+  function canSendDirectChat(user,peerId){
+    if(peerId===user.id||peerId===SECURITY_SENDER||
+       (peerId===ownerAccountId&&!isOwner(user)))return false;
+    const peer=identityStore.getUser(peerId);
+    return Boolean(peer&&peer.state==='active'&&
+      (isOwner(peer)||membershipActive(peer.id)));
+  }
   function groupAction(work){
     try{return work();}
     catch(error){
@@ -249,7 +258,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           }
           else if (route === '/api/suite/communications/threads') {
             const threads=communicationsStore.chatThreads(user.id).map(x=>({
-              ...x,peer:displayContact(x.peerId)}));
+              ...x,peer:displayContact(x.peerId),canSend:canSendDirectChat(user,x.peerId)}));
             send(res,200,{threads});
           }
           else if (route === '/api/suite/communications/chat/history') {
@@ -257,7 +266,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
               throw new ServiceError(403,'access_denied');
             // Historic conversations can be read after a recipient is disabled.
             send(res,200,{messages:communicationsStore.chatHistory(user.id,body.peerId),
-              peer:displayContact(body.peerId)});
+              peer:displayContact(body.peerId),canSend:canSendDirectChat(user,body.peerId)});
           }
           else if (route === '/api/suite/communications/chat/send') {
             checkRecipient(body.recipientId);
