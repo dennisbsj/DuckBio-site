@@ -26,7 +26,7 @@ function fixture(objects=good(),config={}){
   assert.equal(options.headers.Authorization,'Bearer '+secret);
   assert.equal(options.headers.Accept,'application/json');
   assert.match(url,/^https:\/\/api\.stripe\.com\/v1\//);
-  const collection=url.split('/')[4];
+  const collection=new URL(url).pathname.split('/').slice(2,-1).join('/');
   if(config.status)return new Response('temporarily unavailable',{status:config.status});
   if(config.nonjson)return new Response('oops',{headers:{'Content-Type':'text/plain'}});
   return Response.json(objects[collection]);
