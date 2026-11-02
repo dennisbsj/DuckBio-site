@@ -563,3 +563,38 @@ test('admin sees isolated TEST candidate seat counts, then cancellation review, 
  assert.equal(org.testSeatCapacity('lab-a',owner.id).apps.find(x=>x.appId==='eel').candidateTestSeats,0);
  assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased,original);
 });
+
+test('in-progress Stripe TEST recheck removes stale seat previews and warns admin in Chromium',{timeout:45000},async t=>{
+ const checkout={priceFor:()=> 'price_test123456',async createSession(){
+  return {id:'cs_test_freshbrowser123',url:'https://checkout.stripe.com/c/pay/browser'};
+ }};
+ const checker={async inspect(snapshot){
+  return {state:'paid_test_verified',sessionId:snapshot.checkout.sessionId,
+   subscriptionId:'sub_test_freshbrowser123',invoiceId:'in_test_freshbrowser123',
+   organizationId:snapshot.draft.organizationId,draftId:snapshot.draft.id,
+   price:snapshot.checkout.price,seats:snapshot.draft.seats,licensesGranted:false,
+   lifecycle:{subscriptionStatus:'active',cancelAtPeriodEnd:false,cancelAt:null,
+    periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_create'}};
+ }};
+ const {page,org,owner}=await fixture(t,{stripeTestCheckout:checkout,stripeTestReconciler:checker});
+ await signIn(page);
+ await page.getByRole('button',{name:'Subscriptions'}).click();
+ await page.getByRole('button',{name:'Prepare subscription'}).click();
+ await page.locator('#draft-plan').selectOption('Single');
+ await page.locator('#draft-seats').fill('2');
+ await page.locator('#buy-fields input[name=eel]').check();
+ await page.getByRole('button',{name:'Save subscription draft'}).click();
+ await page.getByRole('button',{name:'Start test checkout'}).click();
+ await page.getByRole('button',{name:'Check Stripe TEST status'}).click();
+ const summary=page.locator('#test-seat-projection');
+ await summary.getByText(/DuckNote: 2 TEST candidate seats/).waitFor();
+ const draft=org.listSubscriptionDrafts('lab-a',owner.id)[0];
+ org.beginTestReconciliation({organizationId:'lab-a',actorId:owner.id,draftId:draft.id});
+ await page.reload();
+ await page.getByRole('button',{name:'Subscriptions'}).click();
+ await summary.getByText(/no eligible candidate seats/).waitFor();
+ await summary.locator('.test-entitlement-readiness').getByText(/DuckNote: 0 unverified Checkout\(s\).*1 billing status/).waitFor();
+ await summary.locator('.test-entitlement-preview').getByText(/DuckNote: Billing status requires manual review/).waitFor();
+ assert.equal(org.testSeatCapacity('lab-a',owner.id).apps.find(a=>a.appId==='eel').candidateTestSeats,0);
+ assert.equal(org.overview('lab-a',owner.id).apps.find(a=>a.id==='eel').purchased,0);
+});
