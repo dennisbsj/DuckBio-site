@@ -62,8 +62,9 @@ test('initial verified allocation and two idempotent renewals never add seats tw
  assert.equal(seat(f),3);
  const db=new DatabaseSync(f.path);
  try{
-  assert.deepEqual(db.prepare('SELECT revision,state FROM verified_subscription_allocations').get(),
-   {revision:2,state:'active'});
+  const allocation=db.prepare('SELECT revision,state FROM verified_subscription_allocations').get();
+  assert.equal(allocation.revision,2);
+  assert.equal(allocation.state,'active');
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM verified_subscription_revisions').get().n,2);
  }finally{db.close();}
  f.reopen();
