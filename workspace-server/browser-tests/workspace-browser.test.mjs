@@ -545,11 +545,15 @@ test('admin sees isolated TEST candidate seat counts, then cancellation review, 
  assert.match(await summary.textContent(),/CytoDuck: 3 TEST candidate seats/);
  assert.match(await summary.textContent(),/not purchased or activated/);
  assert.equal(org.testSeatCapacity('lab-a',owner.id).apps.find(x=>x.appId==='eel').candidateTestSeats,3);
+ assert.equal(org.testSeatImpact('lab-a',owner.id).apps.find(x=>x.appId==='eel').status,'test_only_candidate');
  assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased,original);
  state='canceled';
  await page.getByRole('button',{name:'Check Stripe TEST status'}).click();
  await page.locator('#subscription-drafts').getByText('TEST seat simulation: Cancellation requires review',{exact:false}).waitFor();
  await summary.getByText(/no eligible candidate seats/).waitFor();
+ await summary.getByText(/DuckNote: billing status requires manual review/).waitFor();
+ await summary.getByText(/CytoDuck: billing status requires manual review/).waitFor();
+ assert.equal(org.testSeatImpact('lab-a',owner.id).apps.find(x=>x.appId==='eel').status,'manual_review');
  assert.equal(org.testSeatCapacity('lab-a',owner.id).apps.find(x=>x.appId==='eel').candidateTestSeats,0);
  assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased,original);
 });
