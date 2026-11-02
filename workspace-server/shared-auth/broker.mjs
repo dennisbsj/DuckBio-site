@@ -203,8 +203,8 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
     } finally { credentialJobs -= 1; }
   }
   async function authenticateCredentials(req, res, body) {
-    if (typeof body.email !== 'string' || body.email.trim().length > 254 || !/^[^\s@]+@[^\s@]+$/.test(body.email.trim()) || typeof body.password !== 'string' || !body.password || body.password.length > 1024) throw new BrokerError(400, 'invalid_input');
-    return credentialWork(req, body.email.trim(), () => identity.authenticate(req, res, { email: body.email.trim(), password: body.password }));
+    if (typeof body.email !== 'string' || body.email.trim().length > 254 || !/^[^\s@]+@[^\s@]+$/.test(body.email.trim()) || typeof body.password !== 'string' || !body.password || body.password.length > 1024 || (body.rememberMe!==undefined && typeof body.rememberMe!=='boolean')) throw new BrokerError(400, 'invalid_input');
+    return credentialWork(req, body.email.trim(), () => identity.authenticate(req, res, { email: body.email.trim(), password: body.password, rememberMe:body.rememberMe===true }));
   }
 
   return Object.freeze({
