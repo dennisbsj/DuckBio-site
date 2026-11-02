@@ -44,7 +44,8 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     'CREATE TABLE IF NOT EXISTS organization_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,org TEXT NOT NULL REFERENCES organizations(id),actor TEXT NOT NULL,action TEXT NOT NULL,subject TEXT NOT NULL,details TEXT NOT NULL CHECK(json_valid(details)),recorded_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS subscription_drafts(id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),status TEXT NOT NULL CHECK(status IN (\'draft\',\'canceled\')),created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS stripe_test_checkouts(draft TEXT PRIMARY KEY REFERENCES subscription_drafts(id),org TEXT NOT NULL REFERENCES organizations(id),price TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN (\'pending\',\'ready\')),session_id TEXT UNIQUE,url TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)',
-    'CREATE TABLE IF NOT EXISTS stripe_test_webhook_events(id TEXT PRIMARY KEY,type TEXT NOT NULL,object_id TEXT NOT NULL,created INTEGER NOT NULL,digest TEXT NOT NULL,org TEXT,draft TEXT,recorded_at INTEGER NOT NULL,CHECK((org IS NULL AND draft IS NULL) OR (org IS NOT NULL AND draft IS NOT NULL)))'
+    'CREATE TABLE IF NOT EXISTS stripe_test_webhook_events(id TEXT PRIMARY KEY,type TEXT NOT NULL,object_id TEXT NOT NULL,created INTEGER NOT NULL,digest TEXT NOT NULL,org TEXT,draft TEXT,recorded_at INTEGER NOT NULL,CHECK((org IS NULL AND draft IS NULL) OR (org IS NOT NULL AND draft IS NOT NULL)))',
+    "CREATE TABLE IF NOT EXISTS stripe_test_reconciliation_checks(draft TEXT NOT NULL REFERENCES subscription_drafts(id),org TEXT NOT NULL REFERENCES organizations(id),attempt INTEGER NOT NULL CHECK(attempt>=1),session_id TEXT NOT NULL,price TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('checking','pending','paid_test_verified','unavailable','superseded')),reason TEXT,subscription_id TEXT,invoice_id TEXT,started_at INTEGER NOT NULL,completed_at INTEGER,PRIMARY KEY(draft,attempt))"
   ].join(';')+';');
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
@@ -227,11 +228,76 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
       return {draft:{id:row.id,organizationId,plan:row.plan,apps:JSON.parse(row.apps),seats:row.seats},
         checkout:{sessionId:row.session_id,price:row.price}};
     },
+    // Persistent test-only observations: never a purchased entitlement.
+    // Starting another attempt makes earlier in-flight results ineligible to overwrite the latest state.
+    beginTestReconciliation({organizationId,actorId,draftId}){
+      if(!safeId(draftId))fail('invalid_checkout');
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        const row=db.prepare("SELECT d.id,d.plan,d.apps,d.seats,c.session_id,c.price FROM subscription_drafts d JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org WHERE d.org=? AND d.id=? AND d.status='draft' AND c.state='ready'")
+          .get(organizationId,draftId);
+        if(!row||!row.session_id)fail('checkout_not_found');
+        const last=db.prepare('SELECT MAX(attempt) AS n FROM stripe_test_reconciliation_checks WHERE draft=? AND org=?')
+          .get(draftId,organizationId).n??0;
+        if(last>=2147483647)fail('reconciliation_limit');
+        const now=clock();
+        db.prepare("UPDATE stripe_test_reconciliation_checks SET state='superseded',completed_at=? WHERE draft=? AND org=? AND state='checking'")
+          .run(now,draftId,organizationId);
+        const attempt=last+1;
+        db.prepare("INSERT INTO stripe_test_reconciliation_checks(draft,org,attempt,session_id,price,state,started_at) VALUES(?,?,?,?,?,'checking',?)")
+          .run(draftId,organizationId,attempt,row.session_id,row.price,now);
+        return {attempt,snapshot:{draft:{id:row.id,organizationId,plan:row.plan,
+          apps:JSON.parse(row.apps),seats:row.seats},
+          checkout:{sessionId:row.session_id,price:row.price}}};
+      });
+    },
+    finishTestReconciliation({organizationId,actorId,draftId,attempt,result}){
+      if(!safeId(draftId)||!Number.isSafeInteger(attempt)||attempt<1||
+        !result||typeof result!=='object'||Array.isArray(result)||
+        result.licensesGranted!==false||!['pending','paid_test_verified','unavailable'].includes(result.state))
+        fail('invalid_reconciliation');
+      const reasons=['checkout_not_completed','payment_unpaid','subscription_not_active',
+        'invoice_unavailable','invoice_not_paid'];
+      if(result.state==='pending' && !reasons.includes(result.reason))fail('invalid_reconciliation');
+      if(result.state==='unavailable' && (result.reason!==undefined || result.invoiceId!==undefined))
+        fail('invalid_reconciliation');
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        const current=db.prepare('SELECT * FROM stripe_test_reconciliation_checks WHERE draft=? AND org=? ORDER BY attempt DESC LIMIT 1')
+          .get(draftId,organizationId);
+        if(!current||current.attempt!==attempt||current.state!=='checking')fail('reconciliation_superseded');
+        const local=db.prepare("SELECT d.seats,c.session_id,c.price FROM subscription_drafts d JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org WHERE d.id=? AND d.org=? AND d.status='draft' AND c.state='ready'")
+          .get(draftId,organizationId);
+        if(!local||local.session_id!==current.session_id||local.price!==current.price)
+          fail('checkout_conflict');
+        let reason=null,subscriptionId=null,invoiceId=null;
+        if(result.state==='pending')reason=result.reason;
+        if(result.state==='paid_test_verified'){
+          if(result.organizationId!==organizationId||result.draftId!==draftId||
+            result.sessionId!==local.session_id||result.price!==local.price||
+            result.seats!==local.seats||
+            typeof result.subscriptionId!=='string'||!/^sub_[A-Za-z0-9_]{4,128}$/.test(result.subscriptionId)||
+            typeof result.invoiceId!=='string'||!/^in_[A-Za-z0-9_]{4,128}$/.test(result.invoiceId))
+            fail('invalid_reconciliation');
+          subscriptionId=result.subscriptionId;invoiceId=result.invoiceId;
+        }
+        const now=clock();
+        db.prepare("UPDATE stripe_test_reconciliation_checks SET state=?,reason=?,subscription_id=?,invoice_id=?,completed_at=? WHERE draft=? AND org=? AND attempt=? AND state='checking'")
+          .run(result.state,reason,subscriptionId,invoiceId,now,draftId,organizationId,attempt);
+        audit(organizationId,actorId,'checkout.test.reconciliation.observed',draftId,
+          {attempt,state:result.state,...(reason?{reason}:{})});
+        return {state:result.state,...(reason?{reason}:{}),attempt,
+          checkedAt:now,licensesGranted:false};
+      });
+    },
     listSubscriptionDrafts(organizationId,actorId){
       requireAdmin(organizationId,actorId);
-      return db.prepare('SELECT d.*,c.state AS checkout_state,c.url AS checkout_url FROM subscription_drafts d LEFT JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org WHERE d.org=? ORDER BY d.created_at DESC,d.id').all(organizationId)
+      return db.prepare("SELECT d.*,c.state AS checkout_state,c.url AS checkout_url,r.state AS reconciliation_state,r.reason AS reconciliation_reason,r.attempt AS reconciliation_attempt,r.completed_at AS reconciliation_checked_at FROM subscription_drafts d LEFT JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org LEFT JOIN stripe_test_reconciliation_checks r ON r.draft=d.id AND r.org=d.org AND r.attempt=(SELECT MAX(z.attempt) FROM stripe_test_reconciliation_checks z WHERE z.draft=d.id AND z.org=d.org) WHERE d.org=? ORDER BY d.created_at DESC,d.id").all(organizationId)
         .map(x=>({id:x.id,plan:x.plan,apps:JSON.parse(x.apps),seats:x.seats,status:x.status,createdAt:x.created_at,updatedAt:x.updated_at,
-          checkoutState:x.checkout_state??null,checkoutUrl:x.checkout_state==='ready'?x.checkout_url:null}));
+          checkoutState:x.checkout_state??null,checkoutUrl:x.checkout_state==='ready'?x.checkout_url:null,
+          testReconciliation:x.reconciliation_state?{state:x.reconciliation_state,
+            reason:x.reconciliation_reason??null,attempt:x.reconciliation_attempt,
+            checkedAt:x.reconciliation_checked_at??null,licensesGranted:false}:null}));
     },
     createSubscriptionDraft({organizationId,actorId,plan,apps,seats}){
       if(!['Single','Mixed','Bundle'].includes(plan)||!Array.isArray(apps)||!Number.isSafeInteger(seats)||seats<1||seats>10000||new Set(apps).size!==apps.length||apps.some(id=>!byId.has(id)))fail('invalid_subscription');
