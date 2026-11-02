@@ -8,7 +8,7 @@ import { OrganizationError } from '../organization-store.mjs';
 const APP_NAMES = Object.freeze({ goflo: 'GoFlo', eel: 'EEL', methpipe: 'MethPipe', mantrain: 'ManTrain', duckman: 'DuckMan', limsman: 'LIMSMan' });
 const STATIC_APPS = new Set(['goflo', 'methpipe', 'mantrain']);
 // Each native app must have an explicit private client origin; retired domains are not fallbacks.
-const FILES = new Set(['index.html', 'login.css', 'app.js', 'app-registry.mjs', 'auth-client.mjs', 'config.mjs', 'admin.html', 'admin.js', 'admin.css', 'workspace.html', 'workspace.css', 'workspace.js', ...Object.keys(APP_NAMES).map(id => `assets/${id}.svg`), 'assets/favicon.svg']);
+const FILES = new Set(['index.html', 'login.css', 'app.js', 'app-registry.mjs', 'auth-client.mjs', 'config.mjs', 'admin.html', 'admin.js', 'admin.css', 'workspace.html', 'workspace.css', 'workspace.js', 'owner.html', 'owner.js', ...Object.keys(APP_NAMES).map(id => `assets/${id}.svg`), 'assets/favicon.svg']);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
 class ServiceError extends Error { constructor(status, code) { super(code); this.status = status; this.code = code; } }
 const safeId = value => typeof value === 'string' && value.length > 0 && value.length <= 128 && !/[\u0000-\u0020\u007f]/.test(value);
@@ -24,7 +24,9 @@ function userView(user) { return { id: user.id, email: user.email, displayName: 
 
 /** Account service is independent of all business-data apps. It never migrates
  * their passwords/users, links by email, or promotes a central role to an app role. */
-export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
+export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null, ownerAccountId = null, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
+  if(ownerAccountId!==null&&!safeId(ownerAccountId))throw new Error('Invalid private owner account ID');
+  const isOwner=user=>Boolean(ownerAccountId&&user?.id===ownerAccountId&&user.role==='admin'&&user.state==='active');
   const url = new URL(origin);
   const identity = createLocalIdentityAdapter({ store: identityStore, origin });
   const broker = createAuthBroker({ origin, issuer, clients, identity, store: authStore, clock, getClientAddress });
@@ -44,7 +46,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     return { parent, user };
   }
   function account(user) {
-    return { user: userView(user), apps: Object.entries(APP_NAMES).map(([id, name]) => ({ id, name, nativeIdentity: nativeApps.has(id), enabled: Boolean(identityStore.getAccess(user.id, id)) })), admin: user.role === 'admin' };
+    return { user: userView(user), apps: Object.entries(APP_NAMES).map(([id, name]) => ({ id, name, nativeIdentity: nativeApps.has(id), enabled: Boolean(identityStore.getAccess(user.id, id)) })), admin: user.role === 'admin',ownerPanel:isOwner(user) };
   }
   async function roster(appId) {
     const client = registrations.get(appId);
@@ -76,6 +78,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     if (['/', '/login/', '/login', '/setup', '/setup/', '/invite', '/invite/'].includes(pathname)) file = 'index.html';
     else if (['/account', '/account/', '/account/index.html'].includes(pathname)) file = 'admin.html';
     else if (['/workspace','/workspace/','/workspace/index.html'].includes(pathname)) file = 'workspace.html';
+    else if (['/owner','/owner/','/owner/index.html'].includes(pathname)) file = 'owner.html';
     else if (file.startsWith('login/')) file = file.slice(6);
     if (!FILES.has(file)) return false;
     try {
@@ -116,7 +119,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           send(res, 200, { status: 'ok', mode: 'local', buildVersion, configured: identityStore.listUsers().length > 0 }); return true;
         }
         if (!route.startsWith('/api/suite/')) return staticFile(req, res, route);
-        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/user/active': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST', '/api/suite/organization/subscription/test-checkout': 'POST', '/api/suite/organization/subscription/test-reconcile': 'POST', '/api/suite/organization/subscription/test-history': 'POST' };
+        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/owner/overview': 'GET', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/user/active': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST', '/api/suite/organization/subscription/test-checkout': 'POST', '/api/suite/organization/subscription/test-reconcile': 'POST', '/api/suite/organization/subscription/test-history': 'POST' };
         if (!methods[route]) return false;
         if (![methods[route]].flat().includes(req.method)) throw new ServiceError(405, 'method_not_allowed');
         if (!['/api/suite/admin/native-users','/api/suite/organization/invite/preview'].includes(route) && parsed.search) throw new ServiceError(400, 'invalid_input');
@@ -155,7 +158,8 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           if (!parent) throw new ServiceError(401, 'invalid_credentials');
           send(res, 200, { authenticated: true, user: userView(identityStore.getUser(parent.subject)) });
         } else {
-          const { parent, user } = await authenticated(req, route.startsWith('/api/suite/admin/'));
+          const { parent, user } = await authenticated(req, route.startsWith('/api/suite/admin/') || route.startsWith('/api/suite/owner/'));
+          if(route.startsWith('/api/suite/owner/')&&(!organizationStore||!isOwner(user)))throw new ServiceError(403,'access_denied');
           if (organizationStore && route.startsWith('/api/suite/admin/')) throw new ServiceError(403,'access_denied');
           const selected = () => organizationStore?.currentSessionOrganization({sessionId:parent.id,accountId:user.id});
           const requireSelection = organizationId => {
@@ -164,6 +168,11 @@ export function createAccountService({ origin, issuer = origin, clients, identit
             if (!active || active.id !== organizationId || !active.admin) throw new ServiceError(403,'access_denied');
           };
           if (route === '/api/suite/account') send(res, 200, account(user));
+          else if (route === '/api/suite/owner/overview') {
+            send(res,200,{ownerOnly:true,summary:organizationStore.ownerSnapshot(),
+              identities:identityStore.listUsers().map(row=>({id:row.id,email:row.email,
+                displayName:row.displayName,state:row.state,centralAdmin:row.role==='admin'}))});
+          }
           else if (route === '/api/suite/organizations') {
             if (!organizationStore) throw new ServiceError(503,'unavailable');
             send(res,200,{organizations:organizationStore.organizationsFor(user.id),selectedOrganization:selected()});
