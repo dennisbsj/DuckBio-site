@@ -185,8 +185,8 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
   acceptPublicContact({submissionId,name,email,organization='',subject,message}={}){
    if(!ownerAccountId||!validId(submissionId)||!validText(name,120)||
       typeof email!=='string'||email.length>254||
-      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||
-      /[\\r\\n]/.test(email)||typeof organization!=='string'||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||
+      /[\r\n]/.test(email)||typeof organization!=='string'||
       organization.length>180||!validText(subject,120)||!validText(message,5000))
     fail('invalid_contact');
    const clean={name:name.trim(),email:email.trim().toLowerCase(),
@@ -211,7 +211,7 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
       'Organization: '+(clean.organization||'Not provided'),
       'Subject: '+clean.subject,'',
       clean.message
-    ].join('\\n');
+    ].join('\n');
     db.prepare(`INSERT INTO internal_mails(id,sender,recipient,from_address,to_address,
      subject,body,kind,created_at,system_reference) VALUES(?,?,?,?,?,?,?,'contact',?,?)`)
       .run(id,'duckbio-contact-form',ownerAccountId,'form@duckbio.internal',
