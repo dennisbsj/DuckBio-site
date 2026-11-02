@@ -7,6 +7,6 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check shared-auth/runtime.mjs && node --check shared-auth/account-service.mjs && node --check organization-store.mjs && node --check private-ui/workspace.js && node --check stripe-test-webhook.mjs && node --check stripe-test-webhook-handler.mjs"
+    "check": "node --check shared-auth/runtime.mjs && node --check shared-auth/account-service.mjs && node --check organization-store.mjs && node --check private-ui/workspace.js && node --check stripe-test-webhook.mjs && node --check stripe-test-webhook-handler.mjs && node --check stripe-test-reconcile.mjs"
   }
 }
