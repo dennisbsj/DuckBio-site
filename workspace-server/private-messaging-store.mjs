@@ -110,7 +110,11 @@ export function createPrivateMessagingStore({
      .all(actorId,kind,limit).map(x=>({...x}));
   },
   conversation(actorId,otherId,{limit=50}={}){
-   access(actorId,otherId,'chat');
+   // Owner contact restrictions apply to SEND, not to reading a chat
+   // legitimately initiated by the owner.
+   activeUser(actorId);
+   activeUser(otherId);
+   if(actorId===otherId)error('self_message_not_allowed');
    if(!Number.isSafeInteger(limit)||limit<1||limit>100)error('invalid_inbox_query');
    return db.prepare(`SELECT id,sender,recipient,body,created_at,read_at
     FROM internal_messages WHERE kind='chat' AND
