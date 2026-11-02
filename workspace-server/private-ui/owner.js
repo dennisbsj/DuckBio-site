@@ -50,6 +50,13 @@ function render(data){
  ];
  $('owner-stats').replaceChildren(...stats.map(([label,value])=>stat(label,value)));
  $('owner-snapshot-time').textContent='Snapshot: '+date(summary.snapshotAt);
+ const alertCounts=summary.alerts?.counts||{};
+ $('owner-notifications').textContent=data.ownerAlertsConfigured===true
+  ?'Owner email alerts enabled · '+(alertCounts.pending||0)+' pending · '+
+   (alertCounts.sending||0)+' in progress · '+(alertCounts.sent||0)+
+   ' accepted by mail provider · '+(alertCounts.failed||0)+
+   ' failed. Delivery to inbox is not guaranteed by provider acceptance.'
+  :'Owner email alerts disabled. To enable, configure the private owner recipient, verified sender, Resend key and explicit server opt-in.';
  fill('owner-organizations',summary.organizations.map(x=>[
   x.name+' · '+x.id,x.activeMembers+' / '+x.memberships,x.admins,
   x.pendingInvitations,x.verifiedSubscriptions,x.unpaidDrafts]));
