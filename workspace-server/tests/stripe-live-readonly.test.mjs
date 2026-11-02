@@ -53,7 +53,7 @@ test('only a private LIVE key is accepted; TEST keys or invalid bindings fail be
   {...binding(),apps:['eel','eel']},
   {...binding(),subscriptionId:'sub_live_bad id'},
   {...binding(),customerId:'cus_test123',seats:0},
-  {...binding(),priceId:'price_bad'},
+  {...binding(),priceId:'invalid-price'},
   {...binding(),apps:['unknown']},
   {...binding(),seats:10001},
  ])await assert.rejects(()=>f.reader.inspect(bad),/Invalid pinned/);
