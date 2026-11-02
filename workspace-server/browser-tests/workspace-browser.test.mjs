@@ -739,4 +739,21 @@ test('Chromium owner creates a cross-contact group and safely tags a user and re
       right:Math.round(x.getBoundingClientRect().right),
       width:Math.round(x.getBoundingClientRect().width)}))}));
  assert(sizes.width<=sizes.viewport+2,JSON.stringify(sizes));
+ await page.goto(origin+'/workspace');
+ await page.getByRole('button',{name:'Sign out'}).click();
+ await page.locator('#sign-in:not([hidden])').waitFor();
+ await page.locator('#email').fill('worker@example.test');
+ await page.locator('#password').fill('Worker passphrase 123456');
+ await page.getByRole('button',{name:'Sign in'}).click();
+ await page.waitForFunction(()=>document.getElementById('status')
+   .textContent.includes('do not have organization administrator'));
+ await page.goto(origin+'/messages');
+ await page.locator('#comms-app:not([hidden])').waitFor();
+ const tagAlert=page.locator('#mentions-list').getByRole('button',{
+  name:/Lab owner tagged you in group chat/});
+ await tagAlert.waitFor();
+ await tagAlert.click();
+ await page.locator('#chat-title').getByText('Cross-team work').waitFor();
+ assert.equal(await page.locator('#send-chat').isDisabled(),true,
+  'workers can read owner-initiated group messages but cannot reply over chat');
 });
