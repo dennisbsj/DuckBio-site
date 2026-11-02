@@ -371,11 +371,12 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     // Aggregate hypothetical test-only capacity, never blended into live purchased seats.
     testSeatCapacity(organizationId,actorId){
       requireAdmin(organizationId,actorId);
-      const projections=db.prepare("SELECT p.decision,p.apps,p.seats FROM stripe_test_seat_projections p JOIN subscription_drafts d ON d.id=p.draft AND d.org=p.org WHERE p.org=? AND d.status='draft'")
+      const projections=db.prepare("SELECT p.decision,p.apps,p.seats,p.period_end FROM stripe_test_seat_projections p JOIN subscription_drafts d ON d.id=p.draft AND d.org=p.org WHERE p.org=? AND d.status='draft'")
         .all(organizationId);
       const counts=Object.fromEntries(APPLICATIONS.map(app=>[app.id,0]));
       for(const row of projections){
-        if(row.decision!=='candidate_paid')continue;
+        if(row.decision!=='candidate_paid'||!Number.isSafeInteger(row.period_end)||
+          row.period_end<=Math.floor(clock()/1000))continue;
         for(const app of JSON.parse(row.apps))counts[app]+=row.seats;
       }
       return {apps:APPLICATIONS.map(app=>({appId:app.id,
@@ -391,8 +392,11 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
             reason:x.reconciliation_reason??null,attempt:x.reconciliation_attempt,
             checkedAt:x.reconciliation_checked_at??null,licensesGranted:false,
             lifecycle:x.reconciliation_lifecycle?JSON.parse(x.reconciliation_lifecycle):null}:null,
-          testSeatProjection:x.projection_decision?{decision:x.projection_decision,attempt:x.projection_attempt,
-            seatsPerApp:x.projection_decision==='candidate_paid'?x.seats:0,
+          testSeatProjection:x.projection_decision?{decision:x.projection_decision==='candidate_paid'&&
+            (!Number.isSafeInteger(x.projection_period_end)||x.projection_period_end<=Math.floor(clock()/1000))
+              ?'payment_review':x.projection_decision,attempt:x.projection_attempt,
+            seatsPerApp:x.projection_decision==='candidate_paid'&&Number.isSafeInteger(x.projection_period_end)&&
+              x.projection_period_end>Math.floor(clock()/1000)?x.seats:0,
             periodEnd:x.projection_period_end??null,licensesGranted:false}:null}));
     },
     createSubscriptionDraft({organizationId,actorId,plan,apps,seats}){
