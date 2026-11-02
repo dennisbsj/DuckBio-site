@@ -4,11 +4,12 @@ import { randomUUID } from 'node:crypto';
 import { createAuthBroker } from './broker.mjs';
 import { createLocalIdentityAdapter, IdentityStoreError } from './identity-store.mjs';
 import { OrganizationError } from '../organization-store.mjs';
+import {OWNER_SUPPORT,SECURITY_SENDER} from '../communications-store.mjs';
 
 const APP_NAMES = Object.freeze({ goflo: 'GoFlo', eel: 'EEL', methpipe: 'MethPipe', mantrain: 'ManTrain', duckman: 'DuckMan', limsman: 'LIMSMan' });
 const STATIC_APPS = new Set(['goflo', 'methpipe', 'mantrain']);
 // Each native app must have an explicit private client origin; retired domains are not fallbacks.
-const FILES = new Set(['index.html', 'login.css', 'app.js', 'app-registry.mjs', 'auth-client.mjs', 'config.mjs', 'admin.html', 'admin.js', 'admin.css', 'workspace.html', 'workspace.css', 'workspace.js', 'owner.html', 'owner.js', ...Object.keys(APP_NAMES).map(id => `assets/${id}.svg`), 'assets/favicon.svg']);
+const FILES = new Set(['index.html', 'login.css', 'app.js', 'app-registry.mjs', 'auth-client.mjs', 'config.mjs', 'admin.html', 'admin.js', 'admin.css', 'workspace.html', 'workspace.css', 'workspace.js', 'owner.html', 'owner.js', 'communications.html', 'communications.js', ...Object.keys(APP_NAMES).map(id => `assets/${id}.svg`), 'assets/favicon.svg']);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
 class ServiceError extends Error { constructor(status, code) { super(code); this.status = status; this.code = code; } }
 const safeId = value => typeof value === 'string' && value.length > 0 && value.length <= 128 && !/[\u0000-\u0020\u007f]/.test(value);
@@ -24,9 +25,23 @@ function userView(user) { return { id: user.id, email: user.email, displayName: 
 
 /** Account service is independent of all business-data apps. It never migrates
  * their passwords/users, links by email, or promotes a central role to an app role. */
-export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null, ownerAccountId = null, ownerAlertsConfigured = false, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
+export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, communicationsStore = null, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null, ownerAccountId = null, ownerAlertsConfigured = false, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
   if(ownerAccountId!==null&&!safeId(ownerAccountId))throw new Error('Invalid private owner account ID');
   const isOwner=user=>Boolean(ownerAccountId&&user?.id===ownerAccountId&&user.role==='admin'&&user.state==='active');
+  const communicationsEnabled=Boolean(organizationStore&&communicationsStore);
+  const membershipActive=id=>Boolean(organizationStore?.organizationsFor(id).length);
+  const canCommunicate=user=>Boolean(communicationsEnabled&&(isOwner(user)||membershipActive(user.id)));
+  function checkRecipient(id){
+    const target=identityStore.getUser(id);
+    if(!target||target.state!=='active'||(!isOwner(target)&&!membershipActive(target.id)))
+      throw new ServiceError(400,'recipient_unavailable');
+    return target;
+  }
+  function displayContact(id){
+    if(id===SECURITY_SENDER)return {accountId:id,displayName:'DuckBio Security',system:true};
+    const row=identityStore.getUser(id);
+    return row?{accountId:id,displayName:row.displayName}: {accountId:id,displayName:'Former user'};
+  }
   const url = new URL(origin);
   const identity = createLocalIdentityAdapter({ store: identityStore, origin });
   const broker = createAuthBroker({ origin, issuer, clients, identity, store: authStore, clock, getClientAddress });
@@ -46,7 +61,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     return { parent, user };
   }
   function account(user) {
-    return { user: userView(user), apps: Object.entries(APP_NAMES).map(([id, name]) => ({ id, name, nativeIdentity: nativeApps.has(id), enabled: Boolean(identityStore.getAccess(user.id, id)) })), admin: user.role === 'admin',ownerPanel:isOwner(user) };
+    return { user: userView(user), apps: Object.entries(APP_NAMES).map(([id, name]) => ({ id, name, nativeIdentity: nativeApps.has(id), enabled: Boolean(identityStore.getAccess(user.id, id)) })), admin: user.role === 'admin',ownerPanel:isOwner(user),communicationsEnabled };
   }
   async function roster(appId) {
     const client = registrations.get(appId);
@@ -79,6 +94,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     else if (['/account', '/account/', '/account/index.html'].includes(pathname)) file = 'admin.html';
     else if (['/workspace','/workspace/','/workspace/index.html'].includes(pathname)) file = 'workspace.html';
     else if (['/owner','/owner/','/owner/index.html'].includes(pathname)) file = 'owner.html';
+    else if (['/messages','/messages/','/messages/index.html'].includes(pathname)) file = 'communications.html';
     else if (file.startsWith('login/')) file = file.slice(6);
     if (!FILES.has(file)) return false;
     try {
@@ -119,7 +135,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           send(res, 200, { status: 'ok', mode: 'local', buildVersion, configured: identityStore.listUsers().length > 0 }); return true;
         }
         if (!route.startsWith('/api/suite/')) return staticFile(req, res, route);
-        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/owner/overview': 'GET', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/user/active': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST', '/api/suite/organization/subscription/test-checkout': 'POST', '/api/suite/organization/subscription/test-reconcile': 'POST', '/api/suite/organization/subscription/test-history': 'POST' };
+        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/owner/overview': 'GET', '/api/suite/communications/self': 'GET', '/api/suite/communications/contacts': 'GET', '/api/suite/communications/search': 'POST', '/api/suite/communications/threads': 'GET', '/api/suite/communications/chat/history': 'POST', '/api/suite/communications/chat/send': 'POST', '/api/suite/communications/chat/read': 'POST', '/api/suite/communications/mail/inbox': 'GET', '/api/suite/communications/mail/sent': 'GET', '/api/suite/communications/mail/send': 'POST', '/api/suite/communications/mail/read': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/user/active': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST', '/api/suite/organization/subscription/test-checkout': 'POST', '/api/suite/organization/subscription/test-reconcile': 'POST', '/api/suite/organization/subscription/test-history': 'POST' };
         if (!methods[route]) return false;
         if (![methods[route]].flat().includes(req.method)) throw new ServiceError(405, 'method_not_allowed');
         if (!['/api/suite/admin/native-users','/api/suite/organization/invite/preview'].includes(route) && parsed.search) throw new ServiceError(400, 'invalid_input');
@@ -167,7 +183,84 @@ export function createAccountService({ origin, issuer = origin, clients, identit
             const active = selected();
             if (!active || active.id !== organizationId || !active.admin) throw new ServiceError(403,'access_denied');
           };
+          if (route.startsWith('/api/suite/communications/')&&!canCommunicate(user))
+            throw new ServiceError(403,'access_denied');
           if (route === '/api/suite/account') send(res, 200, account(user));
+          else if (route === '/api/suite/communications/self') {
+            send(res,200,{address:communicationsStore.addressFor(user.id),
+              owner:isOwner(user),supportAddress:OWNER_SUPPORT,
+              billingAddress:isOwner(user)?communicationsStore.ownerAddresses()?.billing:null,
+              realtime:'polling',mailTransport:'internal_only'});
+          }
+          else if (route === '/api/suite/communications/contacts') {
+            const rows=organizationStore.activeContactBook(user.id).filter(x=>x.accountId!==ownerAccountId);
+            send(res,200,{contacts:rows.filter(x=>identityStore.getUser(x.accountId)?.state==='active')
+              .map(x=>({...x,address:communicationsStore.addressFor(x.accountId)})),
+              ownerHidden:true});
+          }
+          else if (route === '/api/suite/communications/search') {
+            if(typeof body.query!=='string'||body.query.trim().length<2||
+               body.query.length>80)throw new ServiceError(400,'invalid_input');
+            const q=body.query.trim().toLowerCase();
+            const results=[];
+            for(const person of identityStore.listUsers()){
+              if(results.length===20)break;
+              if(person.id===user.id||person.id===ownerAccountId||
+                 person.state!=='active'||!membershipActive(person.id))continue;
+              if(person.displayName.toLowerCase().includes(q)||communicationsStore.addressFor(person.id).includes(q))
+                results.push({...displayContact(person.id),
+                  address:communicationsStore.addressFor(person.id)});
+            }
+            send(res,200,{results,ownerExcluded:true});
+          }
+          else if (route === '/api/suite/communications/threads') {
+            const threads=communicationsStore.chatThreads(user.id).map(x=>({
+              ...x,peer:displayContact(x.peerId)}));
+            send(res,200,{threads});
+          }
+          else if (route === '/api/suite/communications/chat/history') {
+            if(!safeId(body.peerId)||(body.peerId===SECURITY_SENDER&&!isOwner(user)))
+              throw new ServiceError(403,'access_denied');
+            // Historic conversations can be read after a recipient is disabled.
+            send(res,200,{messages:communicationsStore.chatHistory(user.id,body.peerId),
+              peer:displayContact(body.peerId)});
+          }
+          else if (route === '/api/suite/communications/chat/send') {
+            checkRecipient(body.recipientId);
+            if(body.recipientId===ownerAccountId&&!isOwner(user))
+              throw new ServiceError(403,'owner_chat_forbidden');
+            const message=communicationsStore.sendChat({
+              senderId:user.id,recipientId:body.recipientId,
+              body:body.body,clientId:body.clientId});
+            send(res,201,{message});
+          }
+          else if (route === '/api/suite/communications/chat/read') {
+            if(!safeId(body.peerId))throw new ServiceError(400,'invalid_input');
+            if(body.peerId===SECURITY_SENDER&&!isOwner(user))
+              throw new ServiceError(403,'access_denied');
+            send(res,200,{marked:communicationsStore.markChatRead(user.id,body.peerId)});
+          }
+          else if (route === '/api/suite/communications/mail/inbox')
+            send(res,200,{messages:communicationsStore.listMail(user.id,'inbox')});
+          else if (route === '/api/suite/communications/mail/sent')
+            send(res,200,{messages:communicationsStore.listMail(user.id,'sent')});
+          else if (route === '/api/suite/communications/mail/send') {
+            const destination=communicationsStore.resolveAddress(body.to);
+            if(!destination||destination.alias==='billing@duckbio.internal')
+              throw new ServiceError(400,'recipient_unavailable');
+            checkRecipient(destination.accountId);
+            if(destination.accountId===ownerAccountId&&destination.alias!==OWNER_SUPPORT)
+              throw new ServiceError(403,'access_denied');
+            const message=communicationsStore.sendMail({
+              senderId:user.id,recipientId:destination.accountId,
+              toAddress:body.to,subject:body.subject,body:body.body,
+              clientId:body.clientId});
+            send(res,201,{message});
+          }
+          else if (route === '/api/suite/communications/mail/read') {
+            if(!safeId(body.id))throw new ServiceError(400,'invalid_input');
+            send(res,200,{marked:communicationsStore.markMailRead(user.id,body.id)});
+          }
           else if (route === '/api/suite/owner/overview') {
             send(res,200,{ownerOnly:true,ownerAlertsConfigured:Boolean(ownerAlertsConfigured),summary:organizationStore.ownerSnapshot(),
               identities:identityStore.listUsers().map(row=>({id:row.id,email:row.email,
