@@ -65,6 +65,16 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
   }
   // Append inside the same write transaction so rolled-back changes leave no audit event.
   const audit=(org,actor,action,subject,details={})=>db.prepare('INSERT INTO organization_audit(org,actor,action,subject,details,recorded_at) VALUES(?,?,?,?,?,?)').run(org,actor,action,subject,JSON.stringify(details),clock());
+  // Test-only diagnostic freshness; Stripe's last snapshot is never a durable license.
+  // A later in-flight check immediately invalidates older positive diagnostics.
+  const TEST_CHECK_MAX_AGE_MS=24*60*60*1000;
+  function currentPaidTestObservation(row,now){
+    return row?.decision==='candidate_paid'&&row.check_state==='paid_test_verified'&&
+      Number.isSafeInteger(row.attempt)&&row.attempt===row.check_attempt&&
+      Number.isSafeInteger(row.check_completed_at)&&row.check_completed_at<=now&&
+      now-row.check_completed_at<=TEST_CHECK_MAX_AGE_MS&&
+      Number.isSafeInteger(row.period_end)&&row.period_end>Math.floor(now/1000);
+  }
   const pendingSeats=(org,app)=>db.prepare("SELECT count(*) AS n FROM organization_invites WHERE org=? AND expires_at>? AND json_type(roles, '$.' || ?) IS NOT NULL").get(org,clock(),app).n;
   const roles=(org,account)=>Object.fromEntries(db.prepare('SELECT app,role FROM assignments WHERE org=? AND account=?').all(org,account).map(x=>[x.app,x.role]));
   const view=(org,row)=>({accountId:row.account,name:row.name,nickname:row.nickname,email:row.email,admin:Boolean(row.admin),active:Boolean(row.active),roles:roles(org,row.account)});
@@ -385,12 +395,11 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     // Aggregate hypothetical test-only capacity, never blended into live purchased seats.
     testSeatCapacity(organizationId,actorId){
       requireAdmin(organizationId,actorId);
-      const projections=db.prepare("SELECT p.decision,p.apps,p.seats,p.period_end FROM stripe_test_seat_projections p JOIN subscription_drafts d ON d.id=p.draft AND d.org=p.org WHERE p.org=? AND d.status='draft'")
+      const projections=db.prepare("SELECT p.decision,p.apps,p.seats,p.period_end,p.attempt,r.attempt AS check_attempt,r.state AS check_state,r.completed_at AS check_completed_at FROM stripe_test_seat_projections p JOIN subscription_drafts d ON d.id=p.draft AND d.org=p.org LEFT JOIN stripe_test_reconciliation_checks r ON r.draft=p.draft AND r.org=p.org AND r.attempt=(SELECT MAX(z.attempt) FROM stripe_test_reconciliation_checks z WHERE z.draft=p.draft AND z.org=p.org) WHERE p.org=? AND d.status='draft'")
         .all(organizationId);
       const counts=Object.fromEntries(APPLICATIONS.map(app=>[app.id,0]));
       for(const row of projections){
-        if(row.decision!=='candidate_paid'||!Number.isSafeInteger(row.period_end)||
-          row.period_end<=Math.floor(clock()/1000))continue;
+        if(!currentPaidTestObservation(row,clock()))continue;
         for(const app of JSON.parse(row.apps))counts[app]+=row.seats;
       }
       return {apps:APPLICATIONS.map(app=>({appId:app.id,
@@ -404,10 +413,12 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     testSubscriptionEntitlementPlan(organizationId,actorId){
       requireAdmin(organizationId,actorId);
       const current=this.overview(organizationId,actorId);
-      const entries=db.prepare("SELECT s.subscription_id,s.org,s.decision,s.apps,s.seats,s.revision,s.period_end FROM subscription_entitlement_shadow s JOIN subscription_drafts d ON d.id=s.draft AND d.org=s.org WHERE s.source='stripe_test' AND s.org=? AND d.status='draft'")
+      const entries=db.prepare("SELECT s.subscription_id,s.org,s.decision,s.apps,s.seats,s.revision AS attempt,s.period_end,r.attempt AS check_attempt,r.state AS check_state,r.completed_at AS check_completed_at FROM subscription_entitlement_shadow s JOIN subscription_drafts d ON d.id=s.draft AND d.org=s.org LEFT JOIN stripe_test_reconciliation_checks r ON r.draft=s.draft AND r.org=s.org AND r.attempt=(SELECT MAX(z.attempt) FROM stripe_test_reconciliation_checks z WHERE z.draft=s.draft AND z.org=s.org) WHERE s.source='stripe_test' AND s.org=? AND d.status='draft'")
         .all(organizationId)
-        .map(row=>({subscriptionId:row.subscription_id,org:row.org,decision:row.decision,
-          apps:JSON.parse(row.apps),seats:row.seats,attempt:row.revision,
+        .map(row=>({subscriptionId:row.subscription_id,org:row.org,
+          decision:row.decision==='candidate_paid'&&!currentPaidTestObservation(row,clock())
+            ?'unavailable':row.decision,
+          apps:JSON.parse(row.apps),seats:row.seats,attempt:row.attempt,
           periodEnd:row.period_end??null}));
       return buildShadowEntitlementPlan({organizationId,apps:current.apps.map(app=>({
         id:app.id,name:app.name,purchased:app.purchased,assigned:app.assigned,reserved:app.reserved
@@ -417,15 +428,14 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     // subscription inventory. Unbound ready checkouts have no proven subscription.
     testEntitlementReadiness(organizationId,actorId){
       requireAdmin(organizationId,actorId);
-      const sources=db.prepare("SELECT d.id,d.apps,c.state,s.subscription_id,s.decision,s.period_end FROM subscription_drafts d JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org LEFT JOIN subscription_entitlement_shadow s ON s.draft=d.id AND s.org=d.org WHERE d.org=? AND d.status='draft' AND c.state='ready'")
+      const sources=db.prepare("SELECT d.id,d.apps,c.state,s.subscription_id,s.decision,s.period_end,s.revision AS attempt,r.attempt AS check_attempt,r.state AS check_state,r.completed_at AS check_completed_at FROM subscription_drafts d JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org LEFT JOIN subscription_entitlement_shadow s ON s.draft=d.id AND s.org=d.org LEFT JOIN stripe_test_reconciliation_checks r ON r.draft=d.id AND r.org=d.org AND r.attempt=(SELECT MAX(z.attempt) FROM stripe_test_reconciliation_checks z WHERE z.draft=d.id AND z.org=d.org) WHERE d.org=? AND d.status='draft' AND c.state='ready'")
         .all(organizationId);
       const byApp=Object.fromEntries(APPLICATIONS.map(app=>[app.id,{
         appId:app.id,appName:app.name,unboundCheckouts:0,reviewRequired:0,verifiedCandidates:0}]));
       const now=Math.floor(clock()/1000);
       for(const source of sources){
         const unbound=!source.subscription_id;
-        const review=!unbound&&(source.decision!=='candidate_paid'||
-          !Number.isSafeInteger(source.period_end)||source.period_end<=now);
+        const review=!unbound&&!currentPaidTestObservation(source,clock());
         for(const app of JSON.parse(source.apps)){
           if(!byApp[app])fail('invalid_subscription');
           if(unbound)byApp[app].unboundCheckouts++;
@@ -445,14 +455,13 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
       const current=this.overview(organizationId,actorId);
       const capacity=this.testSeatCapacity(organizationId,actorId);
       const projected=new Map(capacity.apps.map(x=>[x.appId,x.candidateTestSeats]));
-      const entries=db.prepare("SELECT p.decision,p.apps,p.period_end FROM stripe_test_seat_projections p JOIN subscription_drafts d ON d.id=p.draft AND d.org=p.org WHERE p.org=? AND d.status='draft'")
+      const entries=db.prepare("SELECT p.decision,p.apps,p.period_end,p.attempt,r.attempt AS check_attempt,r.state AS check_state,r.completed_at AS check_completed_at FROM stripe_test_seat_projections p JOIN subscription_drafts d ON d.id=p.draft AND d.org=p.org LEFT JOIN stripe_test_reconciliation_checks r ON r.draft=p.draft AND r.org=p.org AND r.attempt=(SELECT MAX(z.attempt) FROM stripe_test_reconciliation_checks z WHERE z.draft=p.draft AND z.org=p.org) WHERE p.org=? AND d.status='draft'")
         .all(organizationId);
-      const covered=new Set(),unknown=new Set(),now=Math.floor(clock()/1000);
+      const covered=new Set(),unknown=new Set();
       for(const entry of entries){
         for(const appId of JSON.parse(entry.apps)){
           covered.add(appId);
-          if(entry.decision!=='candidate_paid'||!Number.isSafeInteger(entry.period_end)||
-             entry.period_end<=now)unknown.add(appId);
+          if(!currentPaidTestObservation(entry,clock()))unknown.add(appId);
         }
       }
       return {apps:current.apps.map(app=>{
@@ -476,11 +485,15 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
             reason:x.reconciliation_reason??null,attempt:x.reconciliation_attempt,
             checkedAt:x.reconciliation_checked_at??null,licensesGranted:false,
             lifecycle:x.reconciliation_lifecycle?JSON.parse(x.reconciliation_lifecycle):null}:null,
-          testSeatProjection:x.projection_decision?{decision:x.projection_decision==='candidate_paid'&&
-            (!Number.isSafeInteger(x.projection_period_end)||x.projection_period_end<=Math.floor(clock()/1000))
-              ?'payment_review':x.projection_decision,attempt:x.projection_attempt,
-            seatsPerApp:x.projection_decision==='candidate_paid'&&Number.isSafeInteger(x.projection_period_end)&&
-              x.projection_period_end>Math.floor(clock()/1000)?x.seats:0,
+          testSeatProjection:x.projection_decision?{decision:x.projection_decision==='candidate_paid'&&!currentPaidTestObservation({
+              decision:x.projection_decision,attempt:x.projection_attempt,
+              period_end:x.projection_period_end,check_attempt:x.reconciliation_attempt,
+              check_state:x.reconciliation_state,check_completed_at:x.reconciliation_checked_at
+            },clock())?'payment_review':x.projection_decision,attempt:x.projection_attempt,
+            seatsPerApp:currentPaidTestObservation({decision:x.projection_decision,
+              attempt:x.projection_attempt,period_end:x.projection_period_end,
+              check_attempt:x.reconciliation_attempt,check_state:x.reconciliation_state,
+              check_completed_at:x.reconciliation_checked_at},clock())?x.seats:0,
             periodEnd:x.projection_period_end??null,licensesGranted:false}:null}));
     },
     createSubscriptionDraft({organizationId,actorId,plan,apps,seats}){

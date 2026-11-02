@@ -400,3 +400,61 @@ test('readiness detects an unbound Checkout not represented in paid subscription
  f.reopen();
  assert.equal(f.store.testEntitlementReadiness('one','admin1').readyForManualPlanning,false);
 });
+
+test('in-flight replacement checks suppress old paid TEST capacity across every diagnostic',t=>{
+ const f=fixture(t);
+ const active={subscriptionStatus:'active',cancelAtPeriodEnd:false,cancelAt:null,
+  periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_cycle'};
+ f.finish(f.start(),{...f.paid,lifecycle:active});
+ const ready=()=>f.store.testEntitlementReadiness('one','admin1');
+ const cap=()=>f.store.testSeatCapacity('one','admin1').apps.find(a=>a.appId==='eel').candidateTestSeats;
+ const plan=()=>f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel');
+ const impact=()=>f.store.testSeatImpact('one','admin1').apps.find(a=>a.appId==='eel');
+ const projection=()=>f.store.listSubscriptionDrafts('one','admin1')[0].testSeatProjection;
+ assert.equal(cap(),3);
+ assert.equal(ready().readyForManualPlanning,true);
+ assert.equal(plan().candidateTestSeats,3);
+ assert.equal(impact().status,'test_only_candidate');
+ const activeCheck=f.start();
+ assert.equal(f.store.listSubscriptionDrafts('one','admin1')[0].testReconciliation.state,'checking');
+ assert.equal(cap(),0,'a newer in-flight check invalidates the previous paid candidate');
+ assert.equal(plan().candidateTestSeats,0);
+ assert.equal(plan().status,'manual_review');
+ assert.equal(impact().status,'manual_review');
+ assert.equal(projection().decision,'payment_review');
+ assert.equal(projection().seatsPerApp,0);
+ assert.equal(ready().readyForManualPlanning,false);
+ assert.equal(ready().apps.find(a=>a.appId==='eel').reviewRequired,1);
+ f.reopen();
+ assert.equal(cap(),0,'reopening the SQLite database does not resurrect a stale paid candidate');
+ f.finish(activeCheck,{state:'pending',reason:'subscription_not_active',
+  lifecycle:{...active,subscriptionStatus:'past_due',invoiceStatus:'open'},
+  licensesGranted:false});
+ assert.equal(cap(),0);
+ assert.equal(ready().readyForManualPlanning,false);
+ const latest=f.start();
+ f.finish(latest,{...f.paid,invoiceId:'in_test_fresh9876',lifecycle:active});
+ assert.equal(cap(),3);
+ assert.equal(ready().readyForManualPlanning,true);
+ assert.equal(plan().candidateTestSeats,3);
+ assert(f.store.overview('one','admin1').apps.every(a=>a.purchased===0&&a.assigned===0));
+});
+test('TEST observation freshness expires after 24h, not just at period end',t=>{
+ const f=fixture(t);
+ const lifecycle={subscriptionStatus:'active',cancelAtPeriodEnd:false,cancelAt:null,
+  periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_create'};
+ f.finish(f.start(),{...f.paid,lifecycle});
+ const t0=1783090000000;
+ f.setClock(t0+24*60*60*1000);
+ assert.equal(f.store.testSeatCapacity('one','admin1').apps.find(a=>a.appId==='eel').candidateTestSeats,3,
+  'boundary at exactly 24h is still eligible for a diagnostic');
+ f.setClock(t0+24*60*60*1000+1);
+ assert.equal(f.store.testSeatCapacity('one','admin1').apps.find(a=>a.appId==='eel').candidateTestSeats,0);
+ assert.equal(f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel').status,'manual_review');
+ assert.equal(f.store.testEntitlementReadiness('one','admin1').readyForManualPlanning,false);
+ assert.equal(f.store.testSeatImpact('one','admin1').apps.find(a=>a.appId==='eel').status,'manual_review');
+ assert.equal(f.store.listSubscriptionDrafts('one','admin1')[0].testSeatProjection.seatsPerApp,0);
+ assert.equal(f.store.listSubscriptionDrafts('one','admin1')[0].testReconciliation.state,'paid_test_verified',
+  'an old historical paid observation is kept for audit but not trusted as current');
+ assert(f.store.overview('one','admin1').apps.every(a=>a.purchased===0));
+});
