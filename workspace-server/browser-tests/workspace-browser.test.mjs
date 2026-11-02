@@ -787,3 +787,29 @@ test('Chromium Messenger opens web URLs and app resource links in new tabs witho
  assert.equal(await page.locator('#mail-detail a.comms-reference').getAttribute('href'),'/content/dm000002');
  assert.equal(await page.locator('#mail-detail a.comms-external-link').getAttribute('target'),'_blank');
 });
+
+test('Chromium Remember me uses a persistent expiring cookie only when explicitly selected',{timeout:45000},async t=>{
+ const {page,origin,context}=await fixture(t);
+ await signIn(page);
+ let cookies=await context.cookies(origin);
+ let identityCookie=cookies.find(x=>x.name.includes('suite_identity'));
+ assert(identityCookie,'private identity cookie must exist');
+ assert(identityCookie.expires<0,'default sign-in must use a browser-session cookie');
+ await page.getByRole('button',{name:'Sign out'}).click();
+ await page.locator('#sign-in:not([hidden])').waitFor();
+ await page.locator('#remember-me').check();
+ await signIn(page);
+ cookies=await context.cookies(origin);
+ identityCookie=cookies.find(x=>x.name.includes('suite_identity'));
+ assert(identityCookie,'remembered session cookie exists');
+ assert(identityCookie.expires>Date.now()/1000+12*86400,
+  'opt-in session must remain valid beyond twelve days');
+ assert(identityCookie.expires<Date.now()/1000+15*86400,
+  'persistent session expiry must remain finite and bounded');
+ assert(identityCookie.httpOnly,'remembered session remains inaccessible to client JS');
+ await page.getByRole('button',{name:'Sign out'}).click();
+ await page.locator('#sign-in:not([hidden])').waitFor();
+ cookies=await context.cookies(origin);
+ assert(!cookies.some(x=>x.name.includes('suite_identity')),
+  'sign out revokes persistent identity cookie immediately');
+});

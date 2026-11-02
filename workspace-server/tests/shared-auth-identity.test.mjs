@@ -290,13 +290,23 @@ test('local identity adapter establishes a host-only cookie and ignores duplicat
   const parent = await adapter.authenticate(req, res, { email: user.email, password: PASSWORD });
   assert.equal(parent.subject, user.id);
   const cookie = headers.get('Set-Cookie');
-  assert.match(cookie, /^__Host-suite_identity=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax; Max-Age=28800; Secure$/);
+  assert.match(cookie, /^__Host-suite_identity=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax; Secure$/);
   assert.equal(cookie.includes('Domain='), false);
   const value = cookie.split(';')[0];
   assert.equal((await adapter.getSession({ headers: { host: 'login.example.com', cookie: value } })).subject, user.id);
   assert.equal(await adapter.getSession({ headers: { host: 'evil.example.com', cookie: value } }), null);
   assert.equal(await adapter.getSession({ headers: { host: 'login.example.com', cookie: `${value}; ${value}` } }), null);
   assert.equal(await adapter.authenticate({ headers: { host: 'login.example.com', origin: 'https://evil.example.com' } }, res, { email: user.email, password: PASSWORD }), null);
+  // Explicitly opting in must select the persistent cookie and corresponding
+  // server-side session expiry, without weakening origin/cookie protections.
+  const rememberHeaders = new Map();
+  const rememberRes={getHeader:n=>rememberHeaders.get(n),
+    setHeader:(n,v)=>rememberHeaders.set(n,v)};
+  const remembered=await adapter.authenticate(req,rememberRes,{
+    email:user.email,password:PASSWORD,rememberMe:true});
+  assert(remembered.expiresAt-parent.expiresAt>12*24*60*60_000);
+  assert.match(rememberHeaders.get('Set-Cookie'),
+    /^__Host-suite_identity=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax; Max-Age=1209600; Secure$/);
   await adapter.logout(parent.id);
   assert.equal(await adapter.getSession({ headers: { host: 'login.example.com', cookie: value } }), null);
 });
