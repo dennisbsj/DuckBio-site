@@ -9,7 +9,8 @@ import {createOrganizationStore} from '../organization-store.mjs';
 function fixture(t){
  const dir=mkdtempSync(join(tmpdir(),'duckbio-test-observations-'));
  const dbPath=join(dir,'private','org.sqlite');
- let store=createOrganizationStore({databasePath:dbPath,clock:()=>1783090000000});
+ let currentTime=1783090000000;
+ let store=createOrganizationStore({databasePath:dbPath,clock:()=>currentTime});
  t.after(()=>{store?.close();rmSync(dir,{recursive:true,force:true});});
  for(const [org,account] of [['one','admin1'],['two','admin2']])
   store.setupOrganization({organizationId:org,name:'Lab '+org,owner:{
@@ -26,7 +27,8 @@ function fixture(t){
   invoiceId:'in_test1234',organizationId:'one',draftId:draft.id,price:'price_test12345',
   seats:3,licensesGranted:false};
  return {dbPath,params,draft,start,finish,paid,get store(){return store;},
-   reopen(){store.close();store=createOrganizationStore({databasePath:dbPath,clock:()=>1783090000000});}};
+   setClock(value){currentTime=value;},
+   reopen(){store.close();store=createOrganizationStore({databasePath:dbPath,clock:()=>currentTime});}};
 }
 test('test reconciliation ledger records scoped, durable statuses without issuing seats',t=>{
  const f=fixture(t);
@@ -245,4 +247,21 @@ test('paid subscription and invoice identity are globally bound to one organizat
  assert.equal(f.store.testSeatCapacity('two','admin2').apps.find(x=>x.appId==='goflo').candidateTestSeats,4);
  assert.equal(f.store.testSeatCapacity('one','admin1').apps.find(x=>x.appId==='goflo').candidateTestSeats,0);
  assert(f.store.overview('two','admin2').apps.every(x=>x.purchased===0));
+});
+
+test('expired TEST billing period stops counting as candidate even without another Stripe read',t=>{
+ const f=fixture(t);
+ const result={...f.paid,lifecycle:{
+  subscriptionStatus:'active',cancelAtPeriodEnd:false,cancelAt:null,
+  periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_cycle'}};
+ f.finish(f.start(),result);
+ assert.equal(f.store.testSeatCapacity('one','admin1').apps.find(x=>x.appId==='eel').candidateTestSeats,3);
+ f.setClock(1900000000000);
+ assert.equal(f.store.testSeatCapacity('one','admin1').apps.find(x=>x.appId==='eel').candidateTestSeats,0);
+ const snapshot=f.store.listSubscriptionDrafts('one','admin1')[0];
+ assert.equal(snapshot.testSeatProjection.decision,'payment_review');
+ assert.equal(snapshot.testSeatProjection.seatsPerApp,0);
+ assert.equal(snapshot.testReconciliation.state,'paid_test_verified',
+  'historical payment evidence remains traceable but has no simulated current seats');
+ assert.equal(f.store.overview('one','admin1').apps.find(x=>x.id==='eel').purchased,0);
 });
