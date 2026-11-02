@@ -73,16 +73,18 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     if(!safeId(org)||!safeId(actor)||!db.prepare('SELECT 1 FROM members WHERE org=? AND account=? AND admin=1 AND active=1').get(org,actor))fail('access_denied');
   }
   // Append inside the same write transaction so rolled-back changes leave no audit event.
-  const alertCategory=action=>
+  const alertCategory=(action,details)=>
     action==='organization.created'?'organization':
-    action==='subscription.entitlement.transition'?'subscription':
+    action==='subscription.entitlement.transition'&&
+      (details.state==='canceled'||(Array.isArray(details.deltas)&&
+       details.deltas.some(delta=>delta.delta!==0)))?'subscription':
     ['member.added','member.updated','member.removed','member.deactivated','member.reactivated','invitation.accepted'].includes(action)?'user':
     action==='permission.updated'?'permission':null;
   const audit=(org,actor,action,subject,details={})=>{
     const at=clock();
     const result=db.prepare('INSERT INTO organization_audit(org,actor,action,subject,details,recorded_at) VALUES(?,?,?,?,?,?)')
       .run(org,actor,action,subject,JSON.stringify(details),at);
-    const category=ownerAlertsOptIn?alertCategory(action):null;
+    const category=ownerAlertsOptIn?alertCategory(action,details):null;
     if(category)db.prepare("INSERT INTO owner_alert_outbox(audit_id,category,state,next_attempt_at) VALUES(?,?,'pending',?)")
       .run(Number(result.lastInsertRowid),category,at);
     return result;
@@ -755,6 +757,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         requireAdmin(organizationId,actorId);
         const id=randomUUID(),now=clock(),selected=[...apps].sort();
         db.prepare('INSERT INTO subscription_drafts VALUES(?,?,?,?,?,?,?,?)').run(id,organizationId,plan,JSON.stringify(selected),seats,'draft',now,now);
+        audit(organizationId,actorId,'subscription.draft.created',id,{plan,apps:selected,seats});
         return {id,plan,apps:selected,seats,status:'draft',createdAt:now,updatedAt:now};
       });
     },
@@ -765,7 +768,10 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         const existing=db.prepare('SELECT status FROM subscription_drafts WHERE id=? AND org=?').get(draftId,organizationId);
         if(!existing)fail('subscription_not_found');
         if(db.prepare('SELECT 1 FROM stripe_test_checkouts WHERE draft=? AND org=?').get(draftId,organizationId))fail('checkout_started');
-        if(existing.status!=='canceled')db.prepare('UPDATE subscription_drafts SET status=\'canceled\',updated_at=? WHERE id=? AND org=?').run(clock(),draftId,organizationId);
+        if(existing.status!=='canceled'){
+          db.prepare('UPDATE subscription_drafts SET status=\'canceled\',updated_at=? WHERE id=? AND org=?').run(clock(),draftId,organizationId);
+          audit(organizationId,actorId,'subscription.draft.canceled',draftId);
+        }
         return {id:draftId,status:'canceled'};
       });
     },
