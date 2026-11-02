@@ -311,6 +311,16 @@ test('local identity adapter establishes a host-only cookie and ignores duplicat
   assert.equal(await adapter.getSession({ headers: { host: 'login.example.com', cookie: value } }), null);
 });
 
+test('Remember me duration is strictly capped at fourteen days even for injected configuration',t=>{
+  const {store}=fixture(t);
+  assert.throws(()=>createLocalIdentityAdapter({
+   store,origin:'https://login.example.com',rememberedSessionTtlMs:30*24*60*60_000
+  }),/invalid_expiry/);
+  assert.doesNotThrow(()=>createLocalIdentityAdapter({
+   store,origin:'https://login.example.com',rememberedSessionTtlMs:14*24*60*60_000
+  }));
+});
+
 test('database paths stay private including a symlink into public_html', async t => {
   assert.throws(() => createIdentityStore({ databasePath: 'relative.sqlite' }), /private/);
   assert.throws(() => createIdentityStore({ databasePath: '/tmp/public_html/accounts.sqlite' }), /private/);
