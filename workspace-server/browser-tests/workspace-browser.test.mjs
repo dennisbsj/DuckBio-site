@@ -905,3 +905,34 @@ test('Chromium messaging continuation rejects unknown or duplicate view paramete
  await page.locator('#comms-app:not([hidden])').waitFor();
  assert.equal(new URL(page.url()).origin,origin);
 });
+
+test('Chromium mail mention notification opens the exact authorized inbox message on mobile',{timeout:65000},async t=>{
+ const {page,origin,owner,worker,communicationsStore}=await fixture(t,{communications:true});
+ const destination=communicationsStore.addressFor(worker.id);
+ const handle='@u-'+Buffer.from(worker.id).toString('hex');
+ const mentioned=communicationsStore.sendMail({senderId:owner.id,recipientId:worker.id,
+  toAddress:destination,subject:'Tagged scientific review',
+  body:'Please review this record '+handle,clientId:'mail-mention-review'});
+ communicationsStore.sendMail({senderId:owner.id,recipientId:worker.id,
+  toAddress:destination,subject:'Unrelated newer mail',
+  body:'This is not the referenced message.',clientId:'mail-unrelated-review'});
+ await page.locator('#email').fill('worker@example.test');
+ await page.locator('#password').fill('Worker passphrase 123456');
+ await page.getByRole('button',{name:'Sign in'}).click();
+ await page.waitForFunction(()=>document.getElementById('status')
+  .textContent.includes('do not have organization administrator'));
+ await page.setViewportSize({width:390,height:720});
+ await page.goto(origin+'/messages?view=notifications');
+ await page.locator('#comms-app:not([hidden])').waitFor();
+ const notice=page.locator('#notifications-list').getByRole('button',{
+  name:/Lab owner tagged you in internal mail/});
+ await notice.waitFor();await notice.click();
+ await page.locator('#mail-detail').getByRole('heading',{name:'Tagged scientific review'}).waitFor();
+ assert.match(await page.locator('#mail-detail').textContent(),/Please review this record/);
+ assert.doesNotMatch(await page.locator('#mail-detail').textContent(),/Unrelated newer mail/);
+ assert.equal(communicationsStore.listMail(worker.id,'inbox').find(x=>x.id===mentioned.id)?.id,
+  mentioned.id,'the opened mail belongs to the signed-in inbox');
+ const sizes=await page.evaluate(()=>({viewport:innerWidth,
+  width:document.documentElement.scrollWidth}));
+ assert(sizes.width<=sizes.viewport+2,'mentioned mail remains usable on mobile: '+JSON.stringify(sizes));
+});
