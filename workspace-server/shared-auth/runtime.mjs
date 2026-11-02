@@ -82,7 +82,7 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
         throw new Error('Stripe test reconciliation requires private organization store and test Checkout');
       const stripeTestReconciler=actual.SUITE_STRIPE_TEST_RECONCILE_ENABLED==='true'
         ?createStripeTestReconciler({secretKey:actual.SUITE_STRIPE_TEST_KEY,fetchImpl}):null;
-      const service = createAccountService({ invitationMailer,stripeTestCheckout,stripeTestReconciler, origin: actual.SUITE_ORIGIN, issuer: actual.SUITE_ISSUER || actual.SUITE_ORIGIN, clients: JSON.parse(actual.SUITE_CLIENTS || 'null'), identityStore, organizationStore, authStore: auth.brokerStore, assetRoot: privatePath(actual.SUITE_ASSET_ROOT, 'login frontend'), buildVersion, clock, fetchImpl,
+      const service = createAccountService({ invitationMailer,stripeTestCheckout,stripeTestReconciler,ownerAccountId:actual.SUITE_OWNER_ACCOUNT_ID||null, origin: actual.SUITE_ORIGIN, issuer: actual.SUITE_ISSUER || actual.SUITE_ORIGIN, clients: JSON.parse(actual.SUITE_CLIENTS || 'null'), identityStore, organizationStore, authStore: auth.brokerStore, assetRoot: privatePath(actual.SUITE_ASSET_ROOT, 'login frontend'), buildVersion, clock, fetchImpl,
         // Passenger supplies the request socket; arbitrary forwarded headers do
         // not select limiter buckets. Account+address buckets isolate users.
         getClientAddress: req => req.socket.remoteAddress,
