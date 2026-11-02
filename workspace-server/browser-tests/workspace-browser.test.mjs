@@ -577,6 +577,7 @@ test('in-progress Stripe TEST recheck removes stale seat previews and warns admi
     periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_create'}};
  }};
  const {page,org,owner}=await fixture(t,{stripeTestCheckout:checkout,stripeTestReconciler:checker});
+ const purchasedBefore=org.overview('lab-a',owner.id).apps.find(a=>a.id==='eel').purchased;
  await signIn(page);
  await page.getByRole('button',{name:'Subscriptions'}).click();
  await page.getByRole('button',{name:'Prepare subscription'}).click();
@@ -596,5 +597,5 @@ test('in-progress Stripe TEST recheck removes stale seat previews and warns admi
  await summary.locator('.test-entitlement-readiness').getByText(/DuckNote: 0 unverified Checkout\(s\).*1 billing status/).waitFor();
  await summary.locator('.test-entitlement-preview').getByText(/DuckNote: Billing status requires manual review/).waitFor();
  assert.equal(org.testSeatCapacity('lab-a',owner.id).apps.find(a=>a.appId==='eel').candidateTestSeats,0);
- assert.equal(org.overview('lab-a',owner.id).apps.find(a=>a.id==='eel').purchased,0);
+ assert.equal(org.overview('lab-a',owner.id).apps.find(a=>a.id==='eel').purchased,purchasedBefore);
 });
