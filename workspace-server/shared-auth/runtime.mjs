@@ -10,6 +10,8 @@ import { createSqliteAuthStores } from './sqlite-store.mjs';
 import { createOrganizationStore } from '../organization-store.mjs';
 import { createResendInvitationMailer } from '../invitation-mailer.mjs';
 import { createStripeTestCheckout } from '../stripe-test-checkout.mjs';
+import { createStripeTestWebhookVerifier } from '../stripe-test-webhook.mjs';
+import { createStripeTestWebhookHandler } from '../stripe-test-webhook-handler.mjs';
 import { createSharedAuthGateway, createProtectedStaticHandler } from './gateway.mjs';
 
 function privatePath(value, label) {
@@ -65,12 +67,27 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
         ?createResendInvitationMailer({apiKey:actual.SUITE_RESEND_API_KEY,from:actual.SUITE_INVITATION_FROM,fetchImpl}):null;
       const stripeTestCheckout=(actual.SUITE_STRIPE_TEST_KEY||actual.SUITE_STRIPE_TEST_PRICES_JSON)
         ?createStripeTestCheckout({secretKey:actual.SUITE_STRIPE_TEST_KEY,priceMap:JSON.parse(actual.SUITE_STRIPE_TEST_PRICES_JSON||'null'),origin:actual.SUITE_ORIGIN,fetchImpl}):null;
+      if(actual.SUITE_STRIPE_TEST_WEBHOOK_SECRET&&(!organizationStore||!stripeTestCheckout))
+        throw new Error('Stripe test webhook requires private organization store and configured test Checkout');
+      const stripeTestWebhookHandler=actual.SUITE_STRIPE_TEST_WEBHOOK_SECRET
+        ?createStripeTestWebhookHandler({
+          verifier:createStripeTestWebhookVerifier({webhookSecret:actual.SUITE_STRIPE_TEST_WEBHOOK_SECRET,clock}),
+          record:event=>organizationStore.recordVerifiedStripeTestEvent(event),
+          host:new URL(actual.SUITE_ORIGIN).host
+        }):null;
       const service = createAccountService({ invitationMailer,stripeTestCheckout, origin: actual.SUITE_ORIGIN, issuer: actual.SUITE_ISSUER || actual.SUITE_ORIGIN, clients: JSON.parse(actual.SUITE_CLIENTS || 'null'), identityStore, organizationStore, authStore: auth.brokerStore, assetRoot: privatePath(actual.SUITE_ASSET_ROOT, 'login frontend'), buildVersion, clock, fetchImpl,
         // Passenger supplies the request socket; arbitrary forwarded headers do
         // not select limiter buckets. Account+address buckets isolate users.
         getClientAddress: req => req.socket.remoteAddress,
       });
-      requestHandler = async (req, res) => { if (!await service.handle(req, res)) json(res, 404, { error: 'not_found' }); };
+      requestHandler = async (req, res) => {
+        if(new URL(req.url,actual.SUITE_ORIGIN).pathname==='/api/suite/billing/stripe-test-webhook'){
+          if(!stripeTestWebhookHandler)json(res,404,{error:'not_found'});
+          else await stripeTestWebhookHandler(req,res);
+          return;
+        }
+        if (!await service.handle(req, res)) json(res, 404, { error: 'not_found' });
+      };
     } else if (actual.SUITE_MODE === 'static') {
       if (!['goflo', 'methpipe', 'mantrain'].includes(actual.SUITE_APP_ID)) throw new Error('Only reviewed static apps may use this runtime');
       const brokerOrigin = new URL(actual.SUITE_BROKER_ORIGIN);
