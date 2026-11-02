@@ -383,6 +383,35 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         candidateTestSeats:counts[app.id],licensesGranted:false})),
         testOnly:true,licensesGranted:false};
     },
+    // Diagnostic only: forecast whether hypothetical TEST seats could cover current
+    // assignments and pending invitations. Never modify real purchased seats.
+    testSeatImpact(organizationId,actorId){
+      requireAdmin(organizationId,actorId);
+      const current=this.overview(organizationId,actorId);
+      const capacity=this.testSeatCapacity(organizationId,actorId);
+      const projected=new Map(capacity.apps.map(x=>[x.appId,x.candidateTestSeats]));
+      const entries=db.prepare("SELECT p.decision,p.apps,p.period_end FROM stripe_test_seat_projections p JOIN subscription_drafts d ON d.id=p.draft AND d.org=p.org WHERE p.org=? AND d.status='draft'")
+        .all(organizationId);
+      const covered=new Set(),unknown=new Set(),now=Math.floor(clock()/1000);
+      for(const entry of entries){
+        for(const appId of JSON.parse(entry.apps)){
+          covered.add(appId);
+          if(entry.decision!=='candidate_paid'||!Number.isSafeInteger(entry.period_end)||
+             entry.period_end<=now)unknown.add(appId);
+        }
+      }
+      return {apps:current.apps.map(app=>{
+        const candidateTestSeats=projected.get(app.id)??0;
+        const committed=app.assigned+app.reserved;
+        const status=!covered.has(app.id)?'not_evaluated':
+          unknown.has(app.id)?'manual_review':
+          committed>candidateTestSeats?'assignment_conflict':'test_only_candidate';
+        return {appId:app.id,appName:app.name,livePurchased:app.purchased,
+          assigned:app.assigned,reserved:app.reserved,candidateTestSeats,status,
+          hypotheticalShortfall:status==='assignment_conflict'?committed-candidateTestSeats:0,
+          licensesGranted:false};
+      }),testOnly:true,licensesGranted:false,realSeatChanges:false};
+    },
     listSubscriptionDrafts(organizationId,actorId){
       requireAdmin(organizationId,actorId);
       return db.prepare("SELECT d.*,c.state AS checkout_state,c.url AS checkout_url,r.state AS reconciliation_state,r.reason AS reconciliation_reason,r.attempt AS reconciliation_attempt,r.completed_at AS reconciliation_checked_at,r.lifecycle AS reconciliation_lifecycle,p.attempt AS projection_attempt,p.decision AS projection_decision,p.period_end AS projection_period_end FROM subscription_drafts d LEFT JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org LEFT JOIN stripe_test_reconciliation_checks r ON r.draft=d.id AND r.org=d.org AND r.attempt=(SELECT MAX(z.attempt) FROM stripe_test_reconciliation_checks z WHERE z.draft=d.id AND z.org=d.org) LEFT JOIN stripe_test_seat_projections p ON p.draft=d.id AND p.org=d.org WHERE d.org=? ORDER BY d.created_at DESC,d.id").all(organizationId)
