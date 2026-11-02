@@ -216,6 +216,17 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         return {recorded:true,matched:Boolean(checkout),draftId:checkout?.draft??null};
       });
     },
+    // Return only the locally pinned test session for this organization's active admin.
+    // No caller-supplied Stripe session/price may influence a reconciliation lookup.
+    testReconciliationSnapshot({organizationId,actorId,draftId}){
+      if(!safeId(draftId))fail('invalid_checkout');
+      requireAdmin(organizationId,actorId);
+      const row=db.prepare("SELECT d.id,d.plan,d.apps,d.seats,c.session_id,c.price FROM subscription_drafts d JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org WHERE d.org=? AND d.id=? AND d.status='draft' AND c.state='ready'")
+        .get(organizationId,draftId);
+      if(!row||!row.session_id)fail('checkout_not_found');
+      return {draft:{id:row.id,organizationId,plan:row.plan,apps:JSON.parse(row.apps),seats:row.seats},
+        checkout:{sessionId:row.session_id,price:row.price}};
+    },
     listSubscriptionDrafts(organizationId,actorId){
       requireAdmin(organizationId,actorId);
       return db.prepare('SELECT d.*,c.state AS checkout_state,c.url AS checkout_url FROM subscription_drafts d LEFT JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org WHERE d.org=? ORDER BY d.created_at DESC,d.id').all(organizationId)
