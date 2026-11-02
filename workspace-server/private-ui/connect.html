@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<title>Connect an app | DuckBio Workspace</title>
+<link rel="stylesheet" href="/connect.css">
+<script type="module" src="/connect.js"></script>
+</head>
+<body>
+<main class="connect-card">
+ <header class="brand"><strong>DuckBio</strong><span>Workspace</span></header>
+ <div class="eyebrow">SECURE APP CONNECTION</div>
+ <h1 id="heading">Connect an app</h1>
+ <p>Continue with your DuckBio Workspace account to confirm access to <strong id="app-name">the selected app</strong>.</p>
+ <p class="explanation">The application will receive a short-lived, one-use authorization code. Your password stays in Workspace. The application must verify your existing app account separately.</p>
+ <div id="active" hidden>
+  <p id="identity" class="identity"></p>
+  <button id="continue" class="primary" type="button">Continue to app</button>
+ </div>
+ <form id="login" hidden>
+  <label>Email<input id="email" type="email" autocomplete="username" maxlength="254" required></label>
+  <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
+  <button class="primary" type="submit">Sign in and continue</button>
+ </form>
+ <p role="status" aria-live="polite" id="status">Checking your Workspace session…</p>
+ <a href="/workspace">Go to Workspace without connecting</a>
+</main>
+</body>
+</html>
