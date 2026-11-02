@@ -13,10 +13,10 @@ async function request(route,body){
   headers:body===undefined?{}:{'Content-Type':'application/json','X-CSRF-Token':state.csrf},
   body:body===undefined?undefined:JSON.stringify(body)});
  let result={};try{result=await res.json();}catch{}
- if(!res.ok)throw Error(res.status===401?'Please sign in through Workspace.':
+ if(!res.ok)throw Object.assign(new Error(res.status===401?'Please sign in through Workspace.':
   res.status===403?'Access denied for this account.':
   res.status===409?'Message conflict or rate limit; review your message.':
-  'The message could not be processed ('+res.status+').');
+  'The message could not be processed ('+res.status+').'),{status:res.status});
  return result;
 }
 const stamp=ms=>new Date(ms).toLocaleString('en-GB');
@@ -406,4 +406,14 @@ setInterval(async()=>{
   }
  }catch{/* Preserve existing messages through temporary network loss. */}
 },5000);
-start().catch(error=>{status(error.message);$('comms-app').hidden=true;});
+start().catch(error=>{
+ if(error.status===401){
+  // The native app's popup may arrive without a Workspace session. Return to
+  // exactly one allowlisted communication view after central sign-in.
+  const views=new URLSearchParams(location.search).getAll('view');
+  const view=views.length===1&&['chat','mail','notifications'].includes(views[0])?
+   views[0]:'chat';
+  location.replace('/workspace?messages='+view);return;
+ }
+ status(error.message);$('comms-app').hidden=true;
+});

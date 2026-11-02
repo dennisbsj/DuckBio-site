@@ -23,6 +23,16 @@ async function resumeContentAfterLogin(){
  location.replace('/content/'+entries[0]);
  return true;
 }
+// Messaging continuations have a fixed view allowlist; this is not an
+// arbitrary post-login redirect and never accepts an external URL.
+const messageViews=new Set(['chat','mail','notifications']);
+async function resumeMessagesAfterLogin(){
+ const values=new URLSearchParams(location.search).getAll('messages');
+ if(values.length!==1||!messageViews.has(values[0]))return false;
+ await request('/api/suite/account');
+ location.replace('/messages?view='+values[0]);
+ return true;
+}
 async function csrf(){
  const response=await fetch('/api/suite/auth/session',{credentials:'same-origin',cache:'no-store'});
  const body=await response.json();
@@ -202,6 +212,7 @@ $('login-form').addEventListener('submit',async event=>{
    history.replaceState(null,'','/workspace');
   }
   if(await resumeContentAfterLogin())return;
+  if(await resumeMessagesAfterLogin())return;
   await load();
  }catch(e){status(e.message);}finally{state.busy=false;}
 });
@@ -571,9 +582,12 @@ async function start(){
  const token=new URLSearchParams(location.search).get('invite');
  if(!token){
   // Existing remembered sessions also resume without another login.
-  if(new URLSearchParams(location.search).has('content')){
-   try{if(await resumeContentAfterLogin())return;}
-   catch(error){if(error.status!==401){status(error.message);return;}}
+  if(new URLSearchParams(location.search).has('content')||
+     new URLSearchParams(location.search).has('messages')){
+   try{
+    if(await resumeContentAfterLogin())return;
+    if(await resumeMessagesAfterLogin())return;
+   }catch(error){if(error.status!==401){status(error.message);return;}}
   }
   await load();return;
  }
