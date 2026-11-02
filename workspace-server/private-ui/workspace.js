@@ -316,6 +316,39 @@ async function refreshSubscriptions(){
      }
     });
     card.append(check);
+    const historyPanel=el('div',undefined,'test-billing-history');
+    historyPanel.hidden=true;
+    const historyButton=button('View TEST history',async()=>{
+     if(!historyPanel.hidden){
+      historyPanel.hidden=true;
+      historyButton.textContent='View TEST history';
+      return;
+     }
+     historyButton.disabled=true;
+     try{
+      const response=await request('/api/suite/organization/subscription/test-history',{
+       organizationId:state.selected,draftId:draft.id});
+      if(response.mode!=='test'||response.licensesGranted!==false||
+         !Array.isArray(response.history)||response.history.length>10||
+         response.history.some(row=>row.licensesGranted!==false))
+       throw new Error('Unexpected test billing history');
+      const list=el('ol');
+      if(!response.history.length)historyPanel.replaceChildren(el('small','No recorded TEST checks.'));
+      else{
+       for(const item of response.history){
+        const when=Number.isFinite(item.checkedAt)&&item.checkedAt>0
+         ?new Date(item.checkedAt).toLocaleString('en-GB'):'Not finished';
+        const detail=item.lifecycle?.subscriptionStatus?' · '+item.lifecycle.subscriptionStatus:'';
+        list.append(el('li','#'+item.attempt+' · '+item.state+detail+' · '+when));
+       }
+       historyPanel.replaceChildren(list);
+      }
+      historyPanel.hidden=false;
+      historyButton.textContent='Hide TEST history';
+     }catch(e){status(e.message);}
+     finally{historyButton.disabled=false;}
+    });
+    card.append(historyButton,historyPanel);
    }
    if(!draft.checkoutState)card.append(button('Cancel draft',async()=>{
     if(!window.confirm('Cancel this draft? This does not change purchased subscriptions or licences.'))return;
