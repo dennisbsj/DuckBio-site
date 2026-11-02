@@ -72,10 +72,12 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
  };
  const mailView=x=>({
   id:x.id,from:x.from_address,to:x.to_address,subject:x.subject,
-  body:x.body,kind:x.kind,createdAt:x.created_at,readAt:x.read_at
+  body:x.body,kind:x.kind,createdAt:x.created_at,readAt:x.read_at,
+  mentions:extractMessageReferences(x.body)
  });
  const chatView=x=>({id:x.id,senderId:x.sender,recipientId:x.recipient,
-  body:x.body,createdAt:x.created_at,readAt:x.read_at});
+  body:x.body,createdAt:x.created_at,readAt:x.read_at,
+  mentions:extractMessageReferences(x.body)});
  return Object.freeze({
   // A group includes the creator plus 2–29 explicitly verified participants.
   // The HTTP caller must resolve every account against active central identities
@@ -208,6 +210,9 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
       !validText(body,2000)||!validId(clientId))fail('invalid_chat_message');
    if(ownerAccountId&&recipientId===ownerAccountId&&senderId!==ownerAccountId)
     fail('owner_chat_forbidden');
+   const refs=extractMessageReferences(body);
+   if(refs.userIds.some(x=>x!==senderId&&x!==recipientId))
+    fail('mention_not_in_conversation');
    return tx(()=>{
     const prior=db.prepare('SELECT * FROM chat_messages WHERE sender=? AND client_id=?')
      .get(senderId,clientId);
@@ -263,6 +268,9 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
     fail('mail_recipient_unavailable');
    if(ownerAccountId&&recipientId===ownerAccountId&&
       destination.alias!==OWNER_SUPPORT)fail('mail_recipient_unavailable');
+   const refs=extractMessageReferences(body);
+   if(refs.userIds.some(x=>x!==senderId&&x!==recipientId))
+    fail('mention_not_in_conversation');
    const fromAddress=ownerAccountId&&senderId===ownerAccountId?
     OWNER_SUPPORT:generateAddress(senderId);
    return tx(()=>{
