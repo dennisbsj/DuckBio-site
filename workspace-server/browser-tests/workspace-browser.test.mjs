@@ -44,7 +44,7 @@ async function fixture(t, {multi=false, invitationMailer=null, stripeTestCheckou
  page.on('pageerror',e=>errors.push(String(e)));
  await page.goto(origin+'/workspace');
  await page.locator('#sign-in:not([hidden])').waitFor();
- return {page,origin,org,identity,owner,worker,communicationsStore,context};
+ return {page,origin,org,identity,owner,worker,communicationsStore,context,registrations};
 }
 async function signIn(page,email='owner@example.test',password='Example passphrase 123456') {
  await page.locator('#email').fill(email);
@@ -952,4 +952,70 @@ test('Chromium mail mention notification opens the exact authorized inbox messag
  const sizes=await page.evaluate(()=>({viewport:innerWidth,
   width:document.documentElement.scrollWidth}));
  assert(sizes.width<=sizes.viewport+2,'mentioned mail remains usable on mobile: '+JSON.stringify(sizes));
+});
+
+test('native connect page completes real CSRF, PKCE and app-bound browser login without exposing credentials',{timeout:65000},async t=>{
+ const {page,origin,identity,worker,registrations,context}=await fixture(t);
+ identity.grantAppAccess({userId:worker.id,appId:'eel',localUserId:'native-worker',
+  organizationId:'lab-a'});
+ const client=registrations.find(x=>x.appId==='eel');
+ const verifier=randomBytes(32).toString('base64url');
+ const state=randomBytes(32).toString('base64url');
+ const challenge=(await import('node:crypto')).createHash('sha256').update(verifier).digest('base64url');
+ const query=new URLSearchParams({appId:'eel',redirectUri:client.redirectUris[0],state,codeChallenge:challenge});
+ await context.route('https://example.invalid/**',route=>
+  route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Native callback fixture</title>'}));
+ const bad=new URLSearchParams(query);bad.append('state',state);
+ const failed=await fetch(origin+'/connect?'+bad);
+ assert.equal(failed.status,400,'duplicate state cannot reach the connect UI');
+ assert.match(failed.headers.get('cache-control'),/no-store/);
+ await page.goto(origin+'/connect?'+query);
+ await page.locator('#login:not([hidden])').waitFor();
+ assert.equal(await page.locator('#app-name').textContent(),'DuckNote');
+ await page.locator('#email').fill('worker@example.test');
+ await page.locator('#password').fill('Worker passphrase 123456');
+ await page.getByRole('button',{name:'Sign in and continue'}).click();
+ await page.waitForURL(/https:\/\/example\.invalid\/eel\/auth\/callback\?/);
+ const callback=new URL(page.url());
+ assert.equal(callback.searchParams.get('state'),state);
+ const code=callback.searchParams.get('code');
+ assert.match(code,/^[A-Za-z0-9_-]{32,128}$/);
+ assert.equal(callback.searchParams.size,2,'no credentials or client tokens leak to the app callback');
+ const exchanged=await fetch(origin+'/api/suite/auth/exchange',{method:'POST',
+  headers:{Authorization:'Basic '+Buffer.from(client.id+':'+client.secret).toString('base64'),
+   'Content-Type':'application/json'},
+  body:JSON.stringify({clientId:client.id,redirectUri:client.redirectUris[0],
+   code,state,codeVerifier:verifier})});
+ assert.equal(exchanged.status,200);
+ const proof=await exchanged.json();
+ assert.equal(proof.localIdentity.userId,'native-worker');
+ assert.equal(proof.localIdentity.organizationId,'lab-a');
+ assert.equal(proof.subject,worker.id);
+ const replay=await fetch(origin+'/api/suite/auth/exchange',{method:'POST',
+  headers:{Authorization:'Basic '+Buffer.from(client.id+':'+client.secret).toString('base64'),
+   'Content-Type':'application/json'},
+  body:JSON.stringify({clientId:client.id,redirectUri:client.redirectUris[0],
+   code,state,codeVerifier:verifier})});
+ assert.equal(replay.status,401,'browser authorization code cannot be reused');
+});
+
+test('native connect page confirms an existing Workspace session before issuing an app code',{timeout:55000},async t=>{
+ const {page,origin,identity,owner,registrations,context}=await fixture(t);
+ identity.grantAppAccess({userId:owner.id,appId:'eel',localUserId:'native-owner',
+  organizationId:'lab-a'});
+ await signIn(page);
+ const client=registrations.find(x=>x.appId==='eel');
+ const verifier=randomBytes(32).toString('base64url');
+ const state=randomBytes(32).toString('base64url');
+ const challenge=(await import('node:crypto')).createHash('sha256').update(verifier).digest('base64url');
+ const query=new URLSearchParams({appId:'eel',redirectUri:client.redirectUris[0],state,codeChallenge:challenge});
+ await context.route('https://example.invalid/**',route=>
+  route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Native callback fixture</title>'}));
+ await page.goto(origin+'/connect?'+query);
+ await page.locator('#active:not([hidden])').waitFor();
+ assert.equal(await page.locator('#login').isVisible(),false);
+ assert.match(await page.locator('#identity').textContent(),/Lab owner/);
+ await page.getByRole('button',{name:'Continue to DuckNote'}).click();
+ await page.waitForURL(/https:\/\/example\.invalid\/eel\/auth\/callback\?/);
+ assert.equal(new URL(page.url()).searchParams.get('state'),state);
 });
