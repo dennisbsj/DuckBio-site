@@ -174,11 +174,13 @@ async function refreshNotifications(){
      $('chat-mentions').replaceChildren();
      $('send-chat').disabled=false;
      showTab('chat');await refreshChat();focusMessage(m.messageId);
-    }else{
-     showTab('mail');state.folder='inbox';
+    }else if(m.source==='mail'){
+     // Resolve the message only from this account's authenticated inbox.
+     // A notification ID or sender hint cannot grant mail read access.
+     showTab('mail');state.folder='inbox';state.group=null;
      $('mail-group-panel').hidden=true;
-     await refreshMail();status('Open the tagged mail in your inbox.');
-    }
+     await refreshMail({openMessageId:m.messageId});
+    }else status('That notification no longer has an available conversation.');
    }catch(error){status(error.message);}
   }));
  }
@@ -296,7 +298,7 @@ function renderMail(message){
   void request('/api/suite/communications/mail/read',{id:message.id})
    .catch(error=>status(error.message));
 }
-async function refreshMail(){
+async function refreshMail({openMessageId=null}={}){
  const result=await request('/api/suite/communications/mail/'+state.folder);
  const root=$('mail-list');root.replaceChildren();
  for(const m of result.messages){
@@ -305,6 +307,11 @@ async function refreshMail(){
    ()=>renderMail(m)));
  }
  if(!result.messages.length)root.append(node('p','No messages in '+state.folder+'.'));
+ if(openMessageId!==null){
+  const message=result.messages.find(m=>m.id===openMessageId);
+  if(message){renderMail(message);$('mail-detail').scrollIntoView({block:'start'});}
+  else status('The tagged mail is no longer available in your inbox.');
+ }
 }
 async function sendMail(event){
  event.preventDefault();
