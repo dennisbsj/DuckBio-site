@@ -167,6 +167,48 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       const counts=db.prepare("SELECT state,count(*) AS n FROM owner_alert_outbox GROUP BY state").all();
       return {optedIn:ownerAlertsOptIn,counts:Object.fromEntries(counts.map(x=>[x.state,x.n]))};
     },
+    // Trusted PRIVATE sync feed for owner inbox and security chat.
+    // A bounded audit cursor is advanced only after each durable internal delivery.
+    // No HTTP route calls this method and no Stripe TEST observation qualifies.
+    ownerCommunicationEvents(afterId=0,limit=100){
+      if(!Number.isSafeInteger(afterId)||afterId<0||
+         !Number.isSafeInteger(limit)||limit<1||limit>100)
+        fail('invalid_audit_cursor');
+      return db.prepare(`SELECT a.id,a.actor,a.action,a.subject,a.details,
+        o.name AS organizationName FROM organization_audit a
+        JOIN organizations o ON o.id=a.org WHERE a.id>?
+        ORDER BY a.id ASC LIMIT ?`).all(afterId,limit).map(x=>{
+        const details=JSON.parse(x.details),label=x.organizationName;
+        let category=null,description=null;
+        if(x.action==='subscription.entitlement.transition'){
+          category='billing';
+          const deltas=Array.isArray(details.deltas)?details.deltas
+            .filter(z=>byId.has(z.appId)&&Number.isSafeInteger(z.delta))
+            .map(z=>(byId.get(z.appId).name+': '+(z.delta>0?'+':'')+z.delta+' seats')):[];
+          description='Verified subscription '+(details.state==='canceled'?'canceled':'updated')+
+            '. Revision '+(Number.isSafeInteger(details.revision)?details.revision:'unknown')+
+            '. '+(deltas.length?deltas.join('; '):'No change to assigned seat capacity')+
+            '. Review your private DuckBio owner panel for details.';
+        }else if(x.action==='member.updated'&&details.before?.admin!==true&&
+           details.after?.admin===true){
+          category='security';
+          description='Administrator privileges granted in '+label+
+            '. Actor account: '+x.actor+'. Affected account: '+x.subject+
+            '. Review the change in your private owner panel.';
+        }else if(x.action==='invitation.accepted'&&details.admin===true){
+          category='security';
+          description='New organization administrator activated in '+label+
+            '. Account: '+x.subject+'. Review your private owner panel.';
+        }else if(x.action==='permission.updated'&&details.enabled===true){
+          category='security';
+          const app=byId.get(details.appId)?.name||'an app';
+          description='An app permission was enabled in '+label+'. App: '+app+
+            '. Actor account: '+x.actor+'. Affected account: '+x.subject+
+            '. Review your private owner panel.';
+        }
+        return {auditId:x.id,category,organizationName:label,description};
+      });
+    },
     // INTERNAL owner snapshot. Caller must enforce authenticated central owner ID.
     // Never expose this method to organization-scoped administrator routes.
     ownerSnapshot(){
