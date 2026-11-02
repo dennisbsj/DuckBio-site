@@ -11,8 +11,12 @@ export async function authorizedContentDestination({
     !organizationStore||typeof organizationStore.accessFor!=='function')
   return null;
  const expectedApp=prefixes[contentId.slice(0,2)];
- const client=clients.find(x=>x.appId===expectedApp);
- if(!client||typeof client.nativeOrigin!=='string')return null;
+ // Ambiguous native client registrations must never resolve via array order.
+ // Fail closed rather than selecting an arbitrary origin for an app prefix.
+ const matchingClients=clients.filter(x=>x?.appId===expectedApp);
+ if(matchingClients.length!==1)return null;
+ const client=matchingClients[0];
+ if(typeof client.nativeOrigin!=='string')return null;
  let origin;
  try{origin=new URL(client.nativeOrigin);}catch{return null;}
  if(origin.origin!==client.nativeOrigin||origin.protocol!=='https:'||

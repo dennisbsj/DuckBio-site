@@ -39,3 +39,17 @@ test('no configured trusted native verifier cannot open content',async()=>{
  assert.equal(await authorizedContentDestination({...args(),resolveResource:async()=>{
   throw Error('provider offline');}}),null);
 });
+
+test('ambiguous native app configuration fails closed regardless of client order',async()=>{
+ const canonical={appId:'limsman',nativeOrigin:'https://labduck.duckbio.net'};
+ const conflicting={appId:'limsman',nativeOrigin:'https://other.example'};
+ for(const clients of [[canonical,conflicting],[conflicting,canonical],[canonical,canonical]]){
+  let calls=0;
+  const destination=await authorizedContentDestination({...args(),clients,
+   resolveResource:async()=>{calls++;return {authorized:true,appId:'limsman',organizationId:'org1',url:'https://labduck.duckbio.net/content/ld000001'};}});
+  assert.equal(destination,null);
+  assert.equal(calls,0,'ambiguous configuration must deny before resolving native resources');
+ }
+ assert.equal(await authorizedContentDestination({...args(),clients:[null,canonical]}),
+  'https://labduck.duckbio.net/content/ld000001');
+});
