@@ -290,6 +290,23 @@ async function refreshSubscriptions(){
    ?'Stripe TEST seat projection (not purchased or activated): '+byApp.join(' · ')+
     '. This is a simulation; no real seats or app access have changed.'
    :'Stripe TEST seat projection: no eligible candidate seats. Real purchased seats and permissions remain unchanged.'));
+  if(result.testSeatImpact?.testOnly===true&&result.testSeatImpact.licensesGranted===false&&
+     result.testSeatImpact.realSeatChanges===false){
+   const list=el('ul');
+   for(const impact of result.testSeatImpact.apps){
+    if(impact.status==='assignment_conflict')
+     list.append(el('li',impact.appName+': manual action required — '+
+      impact.assigned+' assigned and '+impact.reserved+' reserved, but only '+
+      impact.candidateTestSeats+' candidate TEST seats ('+
+      impact.hypotheticalShortfall+' hypothetical shortfall).'));
+    else if(impact.status==='manual_review')
+     list.append(el('li',impact.appName+': billing status requires manual review. '+
+      impact.assigned+' assigned and '+impact.reserved+' reserved users remain unchanged.'));
+   }
+   if(list.childElementCount){
+    simulation.append(el('strong','TEST transition review (no access will be removed):'),list);
+   }
+  }
  }
  const root=$('subscription-drafts');root.replaceChildren();
  if(!result.drafts.length){root.append(el('p','No subscription drafts.'));return;}
