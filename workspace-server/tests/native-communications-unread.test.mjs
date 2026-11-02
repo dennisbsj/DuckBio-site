@@ -115,4 +115,25 @@ test('native app can read only its validated central identity unread counters, n
  identity.revokeAppAccess(worker.id,'eel');
  assert.equal((await native({sessionToken:token})).status,401,
   'revoking the app mapping immediately invalidates the native proof');
+
+ // A fresh, valid broker proof without a bound organization must not be
+ // allowed to borrow this user's otherwise active DuckNote organization role.
+ identity.grantAppAccess({userId:worker.id,appId:'eel',localUserId:'native-worker'});
+ const secondVerifier=randomBytes(32).toString('base64url');
+ const secondState=randomBytes(32).toString('base64url');
+ const secondAuthorize=await fetch(origin+'/api/suite/auth/authorize',{method:'POST',
+  headers:{...browserHeaders,Cookie:csrfCookie+'; '+identityCookie},
+  body:JSON.stringify({appId:'eel',redirectUri:client.redirectUris[0],
+   codeChallenge:createHash('sha256').update(secondVerifier).digest('base64url'),
+   codeChallengeMethod:'S256',state:secondState,returnPath:'/'})});
+ assert.equal(secondAuthorize.status,200);
+ const secondCode=new URL((await secondAuthorize.json()).redirectUrl).searchParams.get('code');
+ const secondExchange=await fetch(origin+'/api/suite/auth/exchange',{method:'POST',
+  headers:{Authorization:basic,'Content-Type':'application/json'},
+  body:JSON.stringify({clientId:client.id,code:secondCode,state:secondState,
+   codeVerifier:secondVerifier,redirectUri:client.redirectUris[0]})});
+ assert.equal(secondExchange.status,200);
+ const unboundToken=(await secondExchange.json()).sessionToken;
+ assert.equal((await native({sessionToken:unboundToken})).status,403,
+  'an unbound native grant may not inherit unrelated organization access');
 });
