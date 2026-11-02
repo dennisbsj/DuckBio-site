@@ -156,7 +156,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           const user=parent?identityStore.getUser(parent.subject):null;
           if(!parent||user?.state!=='active'){
             // Authentication is required before revealing native resource location.
-            res.writeHead(303,{'Location':'/workspace','Cache-Control':'private, no-store',
+            res.writeHead(303,{'Location':'/workspace?content='+contentId,'Cache-Control':'private, no-store',
               'Referrer-Policy':'no-referrer'});res.end();return true;
           }
           const destination=await authorizedContentDestination({

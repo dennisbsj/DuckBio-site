@@ -12,6 +12,17 @@ async function request(route,data){
  return body;
 }
 function showPortal(visible){$('portal').hidden=!visible;$('sign-in').hidden=visible;$('organization-choice').hidden=true;$('invite-accept-panel').hidden=true;$('logout').hidden=!visible;}
+// Only an app-prefixed content ID can survive a login handoff. Never accept
+// arbitrary URLs or user-controlled destination origins.
+const continuationPattern=/^(?:ld|dm|dn|cd|md|dt)[0-9]{6,}$/;
+async function resumeContentAfterLogin(){
+ const entries=new URLSearchParams(location.search).getAll('content');
+ if(entries.length!==1||!continuationPattern.test(entries[0]))return false;
+ // Check the central session; the gateway then checks native permissions.
+ await request('/api/suite/account');
+ location.replace('/content/'+entries[0]);
+ return true;
+}
 async function csrf(){
  const response=await fetch('/api/suite/auth/session',{credentials:'same-origin',cache:'no-store'});
  const body=await response.json();
@@ -190,6 +201,7 @@ $('login-form').addEventListener('submit',async event=>{
    state.inviteToken=null;state.inviteDetails=null;
    history.replaceState(null,'','/workspace');
   }
+  if(await resumeContentAfterLogin())return;
   await load();
  }catch(e){status(e.message);}finally{state.busy=false;}
 });
@@ -557,7 +569,14 @@ $('invite-accept-form').addEventListener('submit',async e=>{
 });
 async function start(){
  const token=new URLSearchParams(location.search).get('invite');
- if(!token){await load();return;}
+ if(!token){
+  // Existing remembered sessions also resume without another login.
+  if(new URLSearchParams(location.search).has('content')){
+   try{if(await resumeContentAfterLogin())return;}
+   catch(error){if(error.status!==401){status(error.message);return;}}
+  }
+  await load();return;
+ }
  state.inviteToken=token;
  await csrf();
  try{

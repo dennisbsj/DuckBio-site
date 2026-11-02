@@ -13,7 +13,7 @@ import {createOrganizationStore} from '../organization-store.mjs';
 import {createCommunicationsStore} from '../communications-store.mjs';
 import {createAccountService} from '../shared-auth/account-service.mjs';
 
-async function fixture(t, {multi=false, invitationMailer=null, stripeTestCheckout=null, stripeTestReconciler=null,communications=false}={}) {
+async function fixture(t, {multi=false, invitationMailer=null, stripeTestCheckout=null, stripeTestReconciler=null,communications=false,resolveContentResource=null}={}) {
  const temp=mkdtempSync(path.join(os.tmpdir(),'duckbio-workspace-browser-'));
  const identity=createIdentityStore({databasePath:path.join(temp,'identity.sqlite')});
  const auth=createSqliteAuthStores({databasePath:path.join(temp,'auth.sqlite')});
@@ -37,7 +37,7 @@ async function fixture(t, {multi=false, invitationMailer=null, stripeTestCheckou
  // Register cleanup before service/browser creation, including constructor failures.
  t.after(async()=>{await browser?.close();server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));identity.close();auth.close();org.close();communicationsStore?.close();rmSync(temp,{recursive:true,force:true});assert.deepEqual(errors,[],'uncaught browser errors');});
  const assetRoot=fileURLToPath(new URL('../private-ui/',import.meta.url));
- service=createAccountService({invitationMailer,stripeTestCheckout,stripeTestReconciler,origin,issuer:'https://login.example.invalid',clients:registrations,identityStore:identity,organizationStore:org,communicationsStore,ownerAccountId:communications?owner.id:null,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
+ service=createAccountService({invitationMailer,stripeTestCheckout,stripeTestReconciler,origin,issuer:'https://login.example.invalid',clients:registrations,identityStore:identity,organizationStore:org,communicationsStore,resolveContentResource,ownerAccountId:communications?owner.id:null,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:1280,height:800}});
  const page=await context.newPage();
@@ -812,4 +812,55 @@ test('Chromium Remember me uses a persistent expiring cookie only when explicitl
  cookies=await context.cookies(origin);
  assert(!cookies.some(x=>x.name.includes('suite_identity')),
   'sign out revokes persistent identity cookie immediately');
+});
+
+// A content reference must survive central login, but must never provide direct
+// access to native app data or allow a caller-controlled redirect origin.
+test('Chromium global content ID continues after login through the protected gateway',{timeout:45000},async t=>{
+ const calls=[];
+ const f=await fixture(t,{resolveContentResource:async args=>{
+  calls.push(args);
+  return {authorized:true,appId:'eel',organizationId:'lab-a',
+   url:'https://example.invalid/content/dn000001'};
+ }});
+ const {page,origin,worker,context}=f;
+ const response=await page.request.get(origin+'/content/dn000001',{maxRedirects:0});
+ assert.equal(response.status(),303);
+ assert.equal(response.headers().location,'/workspace?content=dn000001');
+ assert.equal(calls.length,0,'no native resource verification before central login');
+ await page.goto(origin+'/content/dn000001');
+ await page.locator('#sign-in:not([hidden])').waitFor();
+ // Intercept only the *browser* navigation after login. Redirect-chain network
+ // requests to example.invalid cannot reliably be intercepted by Playwright.
+ await page.route(origin+'/content/dn000001',route=>route.fulfill({
+  status:200,contentType:'text/html',body:'<h1>Protected gateway requested</h1>'}));
+ assert.match(page.url(),/\/workspace\?content=dn000001$/);
+ await page.locator('#email').fill('worker@example.test');
+ await page.locator('#password').fill('Worker passphrase 123456');
+ await page.getByRole('button',{name:'Sign in'}).click();
+ await page.waitForURL(origin+'/content/dn000001');
+ assert.equal(await page.locator('h1').textContent(),'Protected gateway requested');
+ assert.equal(calls.length,0,'browser interception must not call the real resolver');
+ // The real authenticated gateway is checked separately without following the
+ // external native redirect or pretending that an app session exists.
+ const verified=await page.request.get(origin+'/content/dn000001',{maxRedirects:0});
+ assert.equal(verified.status(),303);
+ assert.equal(verified.headers().location,'https://example.invalid/content/dn000001');
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].viewerId,worker.id);
+ assert.equal(calls[0].appId,'eel');
+ assert.equal((await context.cookies('https://example.invalid')).length,0,
+  'central login does not install any native app session cookie');
+});
+
+test('Chromium content-login continuation rejects external and duplicate targets',{timeout:45000},async t=>{
+ const {page,origin}=await fixture(t);
+ await page.goto(origin+'/workspace?content='+encodeURIComponent('https://evil.example/steal'));
+ await signIn(page);
+ assert.match(page.url(),/\/workspace\?/);
+ assert.equal(new URL(page.url()).origin,origin);
+ await page.goto(origin+'/workspace?content=dn000001&content=dm000002');
+ await page.locator('#portal:not([hidden])').waitFor();
+ assert.equal(new URL(page.url()).origin,origin);
+ assert.match(page.url(),/\/workspace\?/);
 });
