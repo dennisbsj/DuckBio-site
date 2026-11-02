@@ -107,6 +107,40 @@ function newGroup(kind){
  $('group-create-title').textContent='Create '+(kind==='chat'?'group chat':'group mail');
  renderGroupChoices();$('group-create-panel').scrollIntoView({behavior:'smooth',block:'start'});
 }
+async function refreshMentions(){
+ const result=await request('/api/suite/communications/mentions');
+ const root=$('mentions-list');root.replaceChildren();
+ if(!result.mentions.length){root.append(node('p','No mentions yet.'));return;}
+ for(const m of result.mentions){
+  const label=(m.readAt?'':'● ')+m.sender.displayName+' tagged you in '+
+   ({chat:'chat',mail:'internal mail',group_chat:'group chat',
+     group_mail:'group mail'}[m.source]||'a message')+
+   ' · '+stamp(m.createdAt);
+  root.append(button(label,async()=>{
+   try{
+    await request('/api/suite/communications/mention/read',{notificationId:m.id});
+    await refreshMentions();
+    if(m.groupId){
+     const groups=await request('/api/suite/communications/groups');
+     const group=groups.groups.find(x=>x.id===m.groupId);
+     if(group)await openGroup(group);
+     else status('That private group is no longer available.');
+    }else if(m.source==='chat'){
+     state.group=null;
+     state.peer={accountId:m.senderId,displayName:m.sender.displayName};
+     $('chat-title').textContent=m.sender.displayName;
+     $('chat-mentions').replaceChildren();
+     $('send-chat').disabled=false;
+     showTab('chat');await refreshChat();
+    }else{
+     showTab('mail');state.folder='inbox';
+     $('mail-group-panel').hidden=true;
+     await refreshMail();status('Open your internal mail inbox to read the mention.');
+    }
+   }catch(error){status(error.message);}
+  }));
+ }
+}
 async function refreshGroups(){
  const data=await request('/api/suite/communications/groups');
  for(const kind of ['chat','mail']){
@@ -255,7 +289,7 @@ async function start(){
  $('comms-app').hidden=false;
  const data=await request('/api/suite/communications/contacts');
  renderContacts(data.contacts);
- await refreshThreads();await refreshMail();await refreshGroups();
+ await refreshThreads();await refreshMail();await refreshGroups();await refreshMentions();
  status('Signed in. Chat messages refresh automatically while this page is open.');
 }
 $('tab-chat').addEventListener('click',()=>showTab('chat'));
@@ -308,6 +342,7 @@ for(const [id,folder] of [['mail-inbox-button','inbox'],['mail-sent-button','sen
 }
 setInterval(async()=>{
  if(!state.self||document.hidden||state.busy)return;
+ try{await refreshMentions();}catch{}
  try{
   if(state.tab==='chat'){
    await refreshThreads();await refreshGroups();
