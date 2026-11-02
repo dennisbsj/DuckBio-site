@@ -49,6 +49,10 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
   ].join(';')+';');
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
+  // Older private SQLite databases created before lifecycle diagnostics have no column.
+  if(!db.prepare('PRAGMA table_info(stripe_test_reconciliation_checks)').all().some(row=>row.name==='lifecycle'))
+    db.exec("ALTER TABLE stripe_test_reconciliation_checks ADD COLUMN lifecycle TEXT CHECK(lifecycle IS NULL OR json_valid(lifecycle))");
+
   for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))chmodSync(databasePath+suffix,0o600);
   const tx=work=>{db.exec('BEGIN IMMEDIATE');try{const result=work();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
   function requireAdmin(org,actor){
@@ -261,6 +265,29 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
       if(result.state==='pending' && !reasons.includes(result.reason))fail('invalid_reconciliation');
       if(result.state==='unavailable' && (result.reason!==undefined || result.invoiceId!==undefined))
         fail('invalid_reconciliation');
+      // These fields are diagnostics from the private Stripe TEST reader, never grants.
+      // Store a small, schema-checked lifecycle object rather than whole remote payloads.
+      let lifecycle=null;
+      if(result.lifecycle!==undefined){
+        const x=result.lifecycle;
+        if(result.state==='unavailable'||!x||typeof x!=='object'||Array.isArray(x)||
+           !['incomplete','incomplete_expired','trialing','active','past_due',
+             'canceled','unpaid','paused'].includes(x.subscriptionStatus)||
+           typeof x.cancelAtPeriodEnd!=='boolean'||
+           (x.cancelAt!==null&&(!Number.isSafeInteger(x.cancelAt)||x.cancelAt<1))||
+           (x.periodEnd!==null&&(!Number.isSafeInteger(x.periodEnd)||x.periodEnd<1))||
+           (x.invoiceStatus!==null&&!['draft','open','paid','uncollectible','void'].includes(x.invoiceStatus))||
+           (x.billingReason!==null&&!['subscription','subscription_create','subscription_cycle',
+             'subscription_threshold','subscription_update'].includes(x.billingReason))||
+           Object.keys(x).sort().join(',')!==
+             ['billingReason','cancelAt','cancelAtPeriodEnd','invoiceStatus','periodEnd','subscriptionStatus'].join(','))
+          fail('invalid_reconciliation');
+        if(result.state==='paid_test_verified'&&(x.subscriptionStatus!=='active'||x.invoiceStatus!=='paid'))
+          fail('invalid_reconciliation');
+        if(result.state==='pending'&&x.subscriptionStatus!=='active'&&result.reason!=='subscription_not_active')
+          fail('invalid_reconciliation');
+        lifecycle=JSON.stringify(x);
+      }
       return tx(()=>{
         requireAdmin(organizationId,actorId);
         const current=db.prepare('SELECT * FROM stripe_test_reconciliation_checks WHERE draft=? AND org=? ORDER BY attempt DESC LIMIT 1')
@@ -282,22 +309,25 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
           subscriptionId=result.subscriptionId;invoiceId=result.invoiceId;
         }
         const now=clock();
-        db.prepare("UPDATE stripe_test_reconciliation_checks SET state=?,reason=?,subscription_id=?,invoice_id=?,completed_at=? WHERE draft=? AND org=? AND attempt=? AND state='checking'")
-          .run(result.state,reason,subscriptionId,invoiceId,now,draftId,organizationId,attempt);
+        db.prepare("UPDATE stripe_test_reconciliation_checks SET state=?,reason=?,subscription_id=?,invoice_id=?,lifecycle=?,completed_at=? WHERE draft=? AND org=? AND attempt=? AND state='checking'")
+          .run(result.state,reason,subscriptionId,invoiceId,lifecycle,now,draftId,organizationId,attempt);
         audit(organizationId,actorId,'checkout.test.reconciliation.observed',draftId,
-          {attempt,state:result.state,...(reason?{reason}:{})});
+          {attempt,state:result.state,...(reason?{reason}:{}),
+           ...(lifecycle?{subscriptionStatus:result.lifecycle.subscriptionStatus}:{} )});
         return {state:result.state,...(reason?{reason}:{}),attempt,
-          checkedAt:now,licensesGranted:false};
+          checkedAt:now,licensesGranted:false,
+          ...(lifecycle?{lifecycle:JSON.parse(lifecycle)}:{})};
       });
     },
     listSubscriptionDrafts(organizationId,actorId){
       requireAdmin(organizationId,actorId);
-      return db.prepare("SELECT d.*,c.state AS checkout_state,c.url AS checkout_url,r.state AS reconciliation_state,r.reason AS reconciliation_reason,r.attempt AS reconciliation_attempt,r.completed_at AS reconciliation_checked_at FROM subscription_drafts d LEFT JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org LEFT JOIN stripe_test_reconciliation_checks r ON r.draft=d.id AND r.org=d.org AND r.attempt=(SELECT MAX(z.attempt) FROM stripe_test_reconciliation_checks z WHERE z.draft=d.id AND z.org=d.org) WHERE d.org=? ORDER BY d.created_at DESC,d.id").all(organizationId)
+      return db.prepare("SELECT d.*,c.state AS checkout_state,c.url AS checkout_url,r.state AS reconciliation_state,r.reason AS reconciliation_reason,r.attempt AS reconciliation_attempt,r.completed_at AS reconciliation_checked_at,r.lifecycle AS reconciliation_lifecycle FROM subscription_drafts d LEFT JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org LEFT JOIN stripe_test_reconciliation_checks r ON r.draft=d.id AND r.org=d.org AND r.attempt=(SELECT MAX(z.attempt) FROM stripe_test_reconciliation_checks z WHERE z.draft=d.id AND z.org=d.org) WHERE d.org=? ORDER BY d.created_at DESC,d.id").all(organizationId)
         .map(x=>({id:x.id,plan:x.plan,apps:JSON.parse(x.apps),seats:x.seats,status:x.status,createdAt:x.created_at,updatedAt:x.updated_at,
           checkoutState:x.checkout_state??null,checkoutUrl:x.checkout_state==='ready'?x.checkout_url:null,
           testReconciliation:x.reconciliation_state?{state:x.reconciliation_state,
             reason:x.reconciliation_reason??null,attempt:x.reconciliation_attempt,
-            checkedAt:x.reconciliation_checked_at??null,licensesGranted:false}:null}));
+            checkedAt:x.reconciliation_checked_at??null,licensesGranted:false,
+            lifecycle:x.reconciliation_lifecycle?JSON.parse(x.reconciliation_lifecycle):null}:null}));
     },
     createSubscriptionDraft({organizationId,actorId,plan,apps,seats}){
       if(!['Single','Mixed','Bundle'].includes(plan)||!Array.isArray(apps)||!Number.isSafeInteger(seats)||seats<1||seats>10000||new Set(apps).size!==apps.length||apps.some(id=>!byId.has(id)))fail('invalid_subscription');
