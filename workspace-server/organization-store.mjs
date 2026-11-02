@@ -3,6 +3,7 @@ import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import {existsSync,mkdirSync,realpathSync,chmodSync,readFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {buildShadowEntitlementPlan} from './subscription-entitlement-planner.mjs';
 
 const policy=JSON.parse(readFileSync(fileURLToPath(new URL('../suite-permissions.json',import.meta.url)),'utf8'));
 export const APPLICATIONS=Object.freeze([['limsman','LabDuck','LIMSMan'],['goflo','CytoDuck','GoFlo'],['methpipe','DuckPipe','MethPipe'],['eel','DuckNote','EEL'],['duckman','DuckMan','DuckMan'],['mantrain','DuckTrain','ManTrain']].map(([id,name,key])=>Object.freeze({id,name,roles:Object.freeze(Object.keys(policy.apps[key].roles)),rolePermissions:Object.freeze(policy.apps[key].roles),permissions:Object.freeze([...new Set(Object.values(policy.apps[key].roles).flat().filter(p=>p!=='*'))].sort())})));
@@ -48,7 +49,8 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     "CREATE TABLE IF NOT EXISTS stripe_test_reconciliation_checks(draft TEXT NOT NULL REFERENCES subscription_drafts(id),org TEXT NOT NULL REFERENCES organizations(id),attempt INTEGER NOT NULL CHECK(attempt>=1),session_id TEXT NOT NULL,price TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('checking','pending','paid_test_verified','unavailable','superseded')),reason TEXT,subscription_id TEXT,invoice_id TEXT,started_at INTEGER NOT NULL,completed_at INTEGER,PRIMARY KEY(draft,attempt))",
     "CREATE TABLE IF NOT EXISTS stripe_test_subscription_bindings(subscription_id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),draft TEXT NOT NULL UNIQUE REFERENCES subscription_drafts(id),created_at INTEGER NOT NULL)",
     "CREATE TABLE IF NOT EXISTS stripe_test_invoice_refs(invoice_id TEXT PRIMARY KEY,subscription_id TEXT NOT NULL REFERENCES stripe_test_subscription_bindings(subscription_id),org TEXT NOT NULL REFERENCES organizations(id),draft TEXT NOT NULL REFERENCES subscription_drafts(id),recorded_at INTEGER NOT NULL)",
-    "CREATE TABLE IF NOT EXISTS stripe_test_seat_projections(draft TEXT PRIMARY KEY REFERENCES subscription_drafts(id),org TEXT NOT NULL REFERENCES organizations(id),attempt INTEGER NOT NULL CHECK(attempt>=1),decision TEXT NOT NULL CHECK(decision IN ('candidate_paid','payment_review','cancellation_review','awaiting_payment','unavailable')),apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),period_end INTEGER,updated_at INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS stripe_test_seat_projections(draft TEXT PRIMARY KEY REFERENCES subscription_drafts(id),org TEXT NOT NULL REFERENCES organizations(id),attempt INTEGER NOT NULL CHECK(attempt>=1),decision TEXT NOT NULL CHECK(decision IN ('candidate_paid','payment_review','cancellation_review','awaiting_payment','unavailable')),apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),period_end INTEGER,updated_at INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS subscription_entitlement_shadow(subscription_id TEXT PRIMARY KEY,source TEXT NOT NULL CHECK(source='stripe_test'),org TEXT NOT NULL REFERENCES organizations(id),draft TEXT NOT NULL UNIQUE REFERENCES subscription_drafts(id),revision INTEGER NOT NULL CHECK(revision>0),decision TEXT NOT NULL CHECK(decision IN ('candidate_paid','payment_review','cancellation_review','awaiting_payment','unavailable')),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),period_end INTEGER,last_paid_invoice TEXT,updated_at INTEGER NOT NULL)"
   ].join(';')+';');
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
@@ -344,6 +346,18 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
              ?'awaiting_payment':'payment_review';
         db.prepare("INSERT INTO stripe_test_seat_projections(draft,org,attempt,decision,apps,seats,period_end,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(draft) DO UPDATE SET org=excluded.org,attempt=excluded.attempt,decision=excluded.decision,apps=excluded.apps,seats=excluded.seats,period_end=excluded.period_end,updated_at=excluded.updated_at")
           .run(draftId,organizationId,attempt,decision,local.apps,local.seats,end,now);
+        // Separate durable subscription identity ledger, never a grant source.
+        // Only a previously VERIFIED paid Stripe TEST subscription is admitted;
+        // later unpaid/canceled/unavailable observations replace its state, not seats.
+        const bound=db.prepare('SELECT subscription_id FROM stripe_test_subscription_bindings WHERE org=? AND draft=?')
+          .get(organizationId,draftId);
+        if(bound){
+          const previous=db.prepare('SELECT revision FROM subscription_entitlement_shadow WHERE subscription_id=? AND org=? AND draft=?')
+            .get(bound.subscription_id,organizationId,draftId);
+          if(previous&&previous.revision>=attempt)fail('reconciliation_superseded');
+          db.prepare("INSERT INTO subscription_entitlement_shadow(subscription_id,source,org,draft,revision,decision,plan,apps,seats,period_end,last_paid_invoice,updated_at) VALUES(?,'stripe_test',?,?,?,?,?,?,?,?,?,?) ON CONFLICT(subscription_id) DO UPDATE SET revision=excluded.revision,decision=excluded.decision,plan=excluded.plan,apps=excluded.apps,seats=excluded.seats,period_end=excluded.period_end,last_paid_invoice=COALESCE(excluded.last_paid_invoice,subscription_entitlement_shadow.last_paid_invoice),updated_at=excluded.updated_at")
+            .run(bound.subscription_id,organizationId,draftId,attempt,decision,local.plan,local.apps,local.seats,end,invoiceId,now);
+        }
         db.prepare("UPDATE stripe_test_reconciliation_checks SET state=?,reason=?,subscription_id=?,invoice_id=?,lifecycle=?,completed_at=? WHERE draft=? AND org=? AND attempt=? AND state='checking'")
           .run(result.state,reason,subscriptionId,invoiceId,lifecycle,now,draftId,organizationId,attempt);
         audit(organizationId,actorId,'checkout.test.reconciliation.observed',draftId,
@@ -385,6 +399,20 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     },
     // Diagnostic only: forecast whether hypothetical TEST seats could cover current
     // assignments and pending invitations. Never modify real purchased seats.
+    // Shadow plans are read-only and strictly separated from additive legacy receipts.
+    // No browser method can turn these TEST candidates into purchased seats.
+    testSubscriptionEntitlementPlan(organizationId,actorId){
+      requireAdmin(organizationId,actorId);
+      const current=this.overview(organizationId,actorId);
+      const entries=db.prepare("SELECT s.subscription_id,s.org,s.decision,s.apps,s.seats,s.revision,s.period_end FROM subscription_entitlement_shadow s JOIN subscription_drafts d ON d.id=s.draft AND d.org=s.org WHERE s.source='stripe_test' AND s.org=? AND d.status='draft'")
+        .all(organizationId)
+        .map(row=>({subscriptionId:row.subscription_id,org:row.org,decision:row.decision,
+          apps:JSON.parse(row.apps),seats:row.seats,attempt:row.revision,
+          periodEnd:row.period_end??null}));
+      return buildShadowEntitlementPlan({organizationId,apps:current.apps.map(app=>({
+        id:app.id,name:app.name,purchased:app.purchased,assigned:app.assigned,reserved:app.reserved
+      })),subscriptions:entries,now:clock()});
+    },
     testSeatImpact(organizationId,actorId){
       requireAdmin(organizationId,actorId);
       const current=this.overview(organizationId,actorId);

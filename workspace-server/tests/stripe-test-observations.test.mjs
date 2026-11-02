@@ -304,3 +304,77 @@ test('test-only transition review detects assigned plus invited seat shortfalls 
  f.reopen();
  assert.equal(f.store.testSeatImpact('one','admin1').apps.find(x=>x.appId==='eel').status,'manual_review');
 });
+
+test('subscription shadow ledger is revisioned and independent of live seats, receipts and app access',t=>{
+ const f=fixture(t);
+ const lifecycle={subscriptionStatus:'active',cancelAtPeriodEnd:false,cancelAt:null,
+  periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_create'};
+ assert.equal(f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel').status,'not_evaluated');
+ assert.throws(()=>f.store.testSubscriptionEntitlementPlan('one','admin2'),/access_denied/);
+ assert.equal(f.finish(f.start(),{...f.paid,lifecycle}).state,'paid_test_verified');
+ let p=f.store.testSubscriptionEntitlementPlan('one','admin1');
+ assert.equal(p.apps.find(a=>a.appId==='eel').candidateTestSeats,3);
+ assert.equal(p.apps.find(a=>a.appId==='eel').status,'increase_candidate');
+ assert.equal(p.realSeatChanges,false);
+ assert.equal(p.licensesGranted,false);
+ const again=f.start();
+ f.finish(again,{...f.paid,lifecycle});
+ assert.equal(f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel').candidateTestSeats,3,
+  'rechecking the same paid invoice cannot add seats');
+ const renewal=f.start();
+ f.finish(renewal,{...f.paid,invoiceId:'in_test_renewal1234',lifecycle:{
+  ...lifecycle,billingReason:'subscription_cycle',periodEnd:1910000000}});
+ assert.equal(f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel').candidateTestSeats,3,
+  'a recurring paid invoice cannot count as a new subscription');
+ let db=new DatabaseSync(f.dbPath);
+ try{
+  const rows=db.prepare('SELECT source,org,draft,revision,decision,last_paid_invoice FROM subscription_entitlement_shadow').all();
+  assert.equal(rows.length,1);
+  assert.equal(rows[0].source,'stripe_test');
+  assert.equal(rows[0].revision,3);
+  assert.equal(rows[0].decision,'candidate_paid');
+  assert.equal(rows[0].last_paid_invoice,'in_test_renewal1234');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM receipts').get().n,0);
+ }finally{db.close();}
+ f.reopen();
+ p=f.store.testSubscriptionEntitlementPlan('one','admin1');
+ assert.equal(p.apps.find(a=>a.appId==='eel').candidateTestSeats,3);
+ assert(f.store.overview('one','admin1').apps.every(a=>a.purchased===0&&a.assigned===0));
+ assert(f.store.overview('two','admin2').apps.every(a=>a.purchased===0));
+});
+test('subscription shadow ledger transitions paid to delinquent, canceled and outage without access changes',t=>{
+ const f=fixture(t);
+ const active={subscriptionStatus:'active',cancelAtPeriodEnd:false,cancelAt:null,
+  periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_create'};
+ f.finish(f.start(),{...f.paid,lifecycle:active});
+ const delinquent={...active,subscriptionStatus:'past_due',invoiceStatus:'open'};
+ f.finish(f.start(),{state:'pending',reason:'subscription_not_active',
+  lifecycle:delinquent,licensesGranted:false});
+ let x=f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel');
+ assert.equal(x.status,'manual_review');assert.equal(x.candidateTestSeats,0);
+ f.finish(f.start(),{state:'unavailable',licensesGranted:false});
+ x=f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel');
+ assert.equal(x.status,'manual_review');
+ const canceled={...active,subscriptionStatus:'canceled'};
+ f.finish(f.start(),{state:'pending',reason:'subscription_not_active',
+  lifecycle:canceled,licensesGranted:false});
+ x=f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel');
+ assert.equal(x.status,'manual_review');
+ const db=new DatabaseSync(f.dbPath);
+ try{
+  const item=db.prepare('SELECT revision,decision,last_paid_invoice FROM subscription_entitlement_shadow').get();
+  assert.equal(item.revision,4);
+  assert.equal(item.decision,'cancellation_review');
+  assert.equal(item.last_paid_invoice,'in_test1234','last confirmed paid invoice remains an audit reference');
+ }finally{db.close();}
+ assert(f.store.overview('one','admin1').apps.every(a=>a.purchased===0&&a.assigned===0));
+});
+test('unverified checkout or unpaid TEST result cannot create shadow subscription or customer entitlement',t=>{
+ const f=fixture(t);
+ f.finish(f.start(),{state:'pending',reason:'payment_unpaid',licensesGranted:false});
+ let db=new DatabaseSync(f.dbPath);
+ try{
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM subscription_entitlement_shadow').get().n,0);
+ }finally{db.close();}
+ assert.equal(f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel').status,'not_evaluated');
+});
