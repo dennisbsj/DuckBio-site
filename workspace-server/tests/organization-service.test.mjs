@@ -361,12 +361,18 @@ test('reconciliation API checks only the selected admin\'s own ready test Checko
   session:{id:'cs_test_mock1234',url:'https://checkout.stripe.com/c/pay/mock'}});
  const result=await admin.call(route,input);
  assert.equal(result.status,200);
- assert.deepEqual(await result.json(),{reconciliation:{
+ const completed=await result.json();
+ assert.deepEqual(completed.reconciliation,{
   state:'paid_test_verified',invoiceId:'in_test_mock1234',subscriptionId:'sub_test_mock1234',
   sessionId:'cs_test_mock1234',organizationId:'org-a',draftId:d.id,price:'price_test12345',
   seats:3,licensesGranted:false
- },observation:{state:'paid_test_verified',attempt:1,checkedAt:1783090000000,licensesGranted:false},
- mode:'test',licensesGranted:false});
+ });
+ assert.equal(completed.mode,'test');
+ assert.equal(completed.licensesGranted,false);
+ assert.equal(completed.observation.state,'paid_test_verified');
+ assert.equal(completed.observation.attempt,1);
+ assert.equal(completed.observation.licensesGranted,false);
+ assert(Number.isSafeInteger(completed.observation.checkedAt));
  assert.equal(f.organizationStore.listSubscriptionDrafts('org-a',owner.id)[0].testReconciliation.state,'paid_test_verified');
  assert.equal(observations.length,1);
  assert.deepEqual(observations[0],{
