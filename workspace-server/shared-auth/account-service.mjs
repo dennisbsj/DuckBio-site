@@ -207,7 +207,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           send(res,200,{counts:communicationsStore.unreadCounts(actor.id)});
           return true;
         }
-        if (route === '/connect' || route === '/connect/') {
+        if (['/connect','/connect/','/connect/index.html','/connect.html'].includes(route)) {
           if (!['GET','HEAD'].includes(req.method)) throw new ServiceError(405,'method_not_allowed');
           if (!nativeConnectRequest(parsed.searchParams, clients)) throw new ServiceError(400,'invalid_input');
         }
