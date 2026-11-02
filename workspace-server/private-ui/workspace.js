@@ -290,6 +290,31 @@ async function refreshSubscriptions(){
    ?'Stripe TEST seat projection (not purchased or activated): '+byApp.join(' · ')+
     '. This is a simulation; no real seats or app access have changed.'
    :'Stripe TEST seat projection: no eligible candidate seats. Real purchased seats and permissions remain unchanged.'));
+  const plan=result.testEntitlementPlan;
+  if(plan?.testOnly===true&&plan.licensesGranted===false&&
+     plan.realSeatChanges===false&&Array.isArray(plan.apps)){
+   const evaluated=plan.apps.filter(a=>a.subscriptionCount>0);
+   if(evaluated.length){
+    const preview=el('div',undefined,'test-entitlement-preview');
+    preview.append(el('strong','Subscription-based TEST entitlement preview (no real seat changes):'));
+    const descriptions={
+     increase_candidate:'Possible increase, not activated',
+     unchanged:'No simulated change',
+     decrease_requires_review:'Downgrade requires manual review',
+     assignment_conflict:'Assigned and reserved users exceed simulated seats',
+     manual_review:'Billing status requires manual review'
+    };
+    const list=el('ul');
+    for(const app of evaluated){
+     const decision=Object.hasOwn(descriptions,app.status)?descriptions[app.status]:'Not evaluated';
+     list.append(el('li',app.appName+': '+decision+' · '+app.candidateTestSeats+
+      ' TEST candidates · '+app.livePurchased+' real purchased · '+
+      app.assigned+' assigned, '+app.reserved+' reserved. No licences granted.'));
+    }
+    preview.append(list);
+    simulation.append(preview);
+   }
+  }
   if(result.testSeatImpact?.testOnly===true&&result.testSeatImpact.licensesGranted===false&&
      result.testSeatImpact.realSeatChanges===false){
    const list=el('ul');
