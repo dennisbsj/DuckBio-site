@@ -31,9 +31,12 @@
 <div id="search-results" class="comms-list" aria-live="polite"></div>
 <h3>My organization contacts</h3><div id="organization-contacts" class="comms-list"></div>
 <h3>Conversations</h3><div id="chat-threads" class="comms-list"></div>
+<h3>Group conversations</h3><button id="new-group-chat" type="button">New group chat</button>
+<div id="chat-groups" class="comms-list"></div>
 </aside>
 <div class="comms-conversation">
 <h2 id="chat-title">Select a contact</h2>
+<div id="chat-mentions" class="comms-list" aria-label="Mention group participants"></div>
 <div id="chat-history" class="comms-history" aria-live="polite"></div>
 <form id="chat-form" class="comms-compose">
 <label>Message<textarea id="chat-body" rows="3" maxlength="2000" placeholder="Type a message…" required></textarea></label>
@@ -50,9 +53,21 @@
 <button id="new-mail-button" type="button" class="primary">Compose mail</button>
 <button id="mail-support-button" type="button">Mail DuckBio support</button>
 <div id="mail-list" class="comms-list"></div>
+<h3>Group mail</h3><button id="new-group-mail" type="button">New group mail</button>
+<div id="mail-groups" class="comms-list"></div>
 </aside>
 <div class="comms-conversation">
 <div id="mail-detail"><h2>Select a mail</h2><p>Mail exists only inside DuckBio Workspace.</p></div>
+<div id="mail-group-panel" hidden>
+<h2 id="mail-group-title">Group mail</h2>
+<div id="mail-group-mentions" class="comms-list"></div>
+<div id="mail-group-history" class="comms-history" aria-live="polite"></div>
+<form id="mail-group-form" class="comms-compose">
+<label>Subject<input id="mail-group-subject" maxlength="160" required></label>
+<label>Message<textarea id="mail-group-body" rows="5" maxlength="8000" required></textarea></label>
+<button type="submit" class="primary">Send to group</button>
+</form>
+</div>
 <form id="mail-form" class="comms-compose" hidden>
 <h2>New internal mail</h2>
 <label>To<input id="mail-to" type="text" maxlength="100" placeholder="duck-…@duckbio.internal" required></label>
@@ -61,5 +76,16 @@
 <div class="actions"><button type="submit" class="primary">Send internal mail</button><button id="mail-cancel" type="button">Cancel</button></div>
 </form>
 </div></div>
+</section>
+<section class="panel" id="group-create-panel" hidden>
+<h2 id="group-create-title">Create group</h2>
+<p>Select at least two other participants. Find coworkers in the contact book or search for users in other organizations.</p>
+<form id="group-create-form" class="comms-compose">
+<label>Group name<input id="group-name" maxlength="100" required></label>
+<h3>Selected participants</h3><div id="group-selected" class="comms-list"></div>
+<h3>Available contacts</h3><div id="group-available" class="comms-list"></div>
+<div class="actions"><button type="submit" class="primary">Create group</button>
+<button id="group-create-cancel" type="button">Cancel</button></div>
+</form>
 </section>
 </div></main></body></html>

@@ -1,7 +1,7 @@
 // Private same-origin messaging UI. No SMTP, WebSocket or external service.
 // Chat refreshes with bounded polling; all real permissions are server-side.
 const $=id=>document.getElementById(id);
-const state={csrf:null,self:null,contacts:[],peer:null,folder:'inbox',busy:false,tab:'chat'};
+const state={csrf:null,self:null,contacts:[],directory:new Map(),selectedGroupMembers:new Set(),groupKind:'chat',group:null,peer:null,folder:'inbox',busy:false,tab:'chat'};
 const node=(tag,text)=>{const x=document.createElement(tag);if(text!==undefined)x.textContent=String(text);return x;};
 const status=text=>{$('comms-status').textContent=text;};
 function button(label,action){
@@ -31,9 +31,11 @@ function showTab(tab){
 }
 function directoryItem(label,contact){
  return button(label,()=>{
+  state.group=null;
   state.peer={accountId:contact.accountId,displayName:contact.displayName,
    system:contact.system===true};
   $('chat-title').textContent=contact.displayName;
+  $('chat-mentions').replaceChildren();
   $('send-chat').disabled=contact.system===true;
   showTab('chat');void refreshChat();
  });
@@ -41,6 +43,8 @@ function directoryItem(label,contact){
 function renderContacts(contacts){
  const root=$('organization-contacts');root.replaceChildren();
  state.contacts=contacts;
+ for(const contact of contacts)state.directory.set(contact.accountId,contact);
+ renderGroupChoices();
  if(!contacts.length)root.append(node('p','No other organization contacts yet.'));
  for(const row of contacts)root.append(directoryItem(
   row.displayName+' · '+row.organizationName,row));
@@ -52,10 +56,100 @@ async function search(){
   const result=await request('/api/suite/communications/search',{query});
   const root=$('search-results');root.replaceChildren();
   if(!result.results.length)root.append(node('p','No users found.'));
-  for(const contact of result.results)root.append(directoryItem(
-   contact.displayName+' · '+contact.address,contact));
+  for(const contact of result.results){state.directory.set(contact.accountId,contact);root.append(directoryItem(
+   contact.displayName+' · '+contact.address,contact));}
+  renderGroupChoices();
   status('Found '+result.results.length+' matching DuckBio contacts.');
  }catch(error){status(error.message);}
+}
+function insertMention(input,mention){
+ const start=input.selectionStart,end=input.selectionEnd;
+ const extra=(start>0&&!/\s/.test(input.value[start-1])?' ':'')+mention+' ';
+ input.setRangeText(extra,start,end,'end');input.focus();
+}
+function mentionControls(rootId,inputId,members){
+ const root=$(rootId);root.replaceChildren();
+ for(const contact of members){
+  if(contact.accountId===state.self?.accountId)continue;
+  const label='Tag '+contact.displayName;
+  root.append(button(label,()=>insertMention($(inputId),contact.mention)));
+ }
+}
+function renderMessageText(target,value){
+ const re=/@(?:ld|dm|dn|cd|md|dt)[0-9]{6,}\b|@u-[a-f0-9]{2,256}\b/g;
+ let previous=0;
+ for(const item of value.matchAll(re)){
+  target.append(document.createTextNode(value.slice(previous,item.index)));
+  const tag=node('code',item[0]);tag.className='comms-reference';tag.title=
+   item[0].startsWith('@u-')?'Unique user mention':
+   'Content ID · access must be confirmed in the owning app';
+  target.append(tag);previous=item.index+item[0].length;
+ }
+ target.append(document.createTextNode(value.slice(previous)));
+}
+function renderGroupChoices(){
+ const root=$('group-available'),chosen=$('group-selected');
+ root.replaceChildren();chosen.replaceChildren();
+ if(!state.self)return;
+ for(const user of state.directory.values()){
+  if(user.accountId===state.self.accountId||user.system)continue;
+  const selected=state.selectedGroupMembers.has(user.accountId);
+  (selected?chosen:root).append(button((selected?'Remove ':'Add ')+user.displayName,
+   ()=>{if(selected)state.selectedGroupMembers.delete(user.accountId);
+    else state.selectedGroupMembers.add(user.accountId);
+    renderGroupChoices();}));
+ }
+ if(!state.selectedGroupMembers.size)chosen.append(node('p','No participants selected.'));
+}
+function newGroup(kind){
+ state.groupKind=kind;state.selectedGroupMembers.clear();
+ $('group-name').value='';$('group-create-panel').hidden=false;
+ $('group-create-title').textContent='Create '+(kind==='chat'?'group chat':'group mail');
+ renderGroupChoices();$('group-create-panel').scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function refreshGroups(){
+ const data=await request('/api/suite/communications/groups');
+ for(const kind of ['chat','mail']){
+  const root=$(kind==='chat'?'chat-groups':'mail-groups');root.replaceChildren();
+  const selected=data.groups.filter(g=>g.kind===kind);
+  if(!selected.length)root.append(node('p','No group '+(kind==='chat'?'chats':'mail')+' yet.'));
+  for(const group of selected)root.append(button(
+   group.title+' · '+group.memberCount+' people',()=>void openGroup(group)));
+ }
+}
+async function openGroup(group){
+ state.group=group;state.peer=null;
+ if(group.kind==='chat'){
+  showTab('chat');$('chat-title').textContent=group.title;
+  $('send-chat').disabled=false;
+ }else{
+  showTab('mail');$('mail-form').hidden=true;$('mail-detail').hidden=true;
+  $('mail-group-panel').hidden=false;$('mail-group-title').textContent=group.title;
+ }
+ const {members}=await request('/api/suite/communications/group/members',{groupId:group.id});
+ if(state.group?.id!==group.id)return;
+ mentionControls(group.kind==='chat'?'chat-mentions':'mail-group-mentions',
+  group.kind==='chat'?'chat-body':'mail-group-body',members);
+ await refreshGroupHistory();
+}
+async function refreshGroupHistory(){
+ const group=state.group;if(!group)return;
+ const response=await request('/api/suite/communications/group/history',{groupId:group.id});
+ if(state.group?.id!==group.id)return;
+ const root=$(group.kind==='chat'?'chat-history':'mail-group-history');root.replaceChildren();
+ for(const m of response.messages){
+  const bubble=node('div');bubble.className='comms-bubble'+
+    (m.senderId===state.self.accountId?' comms-mine':'');
+  const sender=state.directory.get(m.senderId)?.displayName||
+    (m.senderId===state.self.accountId?'You':m.senderId);
+  bubble.append(node('small',sender+(m.subject?' · '+m.subject:'')));
+  const body=node('div');renderMessageText(body,m.body);bubble.append(body);
+  bubble.append(node('small',stamp(m.createdAt)));root.append(bubble);
+ }
+ root.scrollTop=root.scrollHeight;
+ const last=response.messages.filter(m=>m.senderId!==state.self.accountId&&!m.readAt).at(-1);
+ if(last)void request('/api/suite/communications/group/read',
+   {groupId:group.id,messageId:last.id}).catch(()=>{});
 }
 async function refreshThreads(){
  const result=await request('/api/suite/communications/threads');
@@ -67,6 +161,7 @@ async function refreshThreads(){
  if(!result.threads.length)root.append(node('p','No conversations yet.'));
 }
 async function refreshChat(){
+ if(state.group?.kind==='chat'){await refreshGroupHistory();return;}
  if(!state.peer)return;
  const peerId=state.peer.accountId;
  const [history]=await Promise.all([
@@ -76,7 +171,7 @@ async function refreshChat(){
  if(!state.peer||state.peer.accountId!==peerId)return;
  const root=$('chat-history');root.replaceChildren();
  for(const m of history.messages){
-  const x=node('div',m.body);
+  const x=node('div');renderMessageText(x,m.body);
   x.className='comms-bubble'+(m.senderId===state.self.accountId?' comms-mine':'');
   x.append(node('small',stamp(m.createdAt)));
   root.append(x);
@@ -85,25 +180,29 @@ async function refreshChat(){
 }
 async function sendChat(event){
  event.preventDefault();
- if(state.busy||!state.peer||state.peer.system)return;
+ if(state.busy||(!state.peer&&!state.group)||state.peer?.system)return;
  const body=$('chat-body').value.trim();
  if(!body)return;
  state.busy=true;
  try{
-  await request('/api/suite/communications/chat/send',{
+  if(state.group?.kind==='chat')await request('/api/suite/communications/group/send',{
+   groupId:state.group.id,body,clientId:crypto.randomUUID()});
+  else await request('/api/suite/communications/chat/send',{
    recipientId:state.peer.accountId,body,clientId:crypto.randomUUID()});
   $('chat-body').value='';
-  await refreshChat();await refreshThreads();
+  await refreshChat();await refreshThreads();await refreshGroups();
   status('Message sent within DuckBio.');
  }catch(error){status(error.message);}finally{state.busy=false;}
 }
 function compose(address=''){
  showTab('mail');
+ state.group=null;$('mail-group-panel').hidden=true;
  $('mail-detail').hidden=true;$('mail-form').hidden=false;
  $('mail-form').reset();$('mail-to').value=address;
  $('mail-to').focus();
 }
 function renderMail(message){
+ state.group=null;$('mail-group-panel').hidden=true;
  const root=$('mail-detail');root.replaceChildren();
  const card=node('div');card.className='comms-mail-card';
  card.append(node('h2',message.subject),node('p','From: '+message.from),
@@ -156,7 +255,7 @@ async function start(){
  $('comms-app').hidden=false;
  const data=await request('/api/suite/communications/contacts');
  renderContacts(data.contacts);
- await refreshThreads();await refreshMail();
+ await refreshThreads();await refreshMail();await refreshGroups();
  status('Signed in. Chat messages refresh automatically while this page is open.');
 }
 $('tab-chat').addEventListener('click',()=>showTab('chat'));
@@ -165,6 +264,37 @@ $('search-users').addEventListener('click',search);
 $('contact-search').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();void search();}});
 $('chat-form').addEventListener('submit',sendChat);
 $('mail-form').addEventListener('submit',sendMail);
+$('new-group-chat').addEventListener('click',()=>newGroup('chat'));
+$('new-group-mail').addEventListener('click',()=>newGroup('mail'));
+$('group-create-cancel').addEventListener('click',()=>{
+ $('group-create-panel').hidden=true;state.selectedGroupMembers.clear();
+});
+$('group-create-form').addEventListener('submit',async e=>{
+ e.preventDefault();if(state.busy||!e.currentTarget.reportValidity())return;
+ const memberIds=[...state.selectedGroupMembers];
+ if(memberIds.length<2){status('Select at least two other group participants.');return;}
+ state.busy=true;
+ try{
+  const response=await request('/api/suite/communications/group/create',{
+   title:$('group-name').value.trim(),memberIds,kind:state.groupKind,
+   clientId:crypto.randomUUID()});
+  $('group-create-panel').hidden=true;
+  await refreshGroups();await openGroup(response.group);
+  status('Private group created.');
+ }catch(error){status(error.message);}finally{state.busy=false;}
+});
+$('mail-group-form').addEventListener('submit',async e=>{
+ e.preventDefault();if(state.busy||state.group?.kind!=='mail')return;
+ const subject=$('mail-group-subject').value.trim(),body=$('mail-group-body').value.trim();
+ if(!subject||!body)return;
+ state.busy=true;
+ try{
+  await request('/api/suite/communications/group/send',{
+   groupId:state.group.id,subject,body,clientId:crypto.randomUUID()});
+  $('mail-group-subject').value='';$('mail-group-body').value='';
+  await refreshGroupHistory();status('Internal group mail delivered.');
+ }catch(error){status(error.message);}finally{state.busy=false;}
+});
 $('new-mail-button').addEventListener('click',()=>compose());
 $('mail-support-button').addEventListener('click',()=>compose('support@duckbio.internal'));
 $('mail-cancel').addEventListener('click',()=>{
@@ -180,9 +310,12 @@ setInterval(async()=>{
  if(!state.self||document.hidden||state.busy)return;
  try{
   if(state.tab==='chat'){
-   await refreshThreads();
-   if(state.peer)await refreshChat();
-  }else await refreshMail();
+   await refreshThreads();await refreshGroups();
+   if(state.peer||state.group?.kind==='chat')await refreshChat();
+  }else{
+   await refreshMail();await refreshGroups();
+   if(state.group?.kind==='mail')await refreshGroupHistory();
+  }
  }catch{/* Preserve existing messages through temporary network loss. */}
 },5000);
 start().catch(error=>{status(error.message);$('comms-app').hidden=true;});
