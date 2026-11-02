@@ -730,6 +730,13 @@ test('Chromium owner creates a cross-contact group and safely tags a user and re
  await page.locator('#mail-group-history code.comms-reference').getByText('@ld000001').waitFor();
  assert.equal(communicationsStore.groupsFor(worker.id).length,2);
  await page.setViewportSize({width:390,height:720});
- const sizes=await page.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth}));
- assert(sizes.width<=sizes.viewport+2);
+ const sizes=await page.evaluate(()=>({viewport:innerWidth,
+  width:document.documentElement.scrollWidth,
+  offenders:[...document.querySelectorAll('body *')].filter(x=>
+    !x.hidden&&x.getBoundingClientRect().right>innerWidth+2)
+    .slice(0,16).map(x=>({tag:x.tagName,id:x.id,
+      className:typeof x.className==='string'?x.className:'',
+      right:Math.round(x.getBoundingClientRect().right),
+      width:Math.round(x.getBoundingClientRect().width)}))}));
+ assert(sizes.width<=sizes.viewport+2,JSON.stringify(sizes));
 });
