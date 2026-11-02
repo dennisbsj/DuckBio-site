@@ -7,6 +7,6 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check shared-auth/runtime.mjs && node --check shared-auth/account-service.mjs && node --check organization-store.mjs && node --check private-ui/workspace.js && node --check private-ui/owner.js && node --check stripe-test-webhook.mjs && node --check stripe-test-webhook-handler.mjs && node --check stripe-test-reconcile.mjs && node --check subscription-entitlement-planner.mjs && node --check verified-subscription-transition.mjs && node --check stripe-live-readonly.mjs && node --check stripe-live-webhook.mjs"
+    "check": "node --check shared-auth/runtime.mjs && node --check shared-auth/account-service.mjs && node --check organization-store.mjs && node --check private-ui/workspace.js && node --check private-ui/owner.js && node --check owner-alert-mailer.mjs && node --check stripe-test-webhook.mjs && node --check stripe-test-webhook-handler.mjs && node --check stripe-test-reconcile.mjs && node --check subscription-entitlement-planner.mjs && node --check verified-subscription-transition.mjs && node --check stripe-live-readonly.mjs && node --check stripe-live-webhook.mjs"
   }
 }
