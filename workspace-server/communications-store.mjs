@@ -209,7 +209,7 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
   },
   markMentionRead(accountId,notificationId){
    if(!validId(accountId)||!validId(notificationId))fail('invalid_mention');
-   const changed=db.prepare('UPDATE message_mentions SET read_at=COALESCE(read_at,?) WHERE recipient=? AND id=?')
+   const changed=db.prepare('UPDATE message_mentions SET read_at=COALESCE(read_at,?) WHERE recipient=? AND id=? AND read_at IS NULL')
      .run(clock(),accountId,notificationId).changes;
    return {marked:changed>0};
   },
