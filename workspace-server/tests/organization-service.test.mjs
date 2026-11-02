@@ -471,6 +471,12 @@ test('private owner dashboard aggregates all organization changes but excludes o
  const draft=f.organizationStore.createSubscriptionDraft({organizationId:'one',
   actorId:f.ownerAccount.id,plan:'Single',apps:['eel'],seats:2});
  assert(draft.id);
+ f.organizationStore.recordVerifiedStripeLiveEvent({
+  id:'evt_live_ownerapi1234',type:'customer.subscription.updated',
+  objectId:'sub_live_ownerapi1234',created:1800000000,
+  digest:'b'.repeat(64),mode:'live',licensesGranted:false,
+  authorizesSeatChanges:false
+ });
  const response=await owner.call('/api/suite/owner/overview');
  assert.equal(response.status,200);
  assert.equal(response.headers.get('cache-control'),'private, no-store');
@@ -480,6 +486,10 @@ test('private owner dashboard aggregates all organization changes but excludes o
  assert.equal(result.summary.totals.memberAccounts,2);
  assert.equal(result.summary.totals.activeMemberships,3);
  assert.equal(result.summary.totals.unpaidDrafts,1);
+ assert.equal(result.summary.totals.liveWebhookEvents,1);
+ assert.equal(result.summary.liveWebhookEvents[0].linkage,'unassigned');
+ assert.equal(result.summary.liveWebhookEvents[0].type,'customer.subscription.updated');
+ assert(!JSON.stringify(result.summary.liveWebhookEvents).includes('sub_live_ownerapi1234'));
  assert.equal(result.summary.totals.activeVerifiedSubscriptions,0);
  assert.equal(result.summary.financials.available,false);
  assert.equal(result.summary.organizations.find(x=>x.id==='one').memberships,2);
