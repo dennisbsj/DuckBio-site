@@ -46,7 +46,7 @@ test('test reconciliation ledger records scoped, durable statuses without issuin
  assert.equal(f.finish(b,f.paid).state,'paid_test_verified');
  let latest=f.store.listSubscriptionDrafts('one','admin1')[0];
  assert.deepEqual(latest.testReconciliation,{state:'paid_test_verified',reason:null,
-  attempt:2,checkedAt:1783090000000,licensesGranted:false});
+  attempt:2,checkedAt:1783090000000,licensesGranted:false,lifecycle:null});
  assert(f.store.overview('one','admin1').apps.every(a=>a.purchased===0 && a.assigned===0));
  assert(f.store.overview('two','admin2').apps.every(a=>a.purchased===0 && a.assigned===0));
  assert.equal(f.store.auditLog('one','admin1').filter(e=>e.action==='checkout.test.reconciliation.observed').length,2);
@@ -95,4 +95,44 @@ test('untrusted or mismatched attestation results cannot be persisted as verifie
  assert.equal(f.store.listSubscriptionDrafts('one','admin1')[0].testReconciliation.state,'checking');
  assert.equal(f.finish(started,{state:'unavailable',licensesGranted:false}).state,'unavailable');
  assert(f.store.overview('one','admin1').apps.every(x=>x.purchased===0));
+});
+
+test('test-only renewal and cancellation diagnostics persist across restart without granting entitlements',t=>{
+ const f=fixture(t);
+ const active={subscriptionStatus:'active',cancelAtPeriodEnd:true,cancelAt:1790000000,
+  periodEnd:1790000000,invoiceStatus:'paid',billingReason:'subscription_cycle'};
+ const first=f.start();
+ const observed=f.finish(first,{...f.paid,lifecycle:active});
+ assert.equal(observed.lifecycle.billingReason,'subscription_cycle');
+ assert.equal(observed.lifecycle.cancelAtPeriodEnd,true);
+ let row=f.store.listSubscriptionDrafts('one','admin1')[0];
+ assert.deepEqual(row.testReconciliation.lifecycle,active);
+ const old=f.start();
+ const canceled={subscriptionStatus:'canceled',cancelAtPeriodEnd:false,cancelAt:null,
+  periodEnd:1790000000,invoiceStatus:'paid',billingReason:'subscription_cycle'};
+ assert.equal(f.finish(old,{state:'pending',reason:'subscription_not_active',
+  lifecycle:canceled,licensesGranted:false}).state,'pending');
+ row=f.store.listSubscriptionDrafts('one','admin1')[0];
+ assert.equal(row.testReconciliation.state,'pending');
+ assert.equal(row.testReconciliation.lifecycle.subscriptionStatus,'canceled');
+ f.reopen();
+ row=f.store.listSubscriptionDrafts('one','admin1')[0];
+ assert.equal(row.testReconciliation.lifecycle.subscriptionStatus,'canceled');
+ assert(f.store.overview('one','admin1').apps.every(x=>x.purchased===0&&x.assigned===0));
+ assert(f.store.overview('two','admin2').apps.every(x=>x.purchased===0));
+});
+test('lifecycle state must match payment attestation and include only known fields',t=>{
+ const f=fixture(t),attempt=f.start();
+ const base={subscriptionStatus:'active',cancelAtPeriodEnd:false,cancelAt:null,
+  periodEnd:1790000000,invoiceStatus:'paid',billingReason:'subscription_create'};
+ for(const input of [
+  {...f.paid,lifecycle:{...base,subscriptionStatus:'canceled'}},
+  {...f.paid,lifecycle:{...base,invoiceStatus:'open'}},
+  {...f.paid,lifecycle:{...base,extra:'untrusted payload'}},
+  {...f.paid,lifecycle:{...base,cancelAtPeriodEnd:'false'}},
+  {...f.paid,lifecycle:{...base,periodEnd:-1}},
+  {state:'pending',reason:'invoice_not_paid',lifecycle:{...base,subscriptionStatus:'past_due'},licensesGranted:false}
+ ]) assert.throws(()=>f.finish(attempt,input),/invalid_reconciliation/);
+ assert.equal(f.finish(attempt,{...f.paid,lifecycle:base}).state,'paid_test_verified');
+ assert.equal(f.store.listSubscriptionDrafts('one','admin1')[0].testReconciliation.lifecycle.subscriptionStatus,'active');
 });

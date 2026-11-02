@@ -260,7 +260,21 @@ const testBillingStatusText=(observation)=>{
  const reason=Object.hasOwn(reasons,observation.reason)?' · '+reasons[observation.reason]:'';
  const last=Number.isFinite(observation.checkedAt)&&observation.checkedAt>0
   ?' · Last checked '+new Date(observation.checkedAt).toLocaleString('en-GB'):'';
- return 'Stripe TEST status: '+label+reason+last+'. No licences are granted.';
+ const lifecycle=observation.lifecycle;
+ let detail='';
+ if(lifecycle&&typeof lifecycle==='object'){
+  const states={active:'Active',past_due:'Past due',unpaid:'Unpaid',
+   canceled:'Canceled',paused:'Paused',trialing:'Trialing',
+   incomplete:'Incomplete',incomplete_expired:'Incomplete expired'};
+  const stateLabel=states[lifecycle.subscriptionStatus]||'Unknown';
+  const kind=lifecycle.billingReason==='subscription_cycle'?' · Renewal invoice':
+   lifecycle.billingReason==='subscription_create'?' · Initial invoice':'';
+  const end=Number.isSafeInteger(lifecycle.periodEnd)&&lifecycle.periodEnd>0
+   ?' · Period ends '+new Date(lifecycle.periodEnd*1000).toLocaleDateString('en-GB'):'';
+  detail=' · Subscription: '+stateLabel+kind+
+   (lifecycle.cancelAtPeriodEnd?' · Cancellation scheduled for period end':'')+end;
+ }
+ return 'Stripe TEST status: '+label+reason+detail+last+'. No licences are granted.';
 };
 async function refreshSubscriptions(){
  if(!state.selected)return;
