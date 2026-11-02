@@ -543,6 +543,10 @@ test('admin sees isolated TEST candidate seat counts, then cancellation review, 
  const summary=page.locator('#test-seat-projection');
  await summary.getByText(/DuckNote: 3 TEST candidate seats/).waitFor();
  assert.match(await summary.textContent(),/CytoDuck: 3 TEST candidate seats/);
+ const preview=summary.locator('.test-entitlement-preview');
+ await preview.getByText(/DuckNote: Possible increase, not activated/).waitFor();
+ assert.match(await preview.textContent(),/CytoDuck: Possible increase, not activated/);
+ assert.match(await preview.textContent(),/3 TEST candidates/);
  assert.match(await summary.textContent(),/not purchased or activated/);
  assert.equal(org.testSeatCapacity('lab-a',owner.id).apps.find(x=>x.appId==='eel').candidateTestSeats,3);
  assert.equal(org.testSeatImpact('lab-a',owner.id).apps.find(x=>x.appId==='eel').status,'test_only_candidate');
@@ -553,6 +557,8 @@ test('admin sees isolated TEST candidate seat counts, then cancellation review, 
  await summary.getByText(/no eligible candidate seats/).waitFor();
  await summary.getByText(/DuckNote: billing status requires manual review/).waitFor();
  await summary.getByText(/CytoDuck: billing status requires manual review/).waitFor();
+ await summary.locator('.test-entitlement-preview').getByText(/DuckNote: Billing status requires manual review/).waitFor();
+ assert.equal(org.testSubscriptionEntitlementPlan('lab-a',owner.id).apps.find(x=>x.appId==='eel').status,'manual_review');
  assert.equal(org.testSeatImpact('lab-a',owner.id).apps.find(x=>x.appId==='eel').status,'manual_review');
  assert.equal(org.testSeatCapacity('lab-a',owner.id).apps.find(x=>x.appId==='eel').candidateTestSeats,0);
  assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased,original);

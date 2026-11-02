@@ -376,7 +376,14 @@ test('reconciliation API checks only the selected admin\'s own ready test Checko
  assert.equal(f.organizationStore.listSubscriptionDrafts('org-a',owner.id)[0].testReconciliation.state,'paid_test_verified');
  const listing=await admin.call('/api/suite/organization/subscriptions',{organizationId:'org-a'});
  assert.equal(listing.status,200);
- const capacity=(await listing.json()).testSeatImpact;
+ const subscriptionResponse=await listing.json();
+ const capacity=subscriptionResponse.testSeatImpact;
+ const shadow=subscriptionResponse.testEntitlementPlan;
+ assert.equal(shadow.testOnly,true);
+ assert.equal(shadow.realSeatChanges,false);
+ assert.equal(shadow.licensesGranted,false);
+ assert.equal(shadow.apps.find(x=>x.appId==='eel').status,'manual_review');
+ assert.equal(shadow.apps.find(x=>x.appId==='eel').candidateTestSeats,0);
  assert.equal(capacity.testOnly,true);
  assert.equal(capacity.licensesGranted,false);
  assert.equal(capacity.realSeatChanges,false);
