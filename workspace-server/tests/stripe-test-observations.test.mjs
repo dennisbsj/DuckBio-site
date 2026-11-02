@@ -39,7 +39,7 @@ test('test reconciliation ledger records scoped, durable statuses without issuin
  assert.equal(a.snapshot.checkout.price,'price_test12345');
  assert.equal(f.store.listSubscriptionDrafts('one','admin1')[0].testReconciliation.state,'checking');
  assert.deepEqual(f.finish(a,{state:'pending',reason:'payment_unpaid',licensesGranted:false}),
-  {state:'pending',reason:'payment_unpaid',attempt:1,checkedAt:1783090000000,licensesGranted:false});
+  {state:'pending',reason:'payment_unpaid',attempt:1,checkedAt:1783090000000,licensesGranted:false,testSeatDecision:'awaiting_payment'});
  assert.equal(f.store.listSubscriptionDrafts('one','admin1')[0].testReconciliation.reason,'payment_unpaid');
  const b=f.start();
  assert.equal(b.attempt,2);
