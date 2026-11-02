@@ -31,7 +31,7 @@ test('chat and internal mail mentions notify the recipient exactly once',t=>{
  assert.equal(f.store.mentionInbox('bob').length,2);
  assert.equal(f.store.markMentionRead('alice',box[0].id).marked,false);
  assert.equal(f.store.markMentionRead('bob',box[0].id).marked,true);
- assert.equal(f.store.markMentionRead('bob',box[0].id).marked,true);
+ assert.equal(f.store.markMentionRead('bob',box[0].id).marked,false);
  f.reopen();
  box=f.store.mentionInbox('bob');
  assert.equal(box.length,2);
