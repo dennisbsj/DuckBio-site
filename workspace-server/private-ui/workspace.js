@@ -248,6 +248,20 @@ $('save-draft').addEventListener('click',async()=>{
 });
 $('cancel-buy').addEventListener('click',()=>{$('buy-panel').hidden=true;});
 $('open-buy').addEventListener('click',()=>$('buy').click());
+const testBillingStatusText=(observation)=>{
+ if(!observation)return 'Stripe TEST status: not checked. No licences are granted.';
+ const labels={checking:'Checking (possibly interrupted)',pending:'Payment not verified',
+  paid_test_verified:'Paid TEST invoice observed',unavailable:'Stripe check unavailable',
+  superseded:'Superseded by a newer check'};
+ const reasons={checkout_not_completed:'Checkout not completed',payment_unpaid:'Payment unpaid',
+  subscription_not_active:'Subscription not active',invoice_unavailable:'Invoice unavailable',
+  invoice_not_paid:'Invoice not paid'};
+ const label=labels[observation.state]||'Unknown status';
+ const reason=Object.hasOwn(reasons,observation.reason)?' · '+reasons[observation.reason]:'';
+ const last=Number.isFinite(observation.checkedAt)&&observation.checkedAt>0
+  ?' · Last checked '+new Date(observation.checkedAt).toLocaleString('en-GB'):'';
+ return 'Stripe TEST status: '+label+reason+last+'. No licences are granted.';
+};
 async function refreshSubscriptions(){
  if(!state.selected)return;
  const result=await request('/api/suite/organization/subscriptions',{organizationId:state.selected});
@@ -269,6 +283,25 @@ async function refreshSubscriptions(){
       status('Stripe test Checkout prepared. No real payment or licence activation.');
      }catch(e){status(e.message);}
     }));
+   }
+   if(result.testReconciliationEnabled&&draft.checkoutState==='ready'){
+    card.append(el('small',testBillingStatusText(draft.testReconciliation)));
+    const check=button('Check Stripe TEST status',async()=>{
+     check.disabled=true;
+     check.textContent='Checking Stripe TEST status…';
+     try{
+      const value=await request('/api/suite/organization/subscription/test-reconcile',{
+       organizationId:state.selected,draftId:draft.id});
+      if(value.mode!=='test'||value.licensesGranted!==false||
+         value.observation?.licensesGranted!==false)throw new Error('Unexpected test billing state');
+      await refreshSubscriptions();
+      status('Stripe TEST status recorded. No licences have been activated.');
+     }catch(e){
+      await refreshSubscriptions().catch(()=>{});
+      status('Stripe TEST check: '+e.message+' No licences have been activated.');
+     }
+    });
+    card.append(check);
    }
    if(!draft.checkoutState)card.append(button('Cancel draft',async()=>{
     if(!window.confirm('Cancel this draft? This does not change purchased subscriptions or licences.'))return;
