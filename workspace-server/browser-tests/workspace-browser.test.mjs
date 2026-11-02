@@ -714,9 +714,10 @@ test('Chromium owner creates a cross-contact group and safely tags a user and re
  await page.locator('#chat-form button[type=submit]').click();
  await page.locator('#chat-history').getByText('Please examine').waitFor();
  assert.equal(communicationsStore.groupHistory({groupId:group.id,actorId:worker.id}).messages.length,1);
- assert.equal(await page.locator('#chat-history code.comms-reference').count(),2);
- assert.equal(await page.locator('#chat-history a[href]').count(),0,
-   'resource mentions must not become unchecked deep-links');
+ assert.equal(await page.locator('#chat-history code.comms-reference').count(),1);
+ assert.equal(await page.locator('#chat-history a.comms-reference').count(),1);
+ assert.equal(await page.locator('#chat-history a.comms-reference').getAttribute('href'),
+  '/content/ld000001','resource links must use the authenticated gateway, not native URLs');
  await page.getByRole('button',{name:'Internal mail'}).click();
  await page.getByRole('button',{name:'New group mail'}).click();
  await page.locator('#group-name').fill('Project mail');
