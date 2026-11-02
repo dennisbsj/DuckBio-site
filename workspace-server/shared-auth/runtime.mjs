@@ -10,6 +10,7 @@ import { createSqliteAuthStores } from './sqlite-store.mjs';
 import { createOrganizationStore } from '../organization-store.mjs';
 import {createCommunicationsStore} from '../communications-store.mjs';
 import {deliverOwnerInternalAudit} from '../owner-internal-audit-delivery.mjs';
+import {createPublicContactHandler,createResendContactMailer,dispatchContactMail} from '../public-contact-relay.mjs';
 import { createResendInvitationMailer } from '../invitation-mailer.mjs';
 import {createResendOwnerAlertMailer,dispatchOwnerAlerts} from '../owner-alert-mailer.mjs';
 import { createStripeTestCheckout } from '../stripe-test-checkout.mjs';
@@ -64,8 +65,11 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
   let identityStore; let nativeStore; let organizationStore; let communicationsStore; let requestHandler;
   let ownerAlertMailer=null,ownerAlertTimer=null,ownerAlertProcessing=false;
   let ownerInternalTimer=null,ownerInternalProcessing=false;
+  let contactHandler=null,contactMailer=null,contactTimer=null,contactProcessing=false;
   try {
     if (actual.SUITE_MODE === 'broker') {
+      if(actual.SUITE_CONTACT_ENABLED&&!['true','false'].includes(actual.SUITE_CONTACT_ENABLED))
+        throw Error('Invalid public contact setting');
       if(actual.SUITE_OWNER_ALERTS_ENABLED&&
          !['true','false'].includes(actual.SUITE_OWNER_ALERTS_ENABLED))
         throw Error('Invalid owner alert opt-in');
@@ -81,6 +85,20 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
         communicationsStore=createCommunicationsStore({databasePath:privatePath(actual.SUITE_COMMUNICATIONS_DB_PATH,'communications database'),clock,ownerAccountId:actual.SUITE_OWNER_ACCOUNT_ID||null});
       }
       if (actual.SUITE_SETUP_TOKEN) identityStore.configureBootstrapToken(actual.SUITE_SETUP_TOKEN, { expiresAt: clock() + 7 * 24 * 60 * 60_000 });
+      if(actual.SUITE_CONTACT_ENABLED==='true'){
+        if(!communicationsStore||!actual.SUITE_OWNER_ACCOUNT_ID||
+           !actual.SUITE_CONTACT_TURNSTILE_SECRET||
+           !actual.SUITE_CONTACT_ALLOWED_ORIGINS_JSON||
+           !actual.SUITE_RESEND_API_KEY||!actual.SUITE_CONTACT_FROM||
+           !actual.SUITE_CONTACT_REAL_EMAIL)
+          throw Error('Public contact requires private DuckBio owner, verification and outgoing mail configuration');
+        contactHandler=createPublicContactHandler({communicationsStore,
+          turnstileSecret:actual.SUITE_CONTACT_TURNSTILE_SECRET,
+          allowedOrigins:JSON.parse(actual.SUITE_CONTACT_ALLOWED_ORIGINS_JSON),
+          host:new URL(actual.SUITE_ORIGIN).host,fetchImpl});
+        contactMailer=createResendContactMailer({apiKey:actual.SUITE_RESEND_API_KEY,
+          from:actual.SUITE_CONTACT_FROM,to:actual.SUITE_CONTACT_REAL_EMAIL,fetchImpl});
+      }
       ownerAlertMailer=enableOwnerAlerts?createResendOwnerAlertMailer({apiKey:actual.SUITE_RESEND_API_KEY,from:actual.SUITE_OWNER_ALERT_FROM,to:actual.SUITE_OWNER_ALERT_EMAIL,origin:actual.SUITE_ORIGIN,fetchImpl}):null;
       const invitationMailer=actual.SUITE_INVITATION_FROM
         ?createResendInvitationMailer({apiKey:actual.SUITE_RESEND_API_KEY,from:actual.SUITE_INVITATION_FROM,fetchImpl}):null;
@@ -106,6 +124,11 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
         getClientAddress: req => req.socket.remoteAddress,
       });
       requestHandler = async (req, res) => {
+        if(new URL(req.url,actual.SUITE_ORIGIN).pathname==='/api/suite/public/contact'){
+          if(!contactHandler)json(res,404,{error:'not_found'});
+          else await contactHandler(req,res);
+          return;
+        }
         if(new URL(req.url,actual.SUITE_ORIGIN).pathname==='/api/suite/billing/stripe-test-webhook'){
           if(!stripeTestWebhookHandler)json(res,404,{error:'not_found'});
           else await stripeTestWebhookHandler(req,res);
@@ -178,6 +201,21 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
     });
     server.once('close',()=>{if(ownerAlertTimer)clearInterval(ownerAlertTimer);});
   }
+  if(contactHandler&&contactMailer&&communicationsStore){
+    const sendContacts=async()=>{
+      if(contactProcessing)return;
+      contactProcessing=true;
+      try{await dispatchContactMail({communicationsStore,mailer:contactMailer,limit:5});}
+      catch{/* Keep jobs for a later private retry. */}
+      finally{contactProcessing=false;}
+    };
+    server.once('listening',()=>{
+      void sendContacts();
+      contactTimer=setInterval(()=>{void sendContacts();},15000);
+      contactTimer.unref?.();
+    });
+    server.once('close',()=>{if(contactTimer)clearInterval(contactTimer);});
+  }
   if(communicationsStore&&organizationStore&&actual.SUITE_OWNER_ACCOUNT_ID){
     const deliver=()=>{
       if(ownerInternalProcessing)return;
@@ -193,7 +231,8 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
       ownerInternalTimer=setInterval(deliver,15000);
       ownerInternalTimer.unref?.();
     });
-    server.once('close',()=>{if(ownerInternalTimer)clearInterval(ownerInternalTimer);});
+    server.once('close',()=>{if(ownerInternalTimer)clearInterval(ownerInternalTimer);
+    if(contactTimer)clearInterval(contactTimer);});
   }
   return Object.freeze({ server, close() { if(ownerAlertTimer)clearInterval(ownerAlertTimer);
     if(ownerInternalTimer)clearInterval(ownerInternalTimer);
