@@ -10,6 +10,7 @@ import { createSqliteAuthStores } from './sqlite-store.mjs';
 import { createOrganizationStore } from '../organization-store.mjs';
 import { createResendInvitationMailer } from '../invitation-mailer.mjs';
 import { createStripeTestCheckout } from '../stripe-test-checkout.mjs';
+import { createStripeTestReconciler } from '../stripe-test-reconcile.mjs';
 import { createStripeTestWebhookVerifier } from '../stripe-test-webhook.mjs';
 import { createStripeTestWebhookHandler } from '../stripe-test-webhook-handler.mjs';
 import { createSharedAuthGateway, createProtectedStaticHandler } from './gateway.mjs';
@@ -75,7 +76,13 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
           record:event=>organizationStore.recordVerifiedStripeTestEvent(event),
           host:new URL(actual.SUITE_ORIGIN).host
         }):null;
-      const service = createAccountService({ invitationMailer,stripeTestCheckout, origin: actual.SUITE_ORIGIN, issuer: actual.SUITE_ISSUER || actual.SUITE_ORIGIN, clients: JSON.parse(actual.SUITE_CLIENTS || 'null'), identityStore, organizationStore, authStore: auth.brokerStore, assetRoot: privatePath(actual.SUITE_ASSET_ROOT, 'login frontend'), buildVersion, clock, fetchImpl,
+      if(actual.SUITE_STRIPE_TEST_RECONCILE_ENABLED&&actual.SUITE_STRIPE_TEST_RECONCILE_ENABLED!=='true')
+        throw new Error('Invalid private Stripe test reconciliation setting');
+      if(actual.SUITE_STRIPE_TEST_RECONCILE_ENABLED==='true'&&(!organizationStore||!stripeTestCheckout))
+        throw new Error('Stripe test reconciliation requires private organization store and test Checkout');
+      const stripeTestReconciler=actual.SUITE_STRIPE_TEST_RECONCILE_ENABLED==='true'
+        ?createStripeTestReconciler({secretKey:actual.SUITE_STRIPE_TEST_KEY,fetchImpl}):null;
+      const service = createAccountService({ invitationMailer,stripeTestCheckout,stripeTestReconciler, origin: actual.SUITE_ORIGIN, issuer: actual.SUITE_ISSUER || actual.SUITE_ORIGIN, clients: JSON.parse(actual.SUITE_CLIENTS || 'null'), identityStore, organizationStore, authStore: auth.brokerStore, assetRoot: privatePath(actual.SUITE_ASSET_ROOT, 'login frontend'), buildVersion, clock, fetchImpl,
         // Passenger supplies the request socket; arbitrary forwarded headers do
         // not select limiter buckets. Account+address buckets isolate users.
         getClientAddress: req => req.socket.remoteAddress,

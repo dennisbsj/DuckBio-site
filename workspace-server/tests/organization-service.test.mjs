@@ -10,7 +10,7 @@ import { createSqliteAuthStores } from '../shared-auth/sqlite-store.mjs';
 import { createAccountService } from '../shared-auth/account-service.mjs';
 import { createOrganizationStore } from '../organization-store.mjs';
 
-async function fixture(t, { allNative = false, beforeRoster, invitationMailer = null, stripeTestCheckout = null } = {}) {
+async function fixture(t, { allNative = false, beforeRoster, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null } = {}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'suite-service-'));
   const identityStore = createIdentityStore({ databasePath: path.join(directory, 'identity.sqlite') });
   const stores = createSqliteAuthStores({ databasePath: path.join(directory, 'auth.sqlite') });
@@ -24,7 +24,7 @@ async function fixture(t, { allNative = false, beforeRoster, invitationMailer = 
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const nativeCalls = [];
-  service = createAccountService({ invitationMailer, stripeTestCheckout, origin, issuer: 'https://login.celluloidconsulting.net', clients, identityStore, organizationStore, authStore: stores.brokerStore, assetRoot: directory, buildVersion: 'test-local-service', getClientAddress: req => req.socket.remoteAddress,
+  service = createAccountService({ invitationMailer, stripeTestCheckout, stripeTestReconciler, origin, issuer: 'https://login.celluloidconsulting.net', clients, identityStore, organizationStore, authStore: stores.brokerStore, assetRoot: directory, buildVersion: 'test-local-service', getClientAddress: req => req.socket.remoteAddress,
     fetchImpl: async (url, options) => {
       nativeCalls.push({ url, options });
       const appId = clients.find(client => client.nativeOrigin && url === `${client.nativeOrigin}/api/suite/native-users`)?.appId;
@@ -329,4 +329,62 @@ test('subscription draft HTTP API is CSRF protected, org locked and cannot mint 
  assert.equal((await admin.call('/api/suite/organization/subscription/cancel',{organizationId:'org-b',draftId:draft.id})).status,403);
  assert.equal((await admin.call('/api/suite/organization/subscription/cancel',{organizationId:'org-a',draftId:draft.id})).status,200);
  assert.deepEqual(f.organizationStore.overview('org-a',owner.id).apps.map(x=>x.purchased),[0,0,0,0,0,0]);
+});
+
+test('reconciliation API checks only the selected admin\'s own ready test Checkout',async t=>{
+ const observations=[];
+ const checker={async inspect(snapshot){
+  observations.push(snapshot);
+  return {state:'paid_test_verified',invoiceId:'in_test_mock1234',licensesGranted:false};
+ }};
+ const f=await fixture(t,{stripeTestReconciler:checker});
+ const admin=f.browser(),outsider=f.browser();await admin.preflight();await outsider.preflight();
+ const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,
+  email:'owner@example.test',displayName:'Owner',password:'Owner password 12345'})).json()).user;
+ for(const id of ['org-a','org-b'])f.organizationStore.setupOrganization({
+  organizationId:id,name:id,owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:owner.email}});
+ const d=f.organizationStore.createSubscriptionDraft({organizationId:'org-a',actorId:owner.id,
+  plan:'Single',apps:['eel'],seats:3});
+ const input={organizationId:'org-a',draftId:d.id},route='/api/suite/organization/subscription/test-reconcile';
+ assert.equal((await admin.call(route,input)).status,403,'must first select organization');
+ await admin.call('/api/suite/organization/select',{organizationId:'org-a'});
+ assert.equal((await admin.call(route,input,'POST',false)).status,403,'CSRF is mandatory');
+ assert.equal((await outsider.call(route,input)).status,401,'no unauthenticated billing read');
+ assert.equal((await admin.call(route,{...input,organizationId:'org-b'})).status,403,'no cross-org access');
+ assert.equal((await admin.call(route,input)).status,400,'unprepared test Checkout cannot be checked');
+ f.organizationStore.prepareTestCheckout({...input,actorId:owner.id,price:'price_test12345'});
+ assert.equal((await admin.call(route,input)).status,400,'pending Checkout is not a ready session');
+ f.organizationStore.completeTestCheckout({...input,actorId:owner.id,
+  session:{id:'cs_test_mock1234',url:'https://checkout.stripe.com/c/pay/mock'}});
+ const result=await admin.call(route,input);
+ assert.equal(result.status,200);
+ assert.deepEqual(await result.json(),{reconciliation:{
+  state:'paid_test_verified',invoiceId:'in_test_mock1234',licensesGranted:false
+ },mode:'test',licensesGranted:false});
+ assert.equal(observations.length,1);
+ assert.deepEqual(observations[0],{
+  draft:{id:d.id,organizationId:'org-a',plan:'Single',apps:['eel'],seats:3},
+  checkout:{sessionId:'cs_test_mock1234',price:'price_test12345'}
+ });
+ assert(f.organizationStore.overview('org-a',owner.id).apps.every(x=>x.purchased===0));
+ assert(f.organizationStore.overview('org-b',owner.id).apps.every(x=>x.purchased===0));
+});
+test('reconciliation API fails closed on Stripe errors and on disabled integration',async t=>{
+ const f=await fixture(t,{stripeTestReconciler:{async inspect(){throw Error('Stripe unavailable');}}});
+ const admin=f.browser();await admin.preflight();
+ const owner=(await (await admin.call('/api/suite/setup',{setupToken:f.setupToken,email:'owner@example.test',
+  displayName:'Owner',password:'Owner password 12345'})).json()).user;
+ f.organizationStore.setupOrganization({organizationId:'org-a',name:'A',owner:{
+  accountId:owner.id,name:'Owner',nickname:'O',email:owner.email}});
+ await admin.call('/api/suite/organization/select',{organizationId:'org-a'});
+ const draft=f.organizationStore.createSubscriptionDraft({organizationId:'org-a',actorId:owner.id,
+  plan:'Single',apps:['eel'],seats:1});
+ const body={organizationId:'org-a',draftId:draft.id};
+ f.organizationStore.prepareTestCheckout({...body,actorId:owner.id,price:'price_test12345'});
+ f.organizationStore.completeTestCheckout({...body,actorId:owner.id,
+  session:{id:'cs_test_mock1234',url:'https://checkout.stripe.com/c/pay/mock'}});
+ const result=await admin.call('/api/suite/organization/subscription/test-reconcile',body);
+ assert.equal(result.status,503);
+ assert.deepEqual(await result.json(),{error:'reconciliation_unavailable'});
+ assert(f.organizationStore.overview('org-a',owner.id).apps.every(x=>x.purchased===0));
 });
