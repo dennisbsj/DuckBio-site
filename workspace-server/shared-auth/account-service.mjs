@@ -190,6 +190,15 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           const actor=identityStore.getUser(assertion.subject);
           if(!actor||actor.state!=='active'||!canCommunicate(actor))
             throw new ServiceError(403,'access_denied');
+          // A broker grant alone does not override native app membership.
+          // Match the exact mapped organization where one exists.
+          const boundOrg=assertion.localIdentity?.organizationId;
+          const memberships=organizationStore.organizationsFor(actor.id);
+          if(!isOwner(actor)&&!memberships.some(org=>
+             (boundOrg===undefined||org.id===boundOrg)&&
+             organizationStore.accessFor({organizationId:org.id,
+               accountId:actor.id,appId:assertion.appId})))
+            throw new ServiceError(403,'access_denied');
           send(res,200,{counts:communicationsStore.unreadCounts(actor.id)});
           return true;
         }
