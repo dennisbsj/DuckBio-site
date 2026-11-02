@@ -181,6 +181,11 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
           return {id:row.session_id,url:row.url,alreadySaved:true};
         }
         db.prepare("UPDATE stripe_test_checkouts SET state='ready',session_id=?,url=?,updated_at=? WHERE draft=? AND org=?").run(session.id,url.href,clock(),draftId,organizationId);
+        // Signed test events can arrive before the Checkout session is saved locally.
+        // Match only the exact newly persisted test session, never infer a paid invoice.
+        const linked=db.prepare("UPDATE stripe_test_webhook_events SET org=?,draft=? WHERE type='checkout.session.completed' AND object_id=? AND org IS NULL AND draft IS NULL")
+          .run(organizationId,draftId,session.id).changes;
+        if(linked)audit(organizationId,actorId,'checkout.test.webhook.matched',draftId,{events:linked});
         audit(organizationId,actorId,'checkout.test.prepared',draftId,{sessionId:session.id});
         return {id:session.id,url:url.href,alreadySaved:false};
       });
