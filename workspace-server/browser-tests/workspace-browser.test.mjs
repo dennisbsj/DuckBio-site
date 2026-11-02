@@ -467,3 +467,38 @@ test('admin checks and reloads Stripe TEST billing observation without licensing
  assert.equal(await page.getByRole('button',{name:'Check Stripe TEST status'}).count(),1);
  assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased,before);
 });
+
+test('admin sees renewal and cancellation lifecycle as TEST observations only',{timeout:45000},async t=>{
+ const checkout={priceFor:()=> 'price_test123456',async createSession(){
+  return {id:'cs_test_browser123',url:'https://checkout.stripe.com/c/pay/browser'};
+ }};
+ let state='renewal';
+ const checker={async inspect(snapshot){
+  const lifecycle={subscriptionStatus:state==='renewal'?'active':'canceled',
+   cancelAtPeriodEnd:state==='renewal',cancelAt:state==='renewal'?1790000000:null,
+   periodEnd:1790000000,invoiceStatus:'paid',billingReason:'subscription_cycle'};
+  if(state==='renewal')return {state:'paid_test_verified',sessionId:snapshot.checkout.sessionId,
+   subscriptionId:'sub_test_browser123',invoiceId:'in_test_browser123',
+   organizationId:snapshot.draft.organizationId,draftId:snapshot.draft.id,
+   price:snapshot.checkout.price,seats:snapshot.draft.seats,licensesGranted:false,lifecycle};
+  return {state:'pending',reason:'subscription_not_active',licensesGranted:false,lifecycle};
+ }};
+ const {page,org,owner}=await fixture(t,{stripeTestCheckout:checkout,stripeTestReconciler:checker});
+ await signIn(page);
+ const original=org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased;
+ await page.getByRole('button',{name:'Subscriptions'}).click();
+ await page.getByRole('button',{name:'Prepare subscription'}).click();
+ await page.locator('#draft-plan').selectOption('Single');
+ await page.locator('#draft-seats').fill('2');
+ await page.locator('#buy-fields input[name=eel]').check();
+ await page.getByRole('button',{name:'Save subscription draft'}).click();
+ await page.getByRole('button',{name:'Start test checkout'}).click();
+ await page.getByRole('button',{name:'Check Stripe TEST status'}).click();
+ await page.locator('#subscription-drafts').getByText(/Paid TEST invoice observed.*Renewal invoice.*Cancellation scheduled for period end/).waitFor();
+ assert.equal(org.listSubscriptionDrafts('lab-a',owner.id)[0].testReconciliation.lifecycle.billingReason,'subscription_cycle');
+ state='canceled';
+ await page.getByRole('button',{name:'Check Stripe TEST status'}).click();
+ await page.locator('#subscription-drafts').getByText(/Payment not verified.*Subscription: Canceled/).waitFor();
+ assert.equal(org.listSubscriptionDrafts('lab-a',owner.id)[0].testReconciliation.state,'pending');
+ assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased,original);
+});
