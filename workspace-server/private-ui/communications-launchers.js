@@ -12,7 +12,7 @@ if(top){
   const btn=document.createElement('button');
   btn.type='button';btn.className='duckbio-message-launcher';
   btn.setAttribute('aria-label',kind==='chat'?'Open instant messages':
-   kind==='mail'?'Open internal mail':'Open notifications');
+   kind==='mail'?'Open mailbox window':'Open notifications');
   btn.title=btn.getAttribute('aria-label');
   const symbol=document.createElement('span');symbol.className='duckbio-message-symbol';
   symbol.textContent=kind==='chat'?'💬':kind==='mail'?'✉':'🔔';
@@ -43,7 +43,7 @@ if(top){
     badge.textContent=value>99?'99+':String(value);
     badge.hidden=value===0;
     badge.parentElement.setAttribute('aria-label',(kind==='chat'?'Open instant messages':
-      kind==='mail'?'Open internal mail':'Open notifications')+
+      kind==='mail'?'Open mailbox window':'Open notifications')+
       (value>0?' ('+value+' unread)':''));
    }
    bar.hidden=false;
