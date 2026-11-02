@@ -7,11 +7,12 @@ import { OrganizationError } from '../organization-store.mjs';
 import {OWNER_SUPPORT,SECURITY_SENDER} from '../communications-store.mjs';
 import {authorizedContentDestination} from '../private-content-launch.mjs';
 import {mentionHandleForUser} from '../message-references.mjs';
+import {nativeConnectRequest} from '../native-connect.mjs';
 
 const APP_NAMES = Object.freeze({ goflo: 'CytoDuck', eel: 'DuckNote', methpipe: 'DuckPipe', mantrain: 'DuckTrain', duckman: 'DuckMan', limsman: 'LabDuck' });
 const STATIC_APPS = new Set(['goflo', 'methpipe', 'mantrain']);
 // Each native app must have an explicit private client origin; retired domains are not fallbacks.
-const FILES = new Set(['index.html', 'login.css', 'app.js', 'app-registry.mjs', 'auth-client.mjs', 'config.mjs', 'admin.html', 'admin.js', 'admin.css', 'workspace.html', 'workspace.css', 'workspace.js', 'owner.html', 'owner.js', 'communications.html', 'communications.js', 'communications.css', 'communications-launchers.js', ...Object.keys(APP_NAMES).map(id => `assets/${id}.svg`), 'assets/favicon.svg']);
+const FILES = new Set(['index.html', 'login.css', 'app.js', 'app-registry.mjs', 'auth-client.mjs', 'config.mjs', 'admin.html', 'admin.js', 'admin.css', 'workspace.html', 'workspace.css', 'workspace.js', 'owner.html', 'owner.js', 'communications.html', 'communications.js', 'communications.css', 'communications-launchers.js', 'connect.html', 'connect.js', 'connect.css', ...Object.keys(APP_NAMES).map(id => `assets/${id}.svg`), 'assets/favicon.svg']);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
 class ServiceError extends Error { constructor(status, code) { super(code); this.status = status; this.code = code; } }
 const safeId = value => typeof value === 'string' && value.length > 0 && value.length <= 128 && !/[\u0000-\u0020\u007f]/.test(value);
@@ -116,6 +117,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     else if (['/workspace','/workspace/','/workspace/index.html'].includes(pathname)) file = 'workspace.html';
     else if (['/owner','/owner/','/owner/index.html'].includes(pathname)) file = 'owner.html';
     else if (['/messages','/messages/','/messages/index.html'].includes(pathname)) file = 'communications.html';
+    else if (['/connect','/connect/','/connect/index.html'].includes(pathname)) file = 'connect.html';
     else if (file.startsWith('login/')) file = file.slice(6);
     if (!FILES.has(file)) return false;
     try {
@@ -204,6 +206,10 @@ export function createAccountService({ origin, issuer = origin, clients, identit
             throw new ServiceError(403,'access_denied');
           send(res,200,{counts:communicationsStore.unreadCounts(actor.id)});
           return true;
+        }
+        if (route === '/connect' || route === '/connect/') {
+          if (!['GET','HEAD'].includes(req.method)) throw new ServiceError(405,'method_not_allowed');
+          if (!nativeConnectRequest(parsed.searchParams, clients)) throw new ServiceError(400,'invalid_input');
         }
         if (!route.startsWith('/api/suite/')) return staticFile(req, res, route);
         const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/owner/overview': 'GET', '/api/suite/communications/self': 'GET', '/api/suite/communications/contacts': 'GET', '/api/suite/communications/search': 'POST', '/api/suite/communications/threads': 'GET', '/api/suite/communications/chat/history': 'POST', '/api/suite/communications/chat/send': 'POST', '/api/suite/communications/chat/read': 'POST', '/api/suite/communications/notifications': 'GET', '/api/suite/communications/notification/read': 'POST', '/api/suite/communications/unread': 'GET', '/api/suite/communications/mentions': 'GET', '/api/suite/communications/mention/read': 'POST', '/api/suite/communications/groups': 'GET', '/api/suite/communications/group/create': 'POST', '/api/suite/communications/group/members': 'POST', '/api/suite/communications/group/history': 'POST', '/api/suite/communications/group/send': 'POST', '/api/suite/communications/group/read': 'POST', '/api/suite/communications/mail/inbox': 'GET', '/api/suite/communications/mail/sent': 'GET', '/api/suite/communications/mail/send': 'POST', '/api/suite/communications/mail/read': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/user/active': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST', '/api/suite/organization/subscription/test-checkout': 'POST', '/api/suite/organization/subscription/test-reconcile': 'POST', '/api/suite/organization/subscription/test-history': 'POST' };
