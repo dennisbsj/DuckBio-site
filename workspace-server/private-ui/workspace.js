@@ -279,6 +279,18 @@ const testBillingStatusText=(observation)=>{
 async function refreshSubscriptions(){
  if(!state.selected)return;
  const result=await request('/api/suite/organization/subscriptions',{organizationId:state.selected});
+ const simulation=$('test-seat-projection');
+ simulation.replaceChildren();
+ if(result.testReconciliationEnabled&&result.testSeatCapacity?.testOnly===true&&
+    result.testSeatCapacity.licensesGranted===false){
+  const projected=result.testSeatCapacity.apps.filter(x=>x.candidateTestSeats>0);
+  const byApp=projected.map(x=>(state.overview.apps.find(a=>a.id===x.appId)?.name||x.appId)+
+    ': '+x.candidateTestSeats+' TEST candidate seats');
+  simulation.append(el('p',projected.length
+   ?'Stripe TEST seat projection (not purchased or activated): '+byApp.join(' · ')+
+    '. This is a simulation; no real seats or app access have changed.'
+   :'Stripe TEST seat projection: no eligible candidate seats. Real purchased seats and permissions remain unchanged.'));
+ }
  const root=$('subscription-drafts');root.replaceChildren();
  if(!result.drafts.length){root.append(el('p','No subscription drafts.'));return;}
  for(const draft of result.drafts){
@@ -300,6 +312,17 @@ async function refreshSubscriptions(){
    }
    if(result.testReconciliationEnabled&&draft.checkoutState==='ready'){
     card.append(el('small',testBillingStatusText(draft.testReconciliation)));
+    if(draft.testSeatProjection){
+     const p=draft.testSeatProjection;
+     const decisions={candidate_paid:'Eligible TEST seat candidate',payment_review:'Payment requires review',
+      cancellation_review:'Cancellation requires review',awaiting_payment:'Awaiting payment',
+      unavailable:'Test status unavailable'};
+     const label=Object.hasOwn(decisions,p.decision)?decisions[p.decision]:'Unknown TEST state';
+     card.append(el('small','TEST seat simulation: '+label+
+      (p.decision==='candidate_paid'?' · '+p.seatsPerApp+' candidate seats per selected app':'')+
+      '. No real user licences granted.'));
+    }
+
     const check=button('Check Stripe TEST status',async()=>{
      check.disabled=true;
      check.textContent='Checking Stripe TEST status…';
