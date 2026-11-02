@@ -1,5 +1,6 @@
 import {DatabaseSync} from 'node:sqlite';
 import {randomBytes,randomUUID} from 'node:crypto';
+import {extractMessageReferences} from './message-references.mjs';
 import {chmodSync,existsSync,mkdirSync,realpathSync} from 'node:fs';
 import path from 'node:path';
 
@@ -35,6 +36,12 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
   "CREATE TABLE IF NOT EXISTS internal_mails(id TEXT PRIMARY KEY,sender TEXT NOT NULL,recipient TEXT NOT NULL,from_address TEXT NOT NULL,to_address TEXT NOT NULL,subject TEXT NOT NULL,body TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN ('user','billing','contact')),created_at INTEGER NOT NULL,read_at INTEGER,system_reference TEXT UNIQUE,client_id TEXT,UNIQUE(sender,client_id))",
   "CREATE INDEX IF NOT EXISTS idx_mail_inbox ON internal_mails(recipient,created_at)",
   "CREATE INDEX IF NOT EXISTS idx_mail_sent ON internal_mails(sender,created_at)",
+  "CREATE TABLE IF NOT EXISTS conversation_groups(id TEXT PRIMARY KEY,kind TEXT NOT NULL CHECK(kind IN ('chat','mail')),title TEXT NOT NULL,created_by TEXT NOT NULL,created_at INTEGER NOT NULL,create_client_id TEXT NOT NULL,UNIQUE(created_by,create_client_id))",
+  "CREATE TABLE IF NOT EXISTS conversation_group_members(group_id TEXT NOT NULL REFERENCES conversation_groups(id),account TEXT NOT NULL,joined_at INTEGER NOT NULL,PRIMARY KEY(group_id,account))",
+  "CREATE INDEX IF NOT EXISTS idx_group_by_member ON conversation_group_members(account,group_id)",
+  "CREATE TABLE IF NOT EXISTS conversation_group_messages(id TEXT PRIMARY KEY,group_id TEXT NOT NULL REFERENCES conversation_groups(id),sender TEXT NOT NULL,subject TEXT,body TEXT NOT NULL,created_at INTEGER NOT NULL,client_id TEXT NOT NULL,UNIQUE(sender,client_id))",
+  "CREATE INDEX IF NOT EXISTS idx_group_messages ON conversation_group_messages(group_id,created_at)",
+  "CREATE TABLE IF NOT EXISTS conversation_group_reads(group_id TEXT NOT NULL REFERENCES conversation_groups(id),account TEXT NOT NULL,message_id TEXT NOT NULL REFERENCES conversation_group_messages(id),read_at INTEGER NOT NULL,PRIMARY KEY(group_id,account,message_id))",
   "CREATE TABLE IF NOT EXISTS internal_sync_cursors(name TEXT PRIMARY KEY,offset INTEGER NOT NULL CHECK(offset>=0))",
   "CREATE TABLE IF NOT EXISTS public_contact_delivery(submission_id TEXT PRIMARY KEY,mail_id TEXT NOT NULL UNIQUE REFERENCES internal_mails(id),contact_email TEXT NOT NULL,payload TEXT NOT NULL CHECK(json_valid(payload)),state TEXT NOT NULL CHECK(state IN ('pending','sending','accepted','failed')),attempts INTEGER NOT NULL DEFAULT 0,available_at INTEGER NOT NULL,lease_token TEXT,locked_until INTEGER,created_at INTEGER NOT NULL)"
  ].join(';')+';');
@@ -70,6 +77,115 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
  const chatView=x=>({id:x.id,senderId:x.sender,recipientId:x.recipient,
   body:x.body,createdAt:x.created_at,readAt:x.read_at});
  return Object.freeze({
+  // A group includes the creator plus 2–29 explicitly verified participants.
+  // The HTTP caller must resolve every account against active central identities
+  // and membership before calling these private persistence operations.
+  createGroup({creatorId,memberIds,kind='chat',title,clientId}={}){
+   if(!validId(creatorId)||!validId(clientId)||
+      !['chat','mail'].includes(kind)||!validText(title,100)||
+      !Array.isArray(memberIds)||memberIds.length<2||memberIds.length>29||
+      memberIds.some(x=>!validId(x)||x===SECURITY_SENDER)||
+      new Set(memberIds).size!==memberIds.length||
+      memberIds.includes(creatorId))fail('invalid_group');
+   const participants=[creatorId,...memberIds].sort();
+   if(kind==='chat'&&ownerAccountId&&participants.includes(ownerAccountId)&&
+      creatorId!==ownerAccountId)fail('owner_chat_forbidden');
+   return tx(()=>{
+    const old=db.prepare('SELECT * FROM conversation_groups WHERE created_by=? AND create_client_id=?')
+      .get(creatorId,clientId);
+    if(old){
+     const members=db.prepare('SELECT account FROM conversation_group_members WHERE group_id=? ORDER BY account')
+      .all(old.id).map(x=>x.account);
+     if(old.title!==title.trim()||old.kind!==kind||
+        JSON.stringify(members)!==JSON.stringify(participants))fail('message_conflict');
+     return {id:old.id,kind:old.kind,title:old.title,members,duplicate:true};
+    }
+    const now=clock(),groupId=randomUUID();
+    db.prepare('INSERT INTO conversation_groups VALUES(?,?,?,?,?,?)')
+      .run(groupId,kind,title.trim(),creatorId,now,clientId);
+    const insert=db.prepare('INSERT INTO conversation_group_members VALUES(?,?,?)');
+    for(const member of participants)insert.run(groupId,member,now);
+    return {id:groupId,kind,title:title.trim(),members:participants,duplicate:false};
+   });
+  },
+  groupsFor(accountId){
+   if(!validId(accountId))fail('invalid_account');
+   return db.prepare(`SELECT g.id,g.kind,g.title,g.created_by,g.created_at,
+      (SELECT count(*) FROM conversation_group_members x WHERE x.group_id=g.id) AS member_count
+    FROM conversation_groups g JOIN conversation_group_members m ON m.group_id=g.id
+    WHERE m.account=? ORDER BY g.created_at DESC,g.id DESC LIMIT 100`)
+    .all(accountId).map(x=>({id:x.id,kind:x.kind,title:x.title,
+      createdBy:x.created_by,createdAt:x.created_at,memberCount:x.member_count}));
+  },
+  groupMembers({groupId,actorId}={}){
+   if(!validId(groupId)||!validId(actorId))fail('invalid_group');
+   if(!db.prepare('SELECT 1 FROM conversation_group_members WHERE group_id=? AND account=?')
+     .get(groupId,actorId))fail('group_access_denied');
+   return db.prepare('SELECT account FROM conversation_group_members WHERE group_id=? ORDER BY account')
+    .all(groupId).map(x=>x.account);
+  },
+  sendGroup({groupId,senderId,body,subject=null,clientId}={}){
+   if(!validId(groupId)||!validId(senderId)||!validId(clientId)||
+      !validText(body,8000))fail('invalid_group_message');
+   const refs=extractMessageReferences(body);
+   return tx(()=>{
+    const group=db.prepare('SELECT * FROM conversation_groups WHERE id=?').get(groupId);
+    if(!group||!db.prepare('SELECT 1 FROM conversation_group_members WHERE group_id=? AND account=?')
+      .get(groupId,senderId))fail('group_access_denied');
+    if(group.kind==='chat'&&subject!==null||
+       group.kind==='mail'&&!validText(subject,160))fail('invalid_group_message');
+    const members=db.prepare('SELECT account FROM conversation_group_members WHERE group_id=?')
+      .all(groupId).map(x=>x.account);
+    if(group.kind==='chat'&&ownerAccountId&&members.includes(ownerAccountId)&&
+       senderId!==ownerAccountId)fail('owner_chat_forbidden');
+    // Mentioning somebody is not silently adding them to a private conversation.
+    if(refs.userIds.some(x=>!members.includes(x)))fail('mention_not_in_conversation');
+    const old=db.prepare('SELECT * FROM conversation_group_messages WHERE sender=? AND client_id=?')
+      .get(senderId,clientId);
+    if(old){
+     if(old.group_id!==groupId||old.subject!==subject||old.body!==body.trim())
+      fail('message_conflict');
+     return {id:old.id,created:false};
+    }
+    const now=clock();
+    ensureRate(senderId,'conversation_group_messages',now);
+    const messageId=randomUUID();
+    db.prepare('INSERT INTO conversation_group_messages VALUES(?,?,?,?,?,?,?)')
+      .run(messageId,groupId,senderId,subject,body.trim(),now,clientId);
+    return {id:messageId,created:true,mentions:refs};
+   });
+  },
+  groupHistory({groupId,actorId,limit=100}={}){
+   if(!validId(groupId)||!validId(actorId)||
+      !Number.isSafeInteger(limit)||limit<1||limit>100)fail('invalid_group');
+   const group=db.prepare('SELECT * FROM conversation_groups WHERE id=?').get(groupId);
+   if(!group||!db.prepare('SELECT 1 FROM conversation_group_members WHERE group_id=? AND account=?')
+      .get(groupId,actorId))fail('group_access_denied');
+   return {group:{id:group.id,kind:group.kind,title:group.title,createdBy:group.created_by},
+     messages:db.prepare(`SELECT m.id,m.sender,m.subject,m.body,m.created_at,
+       (SELECT read_at FROM conversation_group_reads r WHERE r.group_id=m.group_id AND r.account=? AND r.message_id=m.id) AS read_at
+       FROM conversation_group_messages m WHERE m.group_id=?
+       ORDER BY m.created_at DESC,m.id DESC LIMIT ?`).all(actorId,groupId,limit).reverse().map(x=>({
+         id:x.id,senderId:x.sender,subject:x.subject,body:x.body,
+         createdAt:x.created_at,readAt:x.read_at,
+         mentions:extractMessageReferences(x.body)
+       }))};
+  },
+  markGroupRead({groupId,actorId,messageId}={}){
+   if(!validId(groupId)||!validId(actorId)||!validId(messageId))
+    fail('invalid_group');
+   return tx(()=>{
+    if(!db.prepare('SELECT 1 FROM conversation_group_members WHERE group_id=? AND account=?')
+       .get(groupId,actorId))fail('group_access_denied');
+    const msg=db.prepare('SELECT sender FROM conversation_group_messages WHERE group_id=? AND id=?')
+       .get(groupId,messageId);
+    if(!msg)fail('message_not_found');
+    if(msg.sender===actorId)return {marked:false};
+    const result=db.prepare('INSERT OR IGNORE INTO conversation_group_reads VALUES(?,?,?,?)')
+       .run(groupId,actorId,messageId,clock());
+    return {marked:result.changes>0};
+   });
+  },
   addressFor(account){return generateAddress(account);},
   ownerAddresses(){return ownerAccountId?
    {support:OWNER_SUPPORT,billing:OWNER_BILLING}:null;},
