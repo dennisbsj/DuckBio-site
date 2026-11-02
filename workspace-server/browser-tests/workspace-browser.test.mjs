@@ -828,16 +828,24 @@ test('Chromium global content ID continues after login through the protected gat
  assert.equal(response.status(),303);
  assert.equal(response.headers().location,'/workspace?content=dn000001');
  assert.equal(calls.length,0,'no native resource verification before central login');
- await page.route('https://example.invalid/content/dn000001',route=>route.fulfill({
-  status:200,contentType:'text/html',body:'<h1>Native app authentication remains separate</h1>'}));
  await page.goto(origin+'/content/dn000001');
  await page.locator('#sign-in:not([hidden])').waitFor();
+ // Intercept only the *browser* navigation after login. Redirect-chain network
+ // requests to example.invalid cannot reliably be intercepted by Playwright.
+ await page.route(origin+'/content/dn000001',route=>route.fulfill({
+  status:200,contentType:'text/html',body:'<h1>Protected gateway requested</h1>'}));
  assert.match(page.url(),/\/workspace\?content=dn000001$/);
  await page.locator('#email').fill('worker@example.test');
  await page.locator('#password').fill('Worker passphrase 123456');
  await page.getByRole('button',{name:'Sign in'}).click();
- await page.waitForURL('https://example.invalid/content/dn000001');
- assert.equal(await page.locator('h1').textContent(),'Native app authentication remains separate');
+ await page.waitForURL(origin+'/content/dn000001');
+ assert.equal(await page.locator('h1').textContent(),'Protected gateway requested');
+ assert.equal(calls.length,0,'browser interception must not call the real resolver');
+ // The real authenticated gateway is checked separately without following the
+ // external native redirect or pretending that an app session exists.
+ const verified=await page.request.get(origin+'/content/dn000001',{maxRedirects:0});
+ assert.equal(verified.status(),303);
+ assert.equal(verified.headers().location,'https://example.invalid/content/dn000001');
  assert.equal(calls.length,1);
  assert.equal(calls[0].viewerId,worker.id);
  assert.equal(calls[0].appId,'eel');
