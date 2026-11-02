@@ -103,6 +103,15 @@ test('native app can read only its validated central identity unread counters, n
  assert.equal((await native({sessionToken:token},{
   extraHeaders:{Cookie:identityCookie}})).status,401);
  assert.equal((await fetch(origin+'/api/suite/native/communications/unread')).status,405);
+ org.saveMember({organizationId:'lab-a',actorId:owner.id,member:{
+  accountId:worker.id,name:'Worker',nickname:'Worker',
+  email:'worker@example.test',admin:false,roles:{}}});
+ assert.equal((await native({sessionToken:token})).status,403,
+  'revoking the current organization app role blocks unread counts');
+ org.saveMember({organizationId:'lab-a',actorId:owner.id,member:{
+  accountId:worker.id,name:'Worker',nickname:'Worker',
+  email:'worker@example.test',admin:false,roles:{eel:'scientist'}}});
+ assert.equal((await native({sessionToken:token})).status,200);
  identity.revokeAppAccess(worker.id,'eel');
  assert.equal((await native({sessionToken:token})).status,401,
   'revoking the app mapping immediately invalidates the native proof');
