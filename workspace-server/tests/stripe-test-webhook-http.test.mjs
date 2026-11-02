@@ -20,7 +20,7 @@ async function fixture(t,{enabled=true}={}){
  const dir=mkdtempSync(join(tmpdir(),'duckbio-test-webhook-http-'));
  mkdirSync(join(dir,'frontend'));writeFileSync(join(dir,'frontend','index.html'),'<html>Private Workspace</html>');
  const db=join(dir,'private','org.sqlite');
- const env={SUITE_MODE:'broker',SUITE_ORIGIN:origin,SUITE_CLIENTS:'[]',
+ const env={SUITE_MODE:'broker',SUITE_ORIGIN:origin,SUITE_ISSUER:'https://login.example.test',SUITE_CLIENTS:'[]',
   SUITE_AUTH_DB_PATH:join(dir,'auth.sqlite'),SUITE_IDENTITY_DB_PATH:join(dir,'identity.sqlite'),
   SUITE_ORGANIZATION_DB_PATH:db,SUITE_ASSET_ROOT:join(dir,'frontend'),
   SUITE_STRIPE_TEST_KEY:'sk_test_synthetic_private_key_12345',
