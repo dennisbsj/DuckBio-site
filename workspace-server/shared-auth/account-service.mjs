@@ -191,13 +191,16 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           if(!actor||actor.state!=='active'||!canCommunicate(actor))
             throw new ServiceError(403,'access_denied');
           // A broker grant alone does not override native app membership.
-          // Match the exact mapped organization where one exists.
+          // Require the exact organization bound at native authentication.
+          // A grant without an organization cannot borrow rights from another
+          // organization the central user also belongs to.
           const boundOrg=assertion.localIdentity?.organizationId;
           const memberships=organizationStore.organizationsFor(actor.id);
-          if(!isOwner(actor)&&!memberships.some(org=>
-             (boundOrg===undefined||org.id===boundOrg)&&
-             organizationStore.accessFor({organizationId:org.id,
-               accountId:actor.id,appId:assertion.appId})))
+          if(!isOwner(actor)&&
+             (typeof boundOrg!=='string'||!boundOrg||
+              !memberships.some(org=>org.id===boundOrg&&
+                organizationStore.accessFor({organizationId:boundOrg,
+                  accountId:actor.id,appId:assertion.appId}))))
             throw new ServiceError(403,'access_denied');
           send(res,200,{counts:communicationsStore.unreadCounts(actor.id)});
           return true;
