@@ -374,6 +374,21 @@ test('reconciliation API checks only the selected admin\'s own ready test Checko
  assert.equal(completed.observation.licensesGranted,false);
  assert(Number.isSafeInteger(completed.observation.checkedAt));
  assert.equal(f.organizationStore.listSubscriptionDrafts('org-a',owner.id)[0].testReconciliation.state,'paid_test_verified');
+ const historyRoute='/api/suite/organization/subscription/test-history';
+ assert.equal((await outsider.call(historyRoute,input)).status,401);
+ assert.equal((await admin.call(historyRoute,input,'POST',false)).status,403);
+ assert.equal((await admin.call(historyRoute,{...input,organizationId:'org-b'})).status,403);
+ const prior=await admin.call(historyRoute,input);
+ assert.equal(prior.status,200);
+ const historical=await prior.json();
+ assert.equal(historical.mode,'test');
+ assert.equal(historical.licensesGranted,false);
+ assert.equal(historical.history.length,1);
+ assert.equal(historical.history[0].state,'paid_test_verified');
+ assert.equal(historical.history[0].licensesGranted,false);
+ assert.equal(historical.history[0].lifecycle,null);
+ assert.equal('subscriptionId' in historical.history[0],false);
+
  assert.equal(observations.length,1);
  assert.deepEqual(observations[0],{
   draft:{id:d.id,organizationId:'org-a',plan:'Single',apps:['eel'],seats:3},
