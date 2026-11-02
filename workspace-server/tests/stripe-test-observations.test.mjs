@@ -32,7 +32,7 @@ test('test reconciliation ledger records scoped, durable statuses without issuin
  const f=fixture(t);
  assert.equal(f.store.listSubscriptionDrafts('one','admin1')[0].testReconciliation,null);
  assert.throws(()=>f.store.beginTestReconciliation({...f.params,actorId:'admin2'}),/access_denied/);
- assert.throws(()=>f.store.beginTestReconciliation({...f.params,organizationId:'two'}),/checkout_not_found/);
+ assert.throws(()=>f.store.beginTestReconciliation({...f.params,organizationId:'two',actorId:'admin2'}),/checkout_not_found/);
  const a=f.start();
  assert.equal(a.attempt,1);
  assert.equal(a.snapshot.draft.seats,3);
