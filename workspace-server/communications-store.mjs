@@ -42,6 +42,8 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
   "CREATE TABLE IF NOT EXISTS conversation_group_messages(id TEXT PRIMARY KEY,group_id TEXT NOT NULL REFERENCES conversation_groups(id),sender TEXT NOT NULL,subject TEXT,body TEXT NOT NULL,created_at INTEGER NOT NULL,client_id TEXT NOT NULL,UNIQUE(sender,client_id))",
   "CREATE INDEX IF NOT EXISTS idx_group_messages ON conversation_group_messages(group_id,created_at)",
   "CREATE TABLE IF NOT EXISTS conversation_group_reads(group_id TEXT NOT NULL REFERENCES conversation_groups(id),account TEXT NOT NULL,message_id TEXT NOT NULL REFERENCES conversation_group_messages(id),read_at INTEGER NOT NULL,PRIMARY KEY(group_id,account,message_id))",
+  "CREATE TABLE IF NOT EXISTS message_mentions(id TEXT PRIMARY KEY,recipient TEXT NOT NULL,sender TEXT NOT NULL,source TEXT NOT NULL CHECK(source IN ('chat','mail','group_chat','group_mail')),message_id TEXT NOT NULL,group_id TEXT,created_at INTEGER NOT NULL,read_at INTEGER,UNIQUE(recipient,source,message_id))",
+  "CREATE INDEX IF NOT EXISTS idx_mentions_recipient ON message_mentions(recipient,created_at DESC)",
   "CREATE TABLE IF NOT EXISTS internal_sync_cursors(name TEXT PRIMARY KEY,offset INTEGER NOT NULL CHECK(offset>=0))",
   "CREATE TABLE IF NOT EXISTS public_contact_delivery(submission_id TEXT PRIMARY KEY,mail_id TEXT NOT NULL UNIQUE REFERENCES internal_mails(id),contact_email TEXT NOT NULL,payload TEXT NOT NULL CHECK(json_valid(payload)),state TEXT NOT NULL CHECK(state IN ('pending','sending','accepted','failed')),attempts INTEGER NOT NULL DEFAULT 0,available_at INTEGER NOT NULL,lease_token TEXT,locked_until INTEGER,created_at INTEGER NOT NULL)"
  ].join(';')+';');
@@ -69,6 +71,11 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
   const n=db.prepare('SELECT count(*) AS n FROM '+table+' WHERE sender=? AND created_at>?')
    .get(sender,now-60000).n;
   if(n>=20)fail('message_rate_limited');
+ };
+ const recordMentions=({refs,senderId,messageId,source,groupId=null,now})=>{
+  const stmt=db.prepare('INSERT OR IGNORE INTO message_mentions(id,recipient,sender,source,message_id,group_id,created_at) VALUES(?,?,?,?,?,?,?)');
+  for(const recipient of refs.userIds)if(recipient!==senderId)
+    stmt.run(randomUUID(),recipient,senderId,source,messageId,groupId,now);
  };
  const mailView=x=>({
   id:x.id,from:x.from_address,to:x.to_address,subject:x.subject,
@@ -154,6 +161,8 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
     const messageId=randomUUID();
     db.prepare('INSERT INTO conversation_group_messages VALUES(?,?,?,?,?,?,?)')
       .run(messageId,groupId,senderId,subject,body.trim(),now,clientId);
+    recordMentions({refs,senderId,messageId,source:group.kind==='chat'?'group_chat':'group_mail',
+      groupId,now});
     return {id:messageId,created:true,mentions:refs};
    });
   },
@@ -187,6 +196,22 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
        .run(groupId,actorId,messageId,clock());
     return {marked:result.changes>0};
    });
+  },
+  // Account-scoped, internal-only notification inbox. An @tag does not grant
+  // group membership, create a user account, or reveal native app content.
+  mentionInbox(accountId,{limit=50}={}){
+   if(!validId(accountId)||!Number.isSafeInteger(limit)||limit<1||limit>100)
+    fail('invalid_mention_query');
+   return db.prepare('SELECT * FROM message_mentions WHERE recipient=? ORDER BY created_at DESC,id DESC LIMIT ?')
+     .all(accountId,limit).map(x=>({id:x.id,senderId:x.sender,source:x.source,
+       groupId:x.group_id,messageId:x.message_id,createdAt:x.created_at,
+       readAt:x.read_at}));
+  },
+  markMentionRead(accountId,notificationId){
+   if(!validId(accountId)||!validId(notificationId))fail('invalid_mention');
+   const changed=db.prepare('UPDATE message_mentions SET read_at=COALESCE(read_at,?) WHERE recipient=? AND id=? AND read_at IS NULL')
+     .run(clock(),accountId,notificationId).changes;
+   return {marked:changed>0};
   },
   addressFor(account){return generateAddress(account);},
   ownerAddresses(){return ownerAccountId?
@@ -225,6 +250,7 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
     const id=randomUUID();
     db.prepare('INSERT INTO chat_messages(id,sender,recipient,body,created_at,client_id) VALUES(?,?,?,?,?,?)')
      .run(id,senderId,recipientId,body.trim(),now,clientId);
+    recordMentions({refs,senderId,messageId:id,source:'chat',now});
     return {id,senderId,recipientId,body:body.trim(),createdAt:now,readAt:null,duplicate:false};
    });
   },
@@ -288,6 +314,7 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
     db.prepare(`INSERT INTO internal_mails(id,sender,recipient,from_address,to_address,
      subject,body,kind,created_at,client_id) VALUES(?,?,?,?,?,?,?,'user',?,?)`)
       .run(id,senderId,recipientId,fromAddress,normalized,subject.trim(),body.trim(),now,clientId);
+    recordMentions({refs,senderId,messageId:id,source:'mail',now});
     return {id,from:fromAddress,to:normalized,subject:subject.trim(),body:body.trim(),
       kind:'user',createdAt:now,readAt:null,duplicate:false};
    });
