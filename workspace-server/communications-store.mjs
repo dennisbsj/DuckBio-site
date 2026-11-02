@@ -187,7 +187,8 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
       typeof email!=='string'||email.length>254||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||
       /[\r\n]/.test(email)||typeof organization!=='string'||
-      organization.length>180||!validText(subject,120)||!validText(message,5000))
+      organization.length>180||/[\r\n]/.test(organization)||/[\r\n]/.test(name)||
+      !validText(subject,120)||/[\r\n]/.test(subject)||!validText(message,5000))
     fail('invalid_contact');
    const clean={name:name.trim(),email:email.trim().toLowerCase(),
      organization:organization.trim(),subject:subject.trim(),message:message.trim()};
