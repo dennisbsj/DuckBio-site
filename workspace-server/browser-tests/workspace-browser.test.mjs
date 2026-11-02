@@ -728,7 +728,7 @@ test('Chromium owner creates a cross-contact group and safely tags a user and re
  await page.locator('#mail-group-subject').fill('New sample');
  await page.locator('#mail-group-body').fill('Sample @ld000001 is ready.');
  await page.locator('#mail-group-form button[type=submit]').click();
- await page.locator('#mail-group-history code.comms-reference').getByText('@ld000001').waitFor();
+ await page.locator('#mail-group-history a.comms-reference').getByText('@ld000001').waitFor();
  assert.equal(communicationsStore.groupsFor(worker.id).length,2);
  await page.setViewportSize({width:390,height:720});
  const sizes=await page.evaluate(()=>({viewport:innerWidth,
