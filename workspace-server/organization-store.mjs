@@ -254,6 +254,18 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       return db.prepare('SELECT id,actor,action,subject,details,recorded_at FROM organization_audit WHERE org=? ORDER BY id DESC LIMIT 50').all(organizationId)
         .map(row=>({id:row.id,actorId:row.actor,action:row.action,subject:row.subject,details:JSON.parse(row.details),at:row.recorded_at}));
     },
+    // Private cross-org contact book: only organizations where this account is
+    // an active member. Never expose real email addresses or native app data.
+    activeContactBook(accountId){
+      if(!safeId(accountId))return [];
+      return db.prepare(`SELECT o.id AS organizationId,o.name AS organizationName,
+        m.account AS accountId,m.name AS displayName
+        FROM members own JOIN organizations o ON o.id=own.org
+        JOIN members m ON m.org=own.org AND m.active=1
+        WHERE own.account=? AND own.active=1 AND m.account<>?
+        ORDER BY o.name,m.name,m.account LIMIT 1001`)
+        .all(accountId,accountId).slice(0,1000).map(x=>({...x}));
+    },
     organizationsFor(account){
       if(!safeId(account))return [];
       return db.prepare('SELECT o.id,o.name,m.admin FROM members m JOIN organizations o ON o.id=m.org WHERE m.account=? AND m.active=1 ORDER BY o.name').all(account).map(x=>({id:x.id,name:x.name,admin:Boolean(x.admin)}));
