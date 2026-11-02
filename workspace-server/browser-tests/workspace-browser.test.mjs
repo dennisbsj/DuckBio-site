@@ -688,3 +688,48 @@ test('Chromium private Messaging UI supports owner chat, virtual mail and mobile
  const sizes=await page.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth}));
  assert(sizes.width<=sizes.viewport+2,'private messages remain responsive: '+JSON.stringify(sizes));
 });
+
+test('Chromium owner creates a cross-contact group and safely tags a user and resource',{timeout:65000},async t=>{
+ const {page,origin,org,identity,owner,worker,communicationsStore}=await fixture(t,{communications:true});
+ const third=await identity.createUser({email:'second@example.test',
+   displayName:'Second teammate',password:'Second password 12345'});
+ org.saveMember({organizationId:'lab-a',actorId:owner.id,member:{
+  accountId:third.id,name:'Second teammate',nickname:'Second',
+  email:'second@example.test',admin:false,roles:{}}});
+ await signIn(page);
+ await page.goto(origin+'/messages');
+ await page.locator('#comms-app:not([hidden])').waitFor();
+ await page.getByRole('button',{name:'New group chat'}).click();
+ await page.locator('#group-name').fill('Cross-team work');
+ await page.locator('#group-available').getByRole('button',{name:'Add Lab worker'}).click();
+ await page.locator('#group-available').getByRole('button',{name:'Add Second teammate'}).click();
+ await page.locator('#group-create-form button[type=submit]').click();
+ await page.locator('#chat-title').getByText('Cross-team work').waitFor();
+ const group=communicationsStore.groupsFor(owner.id)[0];
+ assert.equal(group.kind,'chat');
+ assert.equal(group.memberCount,3);
+ await page.locator('#chat-mentions').getByRole('button',{name:'Tag Lab worker'}).click();
+ await page.locator('#chat-body').fill('Please examine @ld000001 with @'+
+   Buffer.from(worker.id).toString('hex').replace(/^/,'u-'));
+ await page.locator('#chat-form button[type=submit]').click();
+ await page.locator('#chat-history').getByText('Please examine').waitFor();
+ assert.equal(communicationsStore.groupHistory({groupId:group.id,actorId:worker.id}).messages.length,1);
+ assert.equal(await page.locator('#chat-history code.comms-reference').count(),2);
+ assert.equal(await page.locator('#chat-history a[href]').count(),0,
+   'resource mentions must not become unchecked deep-links');
+ await page.getByRole('button',{name:'Internal mail'}).click();
+ await page.getByRole('button',{name:'New group mail'}).click();
+ await page.locator('#group-name').fill('Project mail');
+ await page.locator('#group-available').getByRole('button',{name:'Add Lab worker'}).click();
+ await page.locator('#group-available').getByRole('button',{name:'Add Second teammate'}).click();
+ await page.locator('#group-create-form button[type=submit]').click();
+ await page.locator('#mail-group-title').getByText('Project mail').waitFor();
+ await page.locator('#mail-group-subject').fill('New sample');
+ await page.locator('#mail-group-body').fill('Sample @ld000001 is ready.');
+ await page.locator('#mail-group-form button[type=submit]').click();
+ await page.locator('#mail-group-history').getByText('Sample').waitFor();
+ assert.equal(communicationsStore.groupsFor(worker.id).length,2);
+ await page.setViewportSize({width:390,height:720});
+ const sizes=await page.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth}));
+ assert(sizes.width<=sizes.viewport+2);
+});
