@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
+<title>Messaging | DuckBio Workspace</title>
+<link rel="stylesheet" href="/workspace.css"><link rel="stylesheet" href="/communications.css">
+<script type="module" src="/communications.js"></script>
+</head><body>
+<header class="top"><div class="brand"><span class="duck">◆</span><b>DuckBio</b><span>Messaging</span></div>
+<nav class="comms-top"><a href="/workspace">Workspace</a><a id="owner-link" href="/owner" hidden>Owner dashboard</a></nav></header>
+<main class="comms-main">
+<section class="hero"><span class="eyebrow">PRIVATE WORKSPACE</span><h1>Messaging</h1>
+<p>Direct chats and DuckBio-only mail. No external mailbox or SMTP server is used.</p>
+<p id="comms-status" role="status" aria-live="polite">Checking your account…</p></section>
+<div id="comms-app" hidden>
+<section class="panel comms-account">
+<div><strong>Your internal address</strong><p id="my-address"></p>
+<small>Internal addresses work only inside DuckBio. They cannot receive internet email.</small></div>
+<div id="owner-addresses" hidden><strong>Owner mailboxes</strong><p>Support: <code>support@duckbio.internal</code></p><p>Subscriptions: <code>billing@duckbio.internal</code></p></div>
+</section>
+<div class="workspace-tabs" role="tablist" aria-label="Message type">
+<button type="button" id="tab-chat" class="active" aria-selected="true">Instant messages</button>
+<button type="button" id="tab-mail" aria-selected="false">Internal mail</button>
+</div>
+<section id="chat-view" class="panel">
+<div class="comms-grid">
+<aside class="comms-sidebar">
+<h2>Contacts</h2>
+<label>Search DuckBio users<input id="contact-search" type="search" minlength="2" maxlength="80" placeholder="Name or internal address"></label>
+<button id="search-users" type="button">Search all organizations</button>
+<div id="search-results" class="comms-list" aria-live="polite"></div>
+<h3>My organization contacts</h3><div id="organization-contacts" class="comms-list"></div>
+<h3>Conversations</h3><div id="chat-threads" class="comms-list"></div>
+</aside>
+<div class="comms-conversation">
+<h2 id="chat-title">Select a contact</h2>
+<div id="chat-history" class="comms-history" aria-live="polite"></div>
+<form id="chat-form" class="comms-compose">
+<label>Message<textarea id="chat-body" rows="3" maxlength="2000" placeholder="Type a message…" required></textarea></label>
+<button type="submit" class="primary" id="send-chat" disabled>Send message</button>
+</form>
+</div></div>
+</section>
+<section id="mail-view" class="panel" hidden>
+<div class="comms-grid">
+<aside class="comms-sidebar">
+<h2>Internal mail</h2>
+<button id="mail-inbox-button" type="button">Inbox</button>
+<button id="mail-sent-button" type="button">Sent</button>
+<button id="new-mail-button" type="button" class="primary">Compose mail</button>
+<button id="mail-support-button" type="button">Mail DuckBio support</button>
+<div id="mail-list" class="comms-list"></div>
+</aside>
+<div class="comms-conversation">
+<div id="mail-detail"><h2>Select a mail</h2><p>Mail exists only inside DuckBio Workspace.</p></div>
+<form id="mail-form" class="comms-compose" hidden>
+<h2>New internal mail</h2>
+<label>To<input id="mail-to" type="text" maxlength="100" placeholder="duck-…@duckbio.internal" required></label>
+<label>Subject<input id="mail-subject" type="text" maxlength="160" required></label>
+<label>Message<textarea id="mail-body" rows="8" maxlength="8000" required></textarea></label>
+<div class="actions"><button type="submit" class="primary">Send internal mail</button><button id="mail-cancel" type="button">Cancel</button></div>
+</form>
+</div></div>
+</section>
+</div></main></body></html>

@@ -10,9 +10,10 @@ import {chromium} from 'playwright';
 import {createIdentityStore} from '../shared-auth/identity-store.mjs';
 import {createSqliteAuthStores} from '../shared-auth/sqlite-store.mjs';
 import {createOrganizationStore} from '../organization-store.mjs';
+import {createCommunicationsStore} from '../communications-store.mjs';
 import {createAccountService} from '../shared-auth/account-service.mjs';
 
-async function fixture(t, {multi=false, invitationMailer=null, stripeTestCheckout=null, stripeTestReconciler=null}={}) {
+async function fixture(t, {multi=false, invitationMailer=null, stripeTestCheckout=null, stripeTestReconciler=null,communications=false}={}) {
  const temp=mkdtempSync(path.join(os.tmpdir(),'duckbio-workspace-browser-'));
  const identity=createIdentityStore({databasePath:path.join(temp,'identity.sqlite')});
  const auth=createSqliteAuthStores({databasePath:path.join(temp,'auth.sqlite')});
@@ -25,6 +26,7 @@ async function fixture(t, {multi=false, invitationMailer=null, stripeTestCheckou
  if(multi)org.setupOrganization({organizationId:'lab-b',name:'Second laboratory',owner:{accountId:owner.id,name:'Lab owner',nickname:'Owner',email:'owner@example.test'}});
  org.applyVerifiedSeatPurchase({reference:'test-purchase-1',organizationId:'lab-a',plan:'Mixed',apps:['eel','goflo'],seats:2});
  org.saveMember({organizationId:'lab-a',actorId:owner.id,member:{accountId:worker.id,name:'Lab worker',nickname:'Worker',email:'worker@example.test',admin:false,roles:{eel:'scientist'}}});
+ const communicationsStore=communications?createCommunicationsStore({databasePath:path.join(temp,'private','communications.sqlite'),ownerAccountId:owner.id}):null;
  const registrations=['goflo','eel','methpipe','mantrain','duckman','limsman'].map(id=>({id,appId:id,secret:randomBytes(32).toString('base64url'),redirectUris:['https://example.invalid/'+id+'/auth/callback'],nativeOrigin:'https://example.invalid'}));
  let service;
  const server=http.createServer(async(req,res)=>{if(!await service.handle(req,res)){res.statusCode=404;res.end();}});
@@ -33,16 +35,16 @@ async function fixture(t, {multi=false, invitationMailer=null, stripeTestCheckou
  let browser;
  const errors=[];
  // Register cleanup before service/browser creation, including constructor failures.
- t.after(async()=>{await browser?.close();server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));identity.close();auth.close();org.close();rmSync(temp,{recursive:true,force:true});assert.deepEqual(errors,[],'uncaught browser errors');});
+ t.after(async()=>{await browser?.close();server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));identity.close();auth.close();org.close();communicationsStore?.close();rmSync(temp,{recursive:true,force:true});assert.deepEqual(errors,[],'uncaught browser errors');});
  const assetRoot=fileURLToPath(new URL('../private-ui/',import.meta.url));
- service=createAccountService({invitationMailer,stripeTestCheckout,stripeTestReconciler,origin,issuer:'https://login.example.invalid',clients:registrations,identityStore:identity,organizationStore:org,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
+ service=createAccountService({invitationMailer,stripeTestCheckout,stripeTestReconciler,origin,issuer:'https://login.example.invalid',clients:registrations,identityStore:identity,organizationStore:org,communicationsStore,ownerAccountId:communications?owner.id:null,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:1280,height:800}});
  const page=await context.newPage();
  page.on('pageerror',e=>errors.push(String(e)));
  await page.goto(origin+'/workspace');
  await page.locator('#sign-in:not([hidden])').waitFor();
- return {page,origin,org,identity,owner,worker,context};
+ return {page,origin,org,identity,owner,worker,communicationsStore,context};
 }
 async function signIn(page,email='owner@example.test',password='Example passphrase 123456') {
  await page.locator('#email').fill(email);
@@ -637,4 +639,52 @@ test('another unverified TEST Checkout blocks positive per-app plan preview',{ti
  assert.equal(org.testSubscriptionEntitlementPlan('lab-a',owner.id).apps.find(x=>x.appId==='eel').status,'manual_review');
  assert.equal(org.testSeatImpact('lab-a',owner.id).apps.find(x=>x.appId==='eel').status,'manual_review');
  assert.equal(org.overview('lab-a',owner.id).apps.find(a=>a.id==='eel').purchased,original);
+});
+
+test('Chromium private Messaging UI supports owner chat, virtual mail and mobile contacts',{timeout:65000},async t=>{
+ const {page,origin,worker,owner,communicationsStore}=await fixture(t,{communications:true});
+ await signIn(page);
+ await page.getByRole('link',{name:'Messaging'}).click();
+ await page.locator('#comms-app:not([hidden])').waitFor();
+ assert.match(await page.locator('#my-address').textContent(),/^duck-[a-f0-9]{24}@duckbio\.internal$/);
+ assert.equal(await page.locator('#owner-addresses').isVisible(),true);
+ await page.locator('#organization-contacts').getByRole('button',{name:/Lab worker/}).click();
+ await page.locator('#chat-body').fill('Hello from DuckBio');
+ await page.locator('#chat-form button[type=submit]').click();
+ await page.locator('#chat-history').getByText('Hello from DuckBio').waitFor();
+ assert.equal(communicationsStore.chatHistory(worker.id,owner.id).length,1);
+ await page.getByRole('button',{name:'Internal mail'}).click();
+ await page.getByRole('button',{name:'Compose mail'}).click();
+ const workerAddress=communicationsStore.addressFor(worker.id);
+ await page.locator('#mail-to').fill(workerAddress);
+ await page.locator('#mail-subject').fill('Meeting');
+ await page.locator('#mail-body').fill('See you tomorrow');
+ await page.locator('#mail-form button[type=submit]').click();
+ await page.locator('#mail-list').getByText(/Meeting/).waitFor();
+ assert.equal(communicationsStore.listMail(worker.id)[0].subject,'Meeting');
+ await page.goto(origin+'/workspace');
+ await page.getByRole('button',{name:'Sign out'}).click();
+ await page.locator('#sign-in:not([hidden])').waitFor();
+ await page.locator('#email').fill('worker@example.test');
+ await page.locator('#password').fill('Worker passphrase 123456');
+ await page.getByRole('button',{name:'Sign in'}).click();
+ await page.waitForFunction(()=>document.getElementById('status').textContent.includes('do not have organization administrator'));
+ await page.goto(origin+'/messages');
+ await page.locator('#comms-app:not([hidden])').waitFor();
+ assert.equal(await page.locator('#owner-addresses').isVisible(),false);
+ assert.equal(await page.locator('#organization-contacts').getByText(/Lab owner/).count(),0);
+ await page.locator('#contact-search').fill('Lab owner');
+ await page.getByRole('button',{name:'Search all organizations'}).click();
+ await page.locator('#search-results').getByText('No users found.').waitFor();
+ await page.getByRole('button',{name:'Internal mail'}).click();
+ await page.getByRole('button',{name:'Mail DuckBio support'}).click();
+ assert.equal(await page.locator('#mail-to').inputValue(),'support@duckbio.internal');
+ await page.locator('#mail-subject').fill('Request');
+ await page.locator('#mail-body').fill('Need assistance');
+ await page.locator('#mail-form button[type=submit]').click();
+ await page.locator('#mail-list').getByText(/Request/).waitFor();
+ assert(communicationsStore.listMail(owner.id).some(x=>x.subject==='Request'));
+ await page.setViewportSize({width:390,height:720});
+ const sizes=await page.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth}));
+ assert(sizes.width<=sizes.viewport+2,'private messages remain responsive: '+JSON.stringify(sizes));
 });

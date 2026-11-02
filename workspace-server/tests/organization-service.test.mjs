@@ -9,16 +9,19 @@ import { createIdentityStore } from '../shared-auth/identity-store.mjs';
 import { createSqliteAuthStores } from '../shared-auth/sqlite-store.mjs';
 import { createAccountService } from '../shared-auth/account-service.mjs';
 import { createOrganizationStore } from '../organization-store.mjs';
+import {createCommunicationsStore} from '../communications-store.mjs';
 
-async function fixture(t, { allNative = false, beforeRoster, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null, prebootstrapOwner = false } = {}) {
+async function fixture(t, { allNative = false, beforeRoster, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null, prebootstrapOwner = false, communications = false } = {}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'suite-service-'));
   const identityStore = createIdentityStore({ databasePath: path.join(directory, 'identity.sqlite') });
   const stores = createSqliteAuthStores({ databasePath: path.join(directory, 'auth.sqlite') });
   const organizationStore = createOrganizationStore({ databasePath: path.join(directory, 'private', 'org.sqlite') });
+  let communicationsStore=null;
   const setupToken = randomBytes(32).toString('base64url');
   identityStore.configureBootstrapToken(setupToken);
   const ownerAccount=prebootstrapOwner?await identityStore.bootstrap(setupToken,{
     email:'owner@example.test',displayName:'DuckBio Owner',password:'Owner password 12345'}):null;
+  if(communications)communicationsStore=createCommunicationsStore({databasePath:path.join(directory,'private','communications.sqlite'),ownerAccountId:ownerAccount?.id??null});
   writeFileSync(path.join(directory, 'index.html'), '<html><head></head><body>local accounts</body></html>');
   const clients = ['goflo', 'eel', 'methpipe', 'mantrain', 'duckman', 'limsman'].map(id => ({ id, appId: id, secret: randomBytes(32).toString('base64url'), redirectUris: [`https://${id}.celluloidconsulting.net/auth/callback`], nativeOrigin: (allNative || ['eel', 'duckman', 'limsman'].includes(id)) ? `https://${id}.celluloidconsulting.net` : undefined }));
   let service;
@@ -26,7 +29,7 @@ async function fixture(t, { allNative = false, beforeRoster, invitationMailer = 
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const nativeCalls = [];
-  service = createAccountService({ invitationMailer, stripeTestCheckout, stripeTestReconciler,ownerAccountId:ownerAccount?.id??null, origin, issuer: 'https://login.celluloidconsulting.net', clients, identityStore, organizationStore, authStore: stores.brokerStore, assetRoot: directory, buildVersion: 'test-local-service', getClientAddress: req => req.socket.remoteAddress,
+  service = createAccountService({ invitationMailer, stripeTestCheckout, stripeTestReconciler,communicationsStore,ownerAccountId:ownerAccount?.id??null, origin, issuer: 'https://login.celluloidconsulting.net', clients, identityStore, organizationStore, authStore: stores.brokerStore, assetRoot: directory, buildVersion: 'test-local-service', getClientAddress: req => req.socket.remoteAddress,
     fetchImpl: async (url, options) => {
       nativeCalls.push({ url, options });
       const appId = clients.find(client => client.nativeOrigin && url === `${client.nativeOrigin}/api/suite/native-users`)?.appId;
@@ -38,7 +41,7 @@ async function fixture(t, { allNative = false, beforeRoster, invitationMailer = 
       return new Response(JSON.stringify({ users: [{ id: appId === 'eel' ? 'native-eel-user' : `existing-${appId}-uuid`, displayName: 'Existing scientist', email: 'native@example.test', role: 'scientist', ...(appId === 'eel' ? { organizationId: 'approved-org', organizationName: 'Existing laboratory' } : {}) }] }), { headers: { 'Content-Type': 'application/json' } });
     },
   });
-  t.after(async () => { await new Promise(resolve => server.close(resolve)); identityStore.close(); organizationStore.close(); stores.close(); rmSync(directory, { recursive: true, force: true }); });
+  t.after(async () => { await new Promise(resolve => server.close(resolve)); identityStore.close(); organizationStore.close(); communicationsStore?.close(); stores.close(); rmSync(directory, { recursive: true, force: true }); });
   function browser() {
     const cookies = new Map(); let csrf;
     async function call(route, body, method = body === undefined ? 'GET' : 'POST', includeCsrf = true) {
@@ -48,7 +51,7 @@ async function fixture(t, { allNative = false, beforeRoster, invitationMailer = 
     }
     return { call, async preflight() { const response = await call('/api/suite/auth/session'); const data = await response.json(); csrf = data.csrfToken; return data; } };
   }
-  return { identityStore, organizationStore, origin, setupToken, ownerAccount, nativeCalls, browser };
+  return { identityStore, organizationStore, communicationsStore, origin, setupToken, ownerAccount, nativeCalls, browser };
 }
 
 
@@ -507,4 +510,88 @@ test('private owner dashboard aggregates all organization changes but excludes o
  assert.equal((await member.call('/api/suite/owner/overview')).status,403);
  assert.equal((await (await member.call('/api/suite/account')).json()).ownerPanel,false);
  assert.equal((await member.call('/api/suite/owner/overview',{anything:'x'})).status,405);
+});
+
+test('DuckBio-only messaging uses private virtual mail and hides owner from all user chat discovery',async t=>{
+ const f=await fixture(t,{prebootstrapOwner:true,communications:true});
+ const owner=f.browser(),alice=f.browser(),bob=f.browser(),carla=f.browser();
+ for(const c of [owner,alice,bob,carla])await c.preflight();
+ const [a,b,c]=await Promise.all([
+  f.identityStore.createUser({email:'alice@example.test',displayName:'Alice Scientist',password:'Alice password 12345'}),
+  f.identityStore.createUser({email:'bob@example.test',displayName:'Bob Technician',password:'Bob password 12345'}),
+  f.identityStore.createUser({email:'carla@example.test',displayName:'Carla Researcher',password:'Carla password 12345'})
+ ]);
+ f.organizationStore.setupOrganization({organizationId:'org-1',name:'First Lab',
+  owner:{accountId:f.ownerAccount.id,name:'DuckBio Owner',nickname:'O',email:'owner@example.test'}});
+ f.organizationStore.setupOrganization({organizationId:'org-2',name:'Second Lab',
+  owner:{accountId:c.id,name:'Carla',nickname:'C',email:'carla@example.test'}});
+ for(const member of [{user:a,name:'Alice'},{user:b,name:'Bob'}])
+  f.organizationStore.saveMember({organizationId:'org-1',actorId:f.ownerAccount.id,
+   member:{accountId:member.user.id,name:member.name,nickname:member.name,
+    email:member.user.email,admin:false,roles:{}}});
+ const logins=[
+  [owner,'owner@example.test'],[alice,'alice@example.test'],
+  [bob,'bob@example.test'],[carla,'carla@example.test']
+ ];
+ for(const [client,email] of logins)assert.equal(
+  (await client.call('/api/suite/account/login',{email,password:
+   email==='owner@example.test'?'Owner password 12345':
+   email==='alice@example.test'?'Alice password 12345':
+   email==='bob@example.test'?'Bob password 12345':'Carla password 12345'})).status,200);
+ const selfAlice=await (await alice.call('/api/suite/communications/self')).json();
+ const selfBob=await (await bob.call('/api/suite/communications/self')).json();
+ const ownerSelf=await (await owner.call('/api/suite/communications/self')).json();
+ assert.match(selfAlice.address,/^duck-[a-f0-9]{24}@duckbio\.internal$/);
+ assert.notEqual(selfAlice.address,selfBob.address);
+ assert.equal(ownerSelf.owner,true);
+ assert.equal(ownerSelf.billingAddress,'billing@duckbio.internal');
+ assert.equal(selfAlice.mailTransport,'internal_only');
+ const contactList=await (await alice.call('/api/suite/communications/contacts')).json();
+ assert(contactList.contacts.some(x=>x.accountId===b.id&&x.organizationName==='First Lab'));
+ assert(!contactList.contacts.some(x=>x.accountId===f.ownerAccount.id));
+ assert(!JSON.stringify(contactList).includes('owner@example.test'));
+ const cross=await (await alice.call('/api/suite/communications/search',{query:'Carla'})).json();
+ assert.equal(cross.results.length,1);
+ assert.equal(cross.results[0].accountId,c.id);
+ assert(!JSON.stringify(cross).includes('carla@example.test'));
+ assert.deepEqual((await (await alice.call('/api/suite/communications/search',{query:'Owner'})).json()).results,[]);
+ const ownerSearch=await (await owner.call('/api/suite/communications/search',{query:'Alice'})).json();
+ assert.equal(ownerSearch.results[0].accountId,a.id);
+ const badChat=await alice.call('/api/suite/communications/chat/send',{
+  recipientId:f.ownerAccount.id,body:'Not allowed',clientId:'owner-guess-123'});
+ assert.equal(badChat.status,403);
+ assert.equal((await alice.call('/api/suite/communications/chat/history',{peerId:'duckbio-security'})).status,403);
+ const sent=await alice.call('/api/suite/communications/chat/send',{
+  recipientId:c.id,body:'Hello across labs',clientId:'cross-lab-123'});
+ assert.equal(sent.status,201);
+ assert.equal((await (await carla.call('/api/suite/communications/threads')).json()).threads[0].peerId,a.id);
+ const ownChat=await owner.call('/api/suite/communications/chat/send',{
+  recipientId:a.id,body:'Owner reaching out',clientId:'owner-to-alice-123'});
+ assert.equal(ownChat.status,201);
+ assert.equal((await (await alice.call('/api/suite/communications/chat/history',{peerId:f.ownerAccount.id})).json()).messages.length,1);
+ assert.equal((await alice.call('/api/suite/communications/chat/send',{
+  recipientId:f.ownerAccount.id,body:'Reply not allowed',clientId:'forbidden-reply-123'})).status,403);
+ const email=await alice.call('/api/suite/communications/mail/send',{
+  to:'support@duckbio.internal',subject:'Question',body:'Please help',clientId:'support-mail-123'});
+ assert.equal(email.status,201);
+ assert.equal((await (await owner.call('/api/suite/communications/mail/inbox')).json()).messages[0].subject,'Question');
+ assert.equal((await alice.call('/api/suite/communications/mail/send',{
+  to:'billing@duckbio.internal',subject:'Spoof notice',body:'Not permitted',clientId:'spoof-mail-123'})).status,400);
+ assert.equal((await alice.call('/api/suite/communications/mail/send',{
+  to:ownerSelf.address,subject:'Guess',body:'Use support instead',clientId:'private-mail-123'})).status,403);
+ assert.equal((await alice.call('/api/suite/communications/mail/send',{
+  to:selfBob.address,subject:'Work',body:'Internal only',clientId:'alice-to-bob-123'})).status,201);
+ assert.equal((await (await bob.call('/api/suite/communications/mail/inbox')).json()).messages[0].body,'Internal only');
+ f.communicationsStore.postSubscriptionNotice({reference:'billing123',organizationName:'First Lab',
+  description:'2 extra DuckNote seats'});
+ f.communicationsStore.postSecurityAlert({reference:'security123',description:'Suspicious login attempts'});
+ const inbox=(await (await owner.call('/api/suite/communications/mail/inbox')).json()).messages;
+ assert(inbox.some(x=>x.to==='billing@duckbio.internal'&&x.kind==='billing'));
+ const ownerThreads=(await (await owner.call('/api/suite/communications/threads')).json()).threads;
+ assert(ownerThreads.some(x=>x.peerId==='duckbio-security'&&x.unread===1));
+ assert.equal((await (await owner.call('/api/suite/communications/chat/history',{peerId:'duckbio-security'})).json()).messages[0].body,'Suspicious login attempts');
+ assert.equal((await (await owner.call('/api/suite/communications/chat/read',{peerId:'duckbio-security'})).json()).marked,1);
+ assert.equal((await (await alice.call('/api/suite/communications/threads')).json()).threads.some(x=>x.peerId==='duckbio-security'),false);
+ assert.equal((await alice.call('/api/suite/communications/chat/send',{
+  recipientId:c.id,body:'Hello across labs',clientId:'cross-lab-123'})).status,201);
 });
