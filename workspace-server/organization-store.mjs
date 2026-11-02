@@ -4,6 +4,7 @@ import {existsSync,mkdirSync,realpathSync,chmodSync,readFileSync} from 'node:fs'
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildShadowEntitlementPlan} from './subscription-entitlement-planner.mjs';
+import {createStripeLiveEventLedger} from './stripe-live-event-ledger.mjs';
 import {planVerifiedSubscriptionTransition} from './verified-subscription-transition.mjs';
 
 const policy=JSON.parse(readFileSync(fileURLToPath(new URL('../suite-permissions.json',import.meta.url)),'utf8'));
@@ -59,7 +60,8 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     "CREATE TABLE IF NOT EXISTS subscription_entitlement_shadow(subscription_id TEXT PRIMARY KEY,source TEXT NOT NULL CHECK(source='stripe_test'),org TEXT NOT NULL REFERENCES organizations(id),draft TEXT NOT NULL UNIQUE REFERENCES subscription_drafts(id),revision INTEGER NOT NULL CHECK(revision>0),decision TEXT NOT NULL CHECK(decision IN ('candidate_paid','payment_review','cancellation_review','awaiting_payment','unavailable')),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),period_end INTEGER,last_paid_invoice TEXT,updated_at INTEGER NOT NULL)",
     "CREATE TABLE IF NOT EXISTS verified_subscription_allocations(subscription_id TEXT PRIMARY KEY,source TEXT NOT NULL CHECK(source='stripe_live'),org TEXT NOT NULL REFERENCES organizations(id),revision INTEGER NOT NULL CHECK(revision>0),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),state TEXT NOT NULL CHECK(state IN ('active','canceled')),paid_through INTEGER,updated_at INTEGER NOT NULL)",
     "CREATE TABLE IF NOT EXISTS verified_subscription_revisions(subscription_id TEXT NOT NULL REFERENCES verified_subscription_allocations(subscription_id),revision INTEGER NOT NULL CHECK(revision>0),event_key TEXT NOT NULL UNIQUE,digest TEXT NOT NULL,org TEXT NOT NULL REFERENCES organizations(id),recorded_at INTEGER NOT NULL,PRIMARY KEY(subscription_id,revision))",
-    "CREATE TABLE IF NOT EXISTS owner_alert_outbox(id INTEGER PRIMARY KEY AUTOINCREMENT,audit_id INTEGER NOT NULL UNIQUE REFERENCES organization_audit(id),category TEXT NOT NULL CHECK(category IN ('organization','subscription','user','permission')),state TEXT NOT NULL CHECK(state IN ('pending','sending','sent','failed')),attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),lease_token TEXT,locked_until INTEGER,next_attempt_at INTEGER NOT NULL,sent_at INTEGER)"
+    "CREATE TABLE IF NOT EXISTS owner_alert_outbox(id INTEGER PRIMARY KEY AUTOINCREMENT,audit_id INTEGER NOT NULL UNIQUE REFERENCES organization_audit(id),category TEXT NOT NULL CHECK(category IN ('organization','subscription','user','permission')),state TEXT NOT NULL CHECK(state IN ('pending','sending','sent','failed')),attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),lease_token TEXT,locked_until INTEGER,next_attempt_at INTEGER NOT NULL,sent_at INTEGER)",
+    "CREATE TABLE IF NOT EXISTS stripe_live_event_log(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,object_id TEXT NOT NULL,event_created INTEGER NOT NULL,raw_digest TEXT NOT NULL,received_at INTEGER NOT NULL)"
   ].join(';')+';');
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
@@ -69,6 +71,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
 
   for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))chmodSync(databasePath+suffix,0o600);
   const tx=work=>{db.exec('BEGIN IMMEDIATE');try{const result=work();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
+  const liveEventLedger=createStripeLiveEventLedger({db,clock});
   function requireAdmin(org,actor){
     if(!safeId(org)||!safeId(actor)||!db.prepare('SELECT 1 FROM members WHERE org=? AND account=? AND admin=1 AND active=1').get(org,actor))fail('access_denied');
   }
@@ -113,6 +116,11 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         audit(organizationId,owner.accountId,'organization.created',organizationId,{name:name.trim()});
         return {id:organizationId,name:name.trim()};
       });
+    },
+    // Private signed-LIVE metadata only, with transactionally durable replay checks.
+    // No route to this method and no inference of customer organization or payment.
+    recordVerifiedStripeLiveEvent(event){
+      return tx(()=>liveEventLedger.record(event));
     },
     // INTERNAL outbox operations. No HTTP routes. Claim tokens make competing
     // private workers mutually exclusive even across multiple Passenger processes.
@@ -168,7 +176,8 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         (SELECT count(*) FROM members WHERE active=1) AS activeMemberships,
         (SELECT count(*) FROM organization_invites WHERE expires_at>?) AS pendingInvitations,
         (SELECT count(*) FROM verified_subscription_allocations WHERE state='active') AS activeVerifiedSubscriptions,
-        (SELECT count(*) FROM subscription_drafts WHERE status='draft') AS unpaidDrafts`).get(clock());
+        (SELECT count(*) FROM subscription_drafts WHERE status='draft') AS unpaidDrafts,
+        (SELECT count(*) FROM stripe_live_event_log) AS liveWebhookEvents`).get(clock());
       const organizations=db.prepare(`SELECT o.id,o.name,
         (SELECT count(*) FROM members m WHERE m.org=o.id) AS memberships,
         (SELECT count(*) FROM members m WHERE m.org=o.id AND m.active=1) AS activeMembers,
@@ -191,6 +200,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       const capacity=db.prepare(`SELECT app,sum(purchased) AS purchased,
         (SELECT count(*) FROM assignments a WHERE a.app=seats.app) AS assigned
         FROM seats GROUP BY app`).all();
+      const liveEvents=liveEventLedger.latest(101);
       const auditRows=db.prepare(`SELECT a.id,a.org,o.name AS organizationName,a.actor,a.action,a.subject,a.details,a.recorded_at
         FROM organization_audit a JOIN organizations o ON o.id=a.org
         ORDER BY a.id DESC LIMIT 101`).all();
@@ -230,10 +240,12 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         truncated:{
           organizations:organizations.length>200,memberships:membershipRows.length>300,
           subscriptions:subscriptionRows.length>200,
-          testDrafts:testDrafts.length>100,activity:auditRows.length>100
+          testDrafts:testDrafts.length>100,activity:auditRows.length>100,
+          liveWebhookEvents:liveEvents.length>100
         },
         snapshotAt:clock(),
         alerts:this.ownerAlertSummary(),
+        liveWebhookEvents:liveEvents.slice(0,100),
         financials:{available:false,reason:'Live Stripe revenue and refunds are not reconciled'}
       };
     },

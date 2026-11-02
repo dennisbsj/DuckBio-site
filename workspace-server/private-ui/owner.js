@@ -46,7 +46,8 @@ function render(data){
   ['Active memberships',summary.totals.activeMemberships],
   ['Active verified subscriptions',summary.totals.activeVerifiedSubscriptions],
   ['Pending invitations',summary.totals.pendingInvitations],
-  ['Unpaid subscription drafts',summary.totals.unpaidDrafts]
+  ['Unpaid subscription drafts',summary.totals.unpaidDrafts],
+  ['Signed LIVE events (unassigned)',summary.totals.liveWebhookEvents]
  ];
  $('owner-stats').replaceChildren(...stats.map(([label,value])=>stat(label,value)));
  $('owner-snapshot-time').textContent='Snapshot: '+date(summary.snapshotAt);
@@ -68,6 +69,8 @@ function render(data){
   (appNames[x.appId]||x.appId)+' · assigned / purchased',x.assigned+' / '+x.purchased)));
  fill('owner-drafts',summary.testDrafts.map(x=>[
   x.organizationId,x.plan,apps(x.apps),x.seats,'Unpaid · '+x.state]));
+ fill('owner-live-events',(summary.liveWebhookEvents||[]).map(x=>[
+  x.type,date(x.occurredAt),date(x.receivedAt),'Not reconciled']));
  fill('owner-activity',summary.activity.map(x=>[
   date(x.at),x.organizationName,x.actorId,
   x.action+(x.mode==='test'?' · TEST':''),x.subject,
