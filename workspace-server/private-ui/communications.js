@@ -64,7 +64,7 @@ async function search(){
 }
 function insertMention(input,mention){
  const start=input.selectionStart,end=input.selectionEnd;
- const extra=(start>0&&!/\\s/.test(input.value[start-1])?' ':'')+mention+' ';
+ const extra=(start>0&&!/\s/.test(input.value[start-1])?' ':'')+mention+' ';
  input.setRangeText(extra,start,end,'end');input.focus();
 }
 function mentionControls(rootId,inputId,members){
@@ -76,7 +76,7 @@ function mentionControls(rootId,inputId,members){
  }
 }
 function renderMessageText(target,value){
- const re=/@(?:ld|dm|dn|cd|md|dt)[0-9]{6,}\\b|@u-[a-f0-9]{2,256}\\b/g;
+ const re=/@(?:ld|dm|dn|cd|md|dt)[0-9]{6,}\b|@u-[a-f0-9]{2,256}\b/g;
  let previous=0;
  for(const item of value.matchAll(re)){
   target.append(document.createTextNode(value.slice(previous,item.index)));
