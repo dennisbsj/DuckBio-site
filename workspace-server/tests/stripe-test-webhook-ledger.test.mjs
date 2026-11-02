@@ -56,3 +56,35 @@ test('test webhook ledger refuses malformed input and conflicting event identifi
  assert.deepEqual(store.recordVerifiedStripeTestEvent(event('evt_okay1234','cs_test_123')),{recorded:true,matched:false,draftId:null});
  assert.throws(()=>store.recordVerifiedStripeTestEvent(event('evt_okay1234','cs_test_different')),/stripe_event_conflict/);
 });
+
+test('late association links signed test Checkout events only to their exact local session',t=>{
+ const dir=mkdtempSync(join(tmpdir(),'duckbio-stripe-late-event-'));
+ const dbPath=join(dir,'private','org.sqlite');
+ const store=createOrganizationStore({databasePath:dbPath,clock:()=>1783090000000});
+ t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});
+ for(const [id,actor] of [['one','admin1'],['two','admin2']]){
+  store.setupOrganization({organizationId:id,name:'Lab '+id,owner:{accountId:actor,name:'Owner',nickname:'Owner',email:id+'@example.test'}});
+ }
+ const a=store.createSubscriptionDraft({organizationId:'one',actorId:'admin1',plan:'Single',apps:['eel'],seats:2});
+ const b=store.createSubscriptionDraft({organizationId:'two',actorId:'admin2',plan:'Single',apps:['goflo'],seats:1});
+ store.prepareTestCheckout({organizationId:'one',actorId:'admin1',draftId:a.id,price:'price_test12345'});
+ store.prepareTestCheckout({organizationId:'two',actorId:'admin2',draftId:b.id,price:'price_test12345'});
+ const early=event('evt_early12345','cs_test_correct_session');
+ assert.deepEqual(store.recordVerifiedStripeTestEvent(early),{recorded:true,matched:false,draftId:null});
+ store.completeTestCheckout({organizationId:'two',actorId:'admin2',draftId:b.id,
+  session:{id:'cs_test_other_session',url:'https://checkout.stripe.com/c/pay/other'}});
+ assert.deepEqual(store.recordVerifiedStripeTestEvent(early),{recorded:false,matched:false,draftId:null});
+ store.completeTestCheckout({organizationId:'one',actorId:'admin1',draftId:a.id,
+  session:{id:'cs_test_correct_session',url:'https://checkout.stripe.com/c/pay/correct'}});
+ assert.deepEqual(store.recordVerifiedStripeTestEvent(early),{recorded:false,matched:true,draftId:a.id});
+ const db=new DatabaseSync(dbPath);
+ try{
+  const saved=db.prepare('SELECT org,draft FROM stripe_test_webhook_events WHERE id=?').get(early.id);
+  assert.deepEqual(saved,{org:'one',draft:a.id});
+  assert.equal(db.prepare('SELECT count(*) AS n FROM stripe_test_webhook_events').get().n,1,'no duplicate events');
+ }finally{db.close();}
+ assert(store.overview('one','admin1').apps.every(x=>x.purchased===0));
+ assert(store.overview('two','admin2').apps.every(x=>x.purchased===0));
+ assert.equal(store.auditLog('one','admin1').filter(x=>x.action==='checkout.test.webhook.matched').length,1);
+ assert.equal(store.auditLog('two','admin2').filter(x=>x.action==='checkout.test.webhook.matched').length,0);
+});
