@@ -340,7 +340,7 @@ test('end-to-end administrator lifecycle: two organizations, invitations, rights
  await memberRow().getByRole('button',{name:'Edit permissions'}).click();
  await page.locator('#role-fields select[name=eel]').selectOption('scientist');
  await page.locator('#member-form button[type=submit]').click();
- await page.locator('#members').getByText('DuckNote (scientist)').waitFor();
+ await memberRow().getByText('DuckNote (scientist)').waitFor();
  assert.equal(org.accessFor({organizationId:'lab-a',accountId:user.id,appId:'eel'}).role,'scientist');
  page.once('dialog',dialog=>dialog.accept());
  await memberRow().getByRole('button',{name:'Deactivate'}).click();
