@@ -4,6 +4,7 @@ import {existsSync,mkdirSync,realpathSync,chmodSync,readFileSync} from 'node:fs'
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildShadowEntitlementPlan} from './subscription-entitlement-planner.mjs';
+import {planVerifiedSubscriptionTransition} from './verified-subscription-transition.mjs';
 
 const policy=JSON.parse(readFileSync(fileURLToPath(new URL('../suite-permissions.json',import.meta.url)),'utf8'));
 export const APPLICATIONS=Object.freeze([['limsman','LabDuck','LIMSMan'],['goflo','CytoDuck','GoFlo'],['methpipe','DuckPipe','MethPipe'],['eel','DuckNote','EEL'],['duckman','DuckMan','DuckMan'],['mantrain','DuckTrain','ManTrain']].map(([id,name,key])=>Object.freeze({id,name,roles:Object.freeze(Object.keys(policy.apps[key].roles)),rolePermissions:Object.freeze(policy.apps[key].roles),permissions:Object.freeze([...new Set(Object.values(policy.apps[key].roles).flat().filter(p=>p!=='*'))].sort())})));
@@ -28,7 +29,11 @@ function validRoles(value){
   for(const [app,role] of Object.entries(value))if(!byId.get(app)?.roles.includes(role))fail('invalid_roles');
   return value;
 }
-export function createOrganizationStore({databasePath,clock=Date.now}){
+export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveSubscriptionEvidence=null}){
+  // Production must inject a PRIVATE verifier of live billing evidence.
+  // Neither browser requests nor sk_test_/TEST observations are accepted here.
+  if(verifyLiveSubscriptionEvidence!==null&&typeof verifyLiveSubscriptionEvidence!=='function')
+    fail('invalid_verified_billing_adapter');
   privatePath(databasePath);
   mkdirSync(path.dirname(databasePath),{recursive:true,mode:0o700});
   const db=new DatabaseSync(databasePath);
@@ -50,7 +55,9 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     "CREATE TABLE IF NOT EXISTS stripe_test_subscription_bindings(subscription_id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),draft TEXT NOT NULL UNIQUE REFERENCES subscription_drafts(id),created_at INTEGER NOT NULL)",
     "CREATE TABLE IF NOT EXISTS stripe_test_invoice_refs(invoice_id TEXT PRIMARY KEY,subscription_id TEXT NOT NULL REFERENCES stripe_test_subscription_bindings(subscription_id),org TEXT NOT NULL REFERENCES organizations(id),draft TEXT NOT NULL REFERENCES subscription_drafts(id),recorded_at INTEGER NOT NULL)",
     "CREATE TABLE IF NOT EXISTS stripe_test_seat_projections(draft TEXT PRIMARY KEY REFERENCES subscription_drafts(id),org TEXT NOT NULL REFERENCES organizations(id),attempt INTEGER NOT NULL CHECK(attempt>=1),decision TEXT NOT NULL CHECK(decision IN ('candidate_paid','payment_review','cancellation_review','awaiting_payment','unavailable')),apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),period_end INTEGER,updated_at INTEGER NOT NULL)",
-    "CREATE TABLE IF NOT EXISTS subscription_entitlement_shadow(subscription_id TEXT PRIMARY KEY,source TEXT NOT NULL CHECK(source='stripe_test'),org TEXT NOT NULL REFERENCES organizations(id),draft TEXT NOT NULL UNIQUE REFERENCES subscription_drafts(id),revision INTEGER NOT NULL CHECK(revision>0),decision TEXT NOT NULL CHECK(decision IN ('candidate_paid','payment_review','cancellation_review','awaiting_payment','unavailable')),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),period_end INTEGER,last_paid_invoice TEXT,updated_at INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS subscription_entitlement_shadow(subscription_id TEXT PRIMARY KEY,source TEXT NOT NULL CHECK(source='stripe_test'),org TEXT NOT NULL REFERENCES organizations(id),draft TEXT NOT NULL UNIQUE REFERENCES subscription_drafts(id),revision INTEGER NOT NULL CHECK(revision>0),decision TEXT NOT NULL CHECK(decision IN ('candidate_paid','payment_review','cancellation_review','awaiting_payment','unavailable')),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),period_end INTEGER,last_paid_invoice TEXT,updated_at INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS verified_subscription_allocations(subscription_id TEXT PRIMARY KEY,source TEXT NOT NULL CHECK(source='stripe_live'),org TEXT NOT NULL REFERENCES organizations(id),revision INTEGER NOT NULL CHECK(revision>0),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),state TEXT NOT NULL CHECK(state IN ('active','canceled')),paid_through INTEGER,updated_at INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS verified_subscription_revisions(subscription_id TEXT NOT NULL REFERENCES verified_subscription_allocations(subscription_id),revision INTEGER NOT NULL CHECK(revision>0),event_key TEXT NOT NULL UNIQUE,digest TEXT NOT NULL,org TEXT NOT NULL REFERENCES organizations(id),recorded_at INTEGER NOT NULL,PRIMARY KEY(subscription_id,revision))"
   ].join(';')+';');
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
@@ -140,6 +147,93 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         db.prepare('INSERT INTO receipts VALUES(?,?,?,?)').run(reference,organizationId,digest,clock());
         for(const app of selection)db.prepare('UPDATE seats SET purchased=purchased+? WHERE org=? AND app=?').run(seats,organizationId,app);
         return {applied:true,apps:selection,seats};
+      });
+    },
+    // Only a trusted PRIVATE adapter can execute this route-free billing mutation.
+    // This method is NOT called by test Stripe, Checkout redirects, webhooks, or the browser.
+    // The injected verifier must authenticate and normalize live provider evidence.
+    applyVerifiedSubscriptionTransition(evidence){
+      if(!verifyLiveSubscriptionEvidence)fail('verified_billing_unavailable');
+      let verified;
+      try{verified=verifyLiveSubscriptionEvidence(evidence);}
+      catch{fail('verified_billing_rejected');}
+      if(!verified||typeof verified!=='object'||Array.isArray(verified)||
+         verified.source!=='stripe_live'||!safeId(verified.eventKey)||
+         !safeId(verified.organizationId)||!safeId(verified.subscriptionId)||
+         !Number.isSafeInteger(verified.revision)||verified.revision<1)
+        fail('verified_billing_rejected');
+      const {eventKey,organizationId,subscriptionId,revision,plan,apps,seats,status,paidThrough}=verified;
+      // Do not allow a test-only reconciliation to set 'source' to live through
+      // any browser endpoint: there is no HTTP route for this method.
+      const canonicalApps=Array.isArray(apps)?[...apps].sort():apps;
+      const digest=createHash('sha256').update(JSON.stringify([
+        organizationId,subscriptionId,revision,plan,canonicalApps,seats,status,paidThrough??null
+      ])).digest('hex');
+      return tx(()=>{
+        if(!db.prepare('SELECT 1 FROM organizations WHERE id=?').get(organizationId))
+          fail('organization_not_found');
+        const byEvent=db.prepare('SELECT org,subscription_id,revision,digest FROM verified_subscription_revisions WHERE event_key=?')
+          .get(eventKey);
+        if(byEvent){
+          if(byEvent.org!==organizationId||byEvent.subscription_id!==subscriptionId||
+             byEvent.revision!==revision||byEvent.digest!==digest)
+            fail('verified_billing_event_conflict');
+          return {applied:false,idempotent:true,licensesChanged:false};
+        }
+        const byRevision=db.prepare('SELECT digest FROM verified_subscription_revisions WHERE subscription_id=? AND revision=?')
+          .get(subscriptionId,revision);
+        if(byRevision){
+          if(byRevision.digest!==digest)fail('verified_subscription_revision_conflict');
+          return {applied:false,idempotent:true,licensesChanged:false};
+        }
+        const previous=db.prepare('SELECT * FROM verified_subscription_allocations WHERE subscription_id=?')
+          .get(subscriptionId);
+        const current=previous?{
+          organizationId:previous.org,subscriptionId,revision:previous.revision,
+          plan:previous.plan,apps:JSON.parse(previous.apps),seats:previous.seats,
+          status:previous.state,paidThrough:previous.paid_through
+        }:null;
+        if(previous?.org!==undefined&&previous.org!==organizationId)
+          fail('verified_subscription_tenant_conflict');
+        const knownApps=APPLICATIONS.map(app=>({
+          appId:app.id,
+          purchased:db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?')
+            .get(organizationId,app.id)?.purchased??0,
+          assigned:db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?')
+            .get(organizationId,app.id).n,
+          reserved:pendingSeats(organizationId,app.id)
+        }));
+        let proposal;
+        try{proposal=planVerifiedSubscriptionTransition({
+          organizationId,subscriptionId,knownApps,existing:current,
+          next:{plan,apps:canonicalApps,seats,status,paidThrough,revision},now:clock()
+        });}
+        catch(error){
+          fail(error.message==='stale_subscription_transition'?
+            'verified_subscription_stale':error.message==='subscription_transition_invariant'?
+            'verified_subscription_invariant':'invalid_verified_subscription');
+        }
+        if(!proposal.allowed)fail('verified_subscription_manual_review');
+        const now=clock();
+        for(const item of proposal.changes){
+          if(!item.delta)continue;
+          db.prepare('UPDATE seats SET purchased=? WHERE org=? AND app=?')
+            .run(item.targetPurchased,organizationId,item.appId);
+        }
+        db.prepare("INSERT INTO verified_subscription_allocations(subscription_id,source,org,revision,plan,apps,seats,state,paid_through,updated_at) VALUES(?,'stripe_live',?,?,?,?,?,?,?,?) ON CONFLICT(subscription_id) DO UPDATE SET revision=excluded.revision,plan=excluded.plan,apps=excluded.apps,seats=excluded.seats,state=excluded.state,paid_through=excluded.paid_through,updated_at=excluded.updated_at")
+          .run(subscriptionId,organizationId,revision,proposal.nextPlan,
+            JSON.stringify(proposal.nextApps),proposal.nextSeats,
+            proposal.nextStatus,proposal.paidThrough,now);
+        db.prepare('INSERT INTO verified_subscription_revisions(subscription_id,revision,event_key,digest,org,recorded_at) VALUES(?,?,?,?,?,?)')
+          .run(subscriptionId,revision,eventKey,digest,organizationId,now);
+        // No personal data or billing secrets are written to the organization audit.
+        audit(organizationId,'verified-billing','subscription.entitlement.transition',subscriptionId,
+          {revision,previousRevision:proposal.currentRevision,state:proposal.nextStatus,
+           deltas:proposal.changes.filter(x=>x.delta!==0).map(x=>({appId:x.appId,delta:x.delta}))});
+        return {applied:true,subscriptionId,revision,
+          licensesChanged:proposal.changes.some(x=>x.delta!==0),
+          deltas:proposal.changes.filter(x=>x.delta!==0)
+            .map(x=>({appId:x.appId,delta:x.delta,targetPurchased:x.targetPurchased}))};
       });
     },
     saveMember({organizationId,actorId,member}){
