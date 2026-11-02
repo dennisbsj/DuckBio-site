@@ -9,6 +9,7 @@ import { createIdentityStore } from './identity-store.mjs';
 import { createSqliteAuthStores } from './sqlite-store.mjs';
 import { createOrganizationStore } from '../organization-store.mjs';
 import {createCommunicationsStore} from '../communications-store.mjs';
+import {deliverOwnerInternalAudit} from '../owner-internal-audit-delivery.mjs';
 import { createResendInvitationMailer } from '../invitation-mailer.mjs';
 import {createResendOwnerAlertMailer,dispatchOwnerAlerts} from '../owner-alert-mailer.mjs';
 import { createStripeTestCheckout } from '../stripe-test-checkout.mjs';
@@ -62,6 +63,7 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
   const auth = createSqliteAuthStores({ databasePath: privatePath(actual.SUITE_AUTH_DB_PATH, 'session database'), clock });
   let identityStore; let nativeStore; let organizationStore; let communicationsStore; let requestHandler;
   let ownerAlertMailer=null,ownerAlertTimer=null,ownerAlertProcessing=false;
+  let ownerInternalTimer=null,ownerInternalProcessing=false;
   try {
     if (actual.SUITE_MODE === 'broker') {
       if(actual.SUITE_OWNER_ALERTS_ENABLED&&
@@ -176,7 +178,25 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
     });
     server.once('close',()=>{if(ownerAlertTimer)clearInterval(ownerAlertTimer);});
   }
+  if(communicationsStore&&organizationStore&&actual.SUITE_OWNER_ACCOUNT_ID){
+    const deliver=()=>{
+      if(ownerInternalProcessing)return;
+      ownerInternalProcessing=true;
+      try{
+        // Bounded synchronous SQLite-only processing; replay safely after restart.
+        deliverOwnerInternalAudit({organizationStore,communicationsStore,limit:100});
+      }catch{/* Retain cursor for safe retry on next pass. */}
+      finally{ownerInternalProcessing=false;}
+    };
+    server.once('listening',()=>{
+      deliver();
+      ownerInternalTimer=setInterval(deliver,15000);
+      ownerInternalTimer.unref?.();
+    });
+    server.once('close',()=>{if(ownerInternalTimer)clearInterval(ownerInternalTimer);});
+  }
   return Object.freeze({ server, close() { if(ownerAlertTimer)clearInterval(ownerAlertTimer);
+    if(ownerInternalTimer)clearInterval(ownerInternalTimer);
     identityStore?.close(); organizationStore?.close(); communicationsStore?.close(); nativeStore?.close(); auth.close(); } });
 }
 

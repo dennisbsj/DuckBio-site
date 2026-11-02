@@ -34,7 +34,8 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
   "CREATE INDEX IF NOT EXISTS idx_chat_by_sender ON chat_messages(sender,created_at)",
   "CREATE TABLE IF NOT EXISTS internal_mails(id TEXT PRIMARY KEY,sender TEXT NOT NULL,recipient TEXT NOT NULL,from_address TEXT NOT NULL,to_address TEXT NOT NULL,subject TEXT NOT NULL,body TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN ('user','billing','contact')),created_at INTEGER NOT NULL,read_at INTEGER,system_reference TEXT UNIQUE,client_id TEXT,UNIQUE(sender,client_id))",
   "CREATE INDEX IF NOT EXISTS idx_mail_inbox ON internal_mails(recipient,created_at)",
-  "CREATE INDEX IF NOT EXISTS idx_mail_sent ON internal_mails(sender,created_at)"
+  "CREATE INDEX IF NOT EXISTS idx_mail_sent ON internal_mails(sender,created_at)",
+  "CREATE TABLE IF NOT EXISTS internal_sync_cursors(name TEXT PRIMARY KEY,offset INTEGER NOT NULL CHECK(offset>=0))"
  ].join(';')+';');
  for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))
   chmodSync(databasePath+suffix,0o600);
@@ -176,6 +177,23 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
    if(!validId(accountId)||!validId(id))fail('invalid_account');
    return db.prepare('UPDATE internal_mails SET read_at=? WHERE recipient=? AND id=? AND read_at IS NULL')
     .run(clock(),accountId,id).changes;
+  },
+  // Private cross-database delivery progress. Insert into the communications
+  // DB before moving the watermark so a restart safely replays undelivered
+  // events without duplicating notices.
+  ownerAuditCursor(){
+   return db.prepare("SELECT offset FROM internal_sync_cursors WHERE name='owner-audit'")
+     .get()?.offset??0;
+  },
+  advanceOwnerAuditCursor(id){
+   if(!Number.isSafeInteger(id)||id<0)fail('invalid_audit_cursor');
+   return tx(()=>{
+    const old=db.prepare("SELECT offset FROM internal_sync_cursors WHERE name='owner-audit'")
+      .get()?.offset??0;
+    if(id>old)db.prepare("INSERT INTO internal_sync_cursors(name,offset) VALUES('owner-audit',?) ON CONFLICT(name) DO UPDATE SET offset=excluded.offset")
+      .run(id);
+    return Math.max(old,id);
+   });
   },
   // Private system-only boundaries: never callable through an authenticated
   // user route, even by a central administrator.
