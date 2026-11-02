@@ -864,3 +864,43 @@ test('Chromium content-login continuation rejects external and duplicate targets
  assert.equal(new URL(page.url()).origin,origin);
  assert.match(page.url(),/\/workspace\?/);
 });
+
+
+test('Chromium messaging window returns to chosen mail view after Workspace sign-in',{timeout:45000},async t=>{
+ const {page,origin}=await fixture(t,{communications:true});
+ await page.goto(origin+'/messages?view=mail');
+ await page.locator('#sign-in:not([hidden])').waitFor();
+ assert.equal(new URL(page.url()).pathname,'/workspace');
+ assert.equal(new URL(page.url()).search,'?messages=mail');
+ await page.locator('#email').fill('owner@example.test');
+ await page.locator('#password').fill('Example passphrase 123456');
+ await page.getByRole('button',{name:'Sign in'}).click();
+ await page.waitForURL(origin+'/messages?view=mail');
+ await page.locator('#comms-app:not([hidden])').waitFor();
+ assert.equal(await page.locator('#tab-mail').getAttribute('aria-selected'),'true');
+ assert.equal(await page.locator('#mail-view').isVisible(),true);
+});
+
+test('Chromium active Workspace sessions can resume Notifications without another login',{timeout:45000},async t=>{
+ const {page,origin}=await fixture(t,{communications:true});
+ await signIn(page);
+ await page.goto(origin+'/workspace?messages=notifications');
+ await page.waitForURL(origin+'/messages?view=notifications');
+ await page.locator('#comms-app:not([hidden])').waitFor();
+ assert.equal(await page.locator('#notifications-panel').count(),1);
+});
+
+test('Chromium messaging continuation rejects unknown or duplicate view parameters',{timeout:45000},async t=>{
+ const {page,origin}=await fixture(t,{communications:true});
+ await signIn(page);
+ for(const query of ['?messages='+encodeURIComponent('https://evil.example/'),
+   '?messages=chat&messages=mail']){
+  await page.goto(origin+'/workspace'+query);
+  await page.locator('#portal:not([hidden])').waitFor();
+  assert.equal(new URL(page.url()).pathname,'/workspace');
+ }
+ // An unknown incoming messenger view is reduced to a fixed safe default.
+ await page.goto(origin+'/messages?view='+encodeURIComponent('https://evil.example/'));
+ await page.locator('#comms-app:not([hidden])').waitFor();
+ assert.equal(new URL(page.url()).origin,origin);
+});
