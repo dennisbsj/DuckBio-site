@@ -319,6 +319,20 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
           ...(lifecycle?{lifecycle:JSON.parse(lifecycle)}:{})};
       });
     },
+    // Admin-scoped, bounded diagnostic history. Never expose internal Stripe IDs
+    // or raw event payloads, and never treat prior checks as current entitlements.
+    testReconciliationHistory({organizationId,actorId,draftId}){
+      if(!safeId(draftId))fail('invalid_checkout');
+      requireAdmin(organizationId,actorId);
+      const draft=db.prepare("SELECT 1 FROM subscription_drafts d JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org WHERE d.id=? AND d.org=? AND c.state='ready'")
+        .get(draftId,organizationId);
+      if(!draft)fail('checkout_not_found');
+      return db.prepare('SELECT attempt,state,reason,started_at,completed_at,lifecycle FROM stripe_test_reconciliation_checks WHERE draft=? AND org=? ORDER BY attempt DESC LIMIT 10')
+        .all(draftId,organizationId)
+        .map(x=>({attempt:x.attempt,state:x.state,reason:x.reason??null,
+          startedAt:x.started_at,checkedAt:x.completed_at??null,
+          lifecycle:x.lifecycle?JSON.parse(x.lifecycle):null,licensesGranted:false}));
+    },
     listSubscriptionDrafts(organizationId,actorId){
       requireAdmin(organizationId,actorId);
       return db.prepare("SELECT d.*,c.state AS checkout_state,c.url AS checkout_url,r.state AS reconciliation_state,r.reason AS reconciliation_reason,r.attempt AS reconciliation_attempt,r.completed_at AS reconciliation_checked_at,r.lifecycle AS reconciliation_lifecycle FROM subscription_drafts d LEFT JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org LEFT JOIN stripe_test_reconciliation_checks r ON r.draft=d.id AND r.org=d.org AND r.attempt=(SELECT MAX(z.attempt) FROM stripe_test_reconciliation_checks z WHERE z.draft=d.id AND z.org=d.org) WHERE d.org=? ORDER BY d.created_at DESC,d.id").all(organizationId)
