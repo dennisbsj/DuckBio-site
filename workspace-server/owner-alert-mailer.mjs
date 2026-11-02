@@ -1,5 +1,3 @@
-import {createHash} from 'node:crypto';
-
 // Opt-in, PRIVATE DuckBio owner alerts. Resend idempotency is based solely
 // on the persisted organization audit ID, so provider retries cannot multiply mail.
 const email=value=>typeof value==='string'&&value.length<=254&&
@@ -34,7 +32,6 @@ export function createResendOwnerAlertMailer({apiKey,from,to,origin,fetchImpl=gl
       typeof alert.actorId!=='string'||alert.actorId.length>128||
       typeof alert.subject!=='string'||alert.subject.length>254||
       !Number.isSafeInteger(alert.at)||alert.at<1||
-      alert.idempotencyKey!=='duckbio-owner-audit-'+alert.idempotencyKey?.replace(/^duckbio-owner-audit-/,'')||
       !/^duckbio-owner-audit-[0-9]+$/.test(alert.idempotencyKey))
     throw Error('Invalid private owner alert');
    const changes=Array.isArray(alert.changes)?alert.changes:[];
