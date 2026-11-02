@@ -413,6 +413,33 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         id:app.id,name:app.name,purchased:app.purchased,assigned:app.assigned,reserved:app.reserved
       })),subscriptions:entries,now:clock()});
     },
+    // Block any interpretation of a partial TEST shadow plan as a complete
+    // subscription inventory. Unbound ready checkouts have no proven subscription.
+    testEntitlementReadiness(organizationId,actorId){
+      requireAdmin(organizationId,actorId);
+      const sources=db.prepare("SELECT d.id,d.apps,c.state,s.subscription_id,s.decision,s.period_end FROM subscription_drafts d JOIN stripe_test_checkouts c ON c.draft=d.id AND c.org=d.org LEFT JOIN subscription_entitlement_shadow s ON s.draft=d.id AND s.org=d.org WHERE d.org=? AND d.status='draft' AND c.state='ready'")
+        .all(organizationId);
+      const byApp=Object.fromEntries(APPLICATIONS.map(app=>[app.id,{
+        appId:app.id,appName:app.name,unboundCheckouts:0,reviewRequired:0,verifiedCandidates:0}]));
+      const now=Math.floor(clock()/1000);
+      for(const source of sources){
+        const unbound=!source.subscription_id;
+        const review=!unbound&&(source.decision!=='candidate_paid'||
+          !Number.isSafeInteger(source.period_end)||source.period_end<=now);
+        for(const app of JSON.parse(source.apps)){
+          if(!byApp[app])fail('invalid_subscription');
+          if(unbound)byApp[app].unboundCheckouts++;
+          else if(review)byApp[app].reviewRequired++;
+          else byApp[app].verifiedCandidates++;
+        }
+      }
+      const apps=Object.values(byApp).map(row=>({...row,
+        readyForManualPlanning:row.unboundCheckouts===0&&row.reviewRequired===0&&row.verifiedCandidates>0,
+        licensesGranted:false}));
+      return {apps,readyForManualPlanning:apps.some(row=>row.verifiedCandidates>0)&&
+        apps.every(row=>row.unboundCheckouts===0&&row.reviewRequired===0),
+        testOnly:true,realSeatChanges:false,licensesGranted:false};
+    },
     testSeatImpact(organizationId,actorId){
       requireAdmin(organizationId,actorId);
       const current=this.overview(organizationId,actorId);

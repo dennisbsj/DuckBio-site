@@ -290,6 +290,19 @@ async function refreshSubscriptions(){
    ?'Stripe TEST seat projection (not purchased or activated): '+byApp.join(' · ')+
     '. This is a simulation; no real seats or app access have changed.'
    :'Stripe TEST seat projection: no eligible candidate seats. Real purchased seats and permissions remain unchanged.'));
+  const readiness=result.testEntitlementReadiness;
+  if(readiness?.testOnly===true&&readiness.realSeatChanges===false&&readiness.licensesGranted===false){
+   const blockers=readiness.apps.filter(a=>a.unboundCheckouts>0||a.reviewRequired>0);
+   if(blockers.length){
+    const warning=el('div',undefined,'test-entitlement-readiness');
+    warning.append(el('strong','TEST subscription inventory requires manual review:'));
+    const list=el('ul');
+    for(const app of blockers)list.append(el('li',app.appName+': '+
+     app.unboundCheckouts+' unverified Checkout(s) · '+
+     app.reviewRequired+' billing status(es) requiring review. No access changes.'));
+    warning.append(list);simulation.append(warning);
+   }
+  }
   const plan=result.testEntitlementPlan;
   if(plan?.testOnly===true&&plan.licensesGranted===false&&
      plan.realSeatChanges===false&&Array.isArray(plan.apps)){
