@@ -877,7 +877,8 @@ test('Chromium messaging window returns to chosen mail view after Workspace sign
  await page.getByRole('button',{name:'Sign in'}).click();
  await page.waitForURL(origin+'/messages?view=mail');
  await page.locator('#comms-app:not([hidden])').waitFor();
- assert.equal(await page.locator('#tab-mail').getAttribute('aria-selected'),'true');
+ // Message data loads asynchronously; the selected view is applied afterwards.
+ await page.locator('#tab-mail[aria-selected="true"]').waitFor();
  assert.equal(await page.locator('#mail-view').isVisible(),true);
 });
 
