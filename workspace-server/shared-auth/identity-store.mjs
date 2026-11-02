@@ -320,7 +320,7 @@ export function createLocalIdentityAdapter({ store, origin, sessionTtlMs = 8 * 6
   const development = url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
   if (url.origin !== origin || (!development && url.protocol !== 'https:') || url.username || url.password) throw new Error('A secure local identity origin is required');
   const duration = ttl(sessionTtlMs, 8 * 60 * 60_000, 30 * 24 * 60 * 60_000);
-  const rememberedDuration=ttl(rememberedSessionTtlMs,14 * 24 * 60 * 60_000,30 * 24 * 60 * 60_000);
+  const rememberedDuration=ttl(rememberedSessionTtlMs,14 * 24 * 60 * 60_000,14 * 24 * 60 * 60_000);
   const name = development ? 'suite_identity_dev' : '__Host-suite_identity';
   function validHost(req) { return String(req.headers.host ?? '').toLowerCase() === url.host.toLowerCase(); }
   function browserWrite(req) { return validHost(req) && req.headers.origin === origin && (!req.headers['sec-fetch-site'] || ['same-origin', 'none'].includes(req.headers['sec-fetch-site'])); }
