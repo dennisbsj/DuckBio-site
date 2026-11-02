@@ -54,23 +54,51 @@ export function createStripeTestReconciler({secretKey,fetchImpl=globalThis.fetch
    const item=subscription.items.data[0];
    if(ref(item.price?.id)!==checkout.price||item.price?.livemode!==false||
      item.quantity!==draft.seats||item.price?.recurring?.usage_type!=='licensed')invalid();
-   if(subscription.status!=='active')return pending('subscription_not_active');
+   // Stripe's newer API versions put the billing period on subscription items.
+   // Legacy versions also exposed it on the parent subscription.
+   const statuses=['incomplete','incomplete_expired','trialing','active','past_due',
+     'canceled','unpaid','paused'];
+   if(!statuses.includes(subscription.status)||
+      (subscription.cancel_at_period_end!==undefined&&
+        typeof subscription.cancel_at_period_end!=='boolean'))invalid();
+   const periodEnd=item.current_period_end??subscription.current_period_end??null;
+   const cancelAt=subscription.cancel_at??null;
+   if((periodEnd!==null&&(!Number.isSafeInteger(periodEnd)||periodEnd<1))||
+      (cancelAt!==null&&(!Number.isSafeInteger(cancelAt)||cancelAt<1)))invalid();
+   const info={subscriptionStatus:subscription.status,
+     cancelAtPeriodEnd:subscription.cancel_at_period_end===true,
+     cancelAt,periodEnd,invoiceStatus:null,billingReason:null};
+   const withLifecycle=(reason)=>Object.freeze({...pending(reason),lifecycle:Object.freeze({...info})});
    const invoiceId=ref(subscription.latest_invoice);
-   if(!id(invoiceId,'in_'))return pending('invoice_unavailable');
+   if(!id(invoiceId,'in_')){
+    if(invoiceId!==null)invalid();
+    return subscription.status==='active'?withLifecycle('invoice_unavailable'):
+      withLifecycle('subscription_not_active');
+   }
    const invoice=await get('invoices',invoiceId);
    // In newer Stripe API versions, the subscription link moved to parent.subscription_details.
    const invoiceSubscription=ref(invoice.parent?.subscription_details?.subscription)??ref(invoice.subscription);
    if(invoice.object!=='invoice'||invoice.id!==invoiceId||
-     invoiceSubscription!==subscriptionId||ref(invoice.customer)!==customerId)invalid();
-   if(invoice.status!=='paid')return pending('invoice_not_paid');
-   if(!Number.isSafeInteger(invoice.amount_paid)||invoice.amount_paid<=0||
+     invoiceSubscription!==subscriptionId||ref(invoice.customer)!==customerId||
+     !['draft','open','paid','uncollectible','void'].includes(invoice.status))invalid();
+   const billingReason=invoice.billing_reason??null;
+   if(billingReason!==null&&!['subscription','subscription_create','subscription_cycle',
+     'subscription_threshold','subscription_update'].includes(billingReason))invalid();
+   info.invoiceStatus=invoice.status;info.billingReason=billingReason;
+   if(subscription.status!=='active')return withLifecycle('subscription_not_active');
+   if(invoice.status!=='paid')return withLifecycle('invoice_not_paid');
+   if(invoice.paid!==true||invoice.paid_out_of_band!==false||
+     !Number.isSafeInteger(invoice.amount_paid)||invoice.amount_paid<=0||
      invoice.amount_remaining!==0||
      !Number.isSafeInteger(invoice.status_transitions?.paid_at)||
      invoice.status_transitions.paid_at<1)invalid();
-   // This is evidence from Stripe test mode, NOT authority to grant or renew seats.
+   // Paid test invoices can be initial or subscription-cycle renewals;
+   // a cancellation scheduled for period end is not an immediately revoked seat.
+   // This is historical TEST evidence only, never entitlement authority.
    return Object.freeze({state:'paid_test_verified',sessionId:session.id,
     subscriptionId,invoiceId,organizationId:draft.organizationId,draftId:draft.id,
-    price:checkout.price,seats:draft.seats,licensesGranted:false});
+    price:checkout.price,seats:draft.seats,licensesGranted:false,
+    lifecycle:Object.freeze({...info})});
   }
  });
 }
