@@ -5,6 +5,7 @@ import { createAuthBroker } from './broker.mjs';
 import { createLocalIdentityAdapter, IdentityStoreError } from './identity-store.mjs';
 import { OrganizationError } from '../organization-store.mjs';
 import {OWNER_SUPPORT,SECURITY_SENDER} from '../communications-store.mjs';
+import {mentionHandleForUser} from '../message-references.mjs';
 
 const APP_NAMES = Object.freeze({ goflo: 'GoFlo', eel: 'EEL', methpipe: 'MethPipe', mantrain: 'ManTrain', duckman: 'DuckMan', limsman: 'LIMSMan' });
 const STATIC_APPS = new Set(['goflo', 'methpipe', 'mantrain']);
@@ -36,6 +37,16 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     if(!target||target.state!=='active'||(!isOwner(target)&&!membershipActive(target.id)))
       throw new ServiceError(400,'recipient_unavailable');
     return target;
+  }
+  function groupAction(work){
+    try{return work();}
+    catch(error){
+      if(['group_access_denied','owner_chat_forbidden'].includes(error.message))
+        throw new ServiceError(403,'access_denied');
+      if(error.message==='message_conflict')throw new ServiceError(409,'message_conflict');
+      if(error.message==='message_rate_limited')throw new ServiceError(429,'rate_limited');
+      throw new ServiceError(400,'invalid_group');
+    }
   }
   function displayContact(id){
     if(id===SECURITY_SENDER)return {accountId:id,displayName:'DuckBio Security',system:true};
@@ -135,7 +146,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           send(res, 200, { status: 'ok', mode: 'local', buildVersion, configured: identityStore.listUsers().length > 0 }); return true;
         }
         if (!route.startsWith('/api/suite/')) return staticFile(req, res, route);
-        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/owner/overview': 'GET', '/api/suite/communications/self': 'GET', '/api/suite/communications/contacts': 'GET', '/api/suite/communications/search': 'POST', '/api/suite/communications/threads': 'GET', '/api/suite/communications/chat/history': 'POST', '/api/suite/communications/chat/send': 'POST', '/api/suite/communications/chat/read': 'POST', '/api/suite/communications/mail/inbox': 'GET', '/api/suite/communications/mail/sent': 'GET', '/api/suite/communications/mail/send': 'POST', '/api/suite/communications/mail/read': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/user/active': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST', '/api/suite/organization/subscription/test-checkout': 'POST', '/api/suite/organization/subscription/test-reconcile': 'POST', '/api/suite/organization/subscription/test-history': 'POST' };
+        const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/owner/overview': 'GET', '/api/suite/communications/self': 'GET', '/api/suite/communications/contacts': 'GET', '/api/suite/communications/search': 'POST', '/api/suite/communications/threads': 'GET', '/api/suite/communications/chat/history': 'POST', '/api/suite/communications/chat/send': 'POST', '/api/suite/communications/chat/read': 'POST', '/api/suite/communications/groups': 'GET', '/api/suite/communications/group/create': 'POST', '/api/suite/communications/group/members': 'POST', '/api/suite/communications/group/history': 'POST', '/api/suite/communications/group/send': 'POST', '/api/suite/communications/group/read': 'POST', '/api/suite/communications/mail/inbox': 'GET', '/api/suite/communications/mail/sent': 'GET', '/api/suite/communications/mail/send': 'POST', '/api/suite/communications/mail/read': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/user/active': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST', '/api/suite/organization/subscription/test-checkout': 'POST', '/api/suite/organization/subscription/test-reconcile': 'POST', '/api/suite/organization/subscription/test-history': 'POST' };
         if (!methods[route]) return false;
         if (![methods[route]].flat().includes(req.method)) throw new ServiceError(405, 'method_not_allowed');
         if (!['/api/suite/admin/native-users','/api/suite/organization/invite/preview'].includes(route) && parsed.search) throw new ServiceError(400, 'invalid_input');
@@ -195,7 +206,8 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           else if (route === '/api/suite/communications/contacts') {
             const rows=organizationStore.activeContactBook(user.id).filter(x=>x.accountId!==ownerAccountId);
             send(res,200,{contacts:rows.filter(x=>identityStore.getUser(x.accountId)?.state==='active')
-              .map(x=>({...x,address:communicationsStore.addressFor(x.accountId)})),
+              .map(x=>({...x,address:communicationsStore.addressFor(x.accountId),
+                mention:'@'+mentionHandleForUser(x.accountId)})),
               ownerHidden:true});
           }
           else if (route === '/api/suite/communications/search') {
@@ -209,7 +221,8 @@ export function createAccountService({ origin, issuer = origin, clients, identit
                  person.state!=='active'||!membershipActive(person.id))continue;
               if(person.displayName.toLowerCase().includes(q)||communicationsStore.addressFor(person.id).includes(q))
                 results.push({...displayContact(person.id),
-                  address:communicationsStore.addressFor(person.id)});
+                  address:communicationsStore.addressFor(person.id),
+                  mention:'@'+mentionHandleForUser(person.id)});
             }
             send(res,200,{results,ownerExcluded:true});
           }
@@ -239,6 +252,43 @@ export function createAccountService({ origin, issuer = origin, clients, identit
             if(body.peerId===SECURITY_SENDER&&!isOwner(user))
               throw new ServiceError(403,'access_denied');
             send(res,200,{marked:communicationsStore.markChatRead(user.id,body.peerId)});
+          }
+          else if (route === '/api/suite/communications/groups') {
+            send(res,200,{groups:communicationsStore.groupsFor(user.id)});
+          }
+          else if (route === '/api/suite/communications/group/create') {
+            if(!Array.isArray(body.memberIds)||body.memberIds.length<2||
+               body.memberIds.length>29||new Set(body.memberIds).size!==body.memberIds.length||
+               body.memberIds.includes(user.id))throw new ServiceError(400,'invalid_group');
+            for(const id of body.memberIds)checkRecipient(id);
+            if(body.kind==='chat'&&body.memberIds.includes(ownerAccountId)&&!isOwner(user))
+              throw new ServiceError(403,'access_denied');
+            const group=groupAction(()=>communicationsStore.createGroup({
+              creatorId:user.id,memberIds:body.memberIds,kind:body.kind,
+              title:body.title,clientId:body.clientId}));
+            send(res,201,{group});
+          }
+          else if (route === '/api/suite/communications/group/members') {
+            const members=groupAction(()=>communicationsStore.groupMembers({
+              groupId:body.groupId,actorId:user.id}));
+            send(res,200,{members:members.map(id=>({
+              ...displayContact(id),mention:'@'+mentionHandleForUser(id)}))});
+          }
+          else if (route === '/api/suite/communications/group/history') {
+            const history=groupAction(()=>communicationsStore.groupHistory({
+              groupId:body.groupId,actorId:user.id}));
+            send(res,200,history);
+          }
+          else if (route === '/api/suite/communications/group/send') {
+            const result=groupAction(()=>communicationsStore.sendGroup({
+              groupId:body.groupId,senderId:user.id,
+              body:body.body,subject:body.subject??null,clientId:body.clientId}));
+            send(res,201,{message:result});
+          }
+          else if (route === '/api/suite/communications/group/read') {
+            const result=groupAction(()=>communicationsStore.markGroupRead({
+              groupId:body.groupId,actorId:user.id,messageId:body.messageId}));
+            send(res,200,result);
           }
           else if (route === '/api/suite/communications/mail/inbox')
             send(res,200,{messages:communicationsStore.listMail(user.id,'inbox')});
