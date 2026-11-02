@@ -378,3 +378,25 @@ test('unverified checkout or unpaid TEST result cannot create shadow subscriptio
  }finally{db.close();}
  assert.equal(f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel').status,'not_evaluated');
 });
+
+test('readiness detects an unbound Checkout not represented in paid subscription shadow',t=>{
+ const f=fixture(t);
+ const first=f.store.testEntitlementReadiness('one','admin1');
+ assert.equal(first.apps.find(x=>x.appId==='eel').unboundCheckouts,1);
+ assert.equal(first.readyForManualPlanning,false);
+ assert.throws(()=>f.store.testEntitlementReadiness('one','admin2'),/access_denied/);
+ const lifecycle={subscriptionStatus:'active',cancelAtPeriodEnd:false,cancelAt:null,
+  periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_create'};
+ f.finish(f.start(),{...f.paid,lifecycle});
+ const paid=f.store.testEntitlementReadiness('one','admin1');
+ assert.equal(paid.apps.find(x=>x.appId==='eel').verifiedCandidates,1);
+ assert.equal(paid.apps.find(x=>x.appId==='eel').unboundCheckouts,0);
+ assert.equal(paid.readyForManualPlanning,true);
+ f.finish(f.start(),{state:'unavailable',licensesGranted:false});
+ const unknown=f.store.testEntitlementReadiness('one','admin1');
+ assert.equal(unknown.apps.find(x=>x.appId==='eel').reviewRequired,1);
+ assert.equal(unknown.readyForManualPlanning,false);
+ assert.equal(f.store.overview('one','admin1').apps.find(x=>x.id==='eel').purchased,0);
+ f.reopen();
+ assert.equal(f.store.testEntitlementReadiness('one','admin1').readyForManualPlanning,false);
+});
