@@ -5,6 +5,7 @@ import { createAuthBroker } from './broker.mjs';
 import { createLocalIdentityAdapter, IdentityStoreError } from './identity-store.mjs';
 import { OrganizationError } from '../organization-store.mjs';
 import {OWNER_SUPPORT,SECURITY_SENDER} from '../communications-store.mjs';
+import {authorizedContentDestination} from '../private-content-launch.mjs';
 import {mentionHandleForUser} from '../message-references.mjs';
 
 const APP_NAMES = Object.freeze({ goflo: 'GoFlo', eel: 'EEL', methpipe: 'MethPipe', mantrain: 'ManTrain', duckman: 'DuckMan', limsman: 'LIMSMan' });
@@ -26,7 +27,7 @@ function userView(user) { return { id: user.id, email: user.email, displayName: 
 
 /** Account service is independent of all business-data apps. It never migrates
  * their passwords/users, links by email, or promotes a central role to an app role. */
-export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, communicationsStore = null, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null, ownerAccountId = null, ownerAlertsConfigured = false, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
+export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, communicationsStore = null, resolveContentResource = null, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null, ownerAccountId = null, ownerAlertsConfigured = false, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
   if(ownerAccountId!==null&&!safeId(ownerAccountId))throw new Error('Invalid private owner account ID');
   const isOwner=user=>Boolean(ownerAccountId&&user?.id===ownerAccountId&&user.role==='admin'&&user.state==='active');
   const communicationsEnabled=Boolean(organizationStore&&communicationsStore);
@@ -144,6 +145,26 @@ export function createAccountService({ origin, issuer = origin, clients, identit
         if (route === '/api/suite/health' || route === '/api/suite/status') {
           if (req.method !== 'GET') throw new ServiceError(405, 'method_not_allowed');
           send(res, 200, { status: 'ok', mode: 'local', buildVersion, configured: identityStore.listUsers().length > 0 }); return true;
+        }
+        if(route.startsWith('/content/')){
+          if(req.method!=='GET'&&req.method!=='HEAD')throw new ServiceError(405,'method_not_allowed');
+          if(parsed.search||parsed.hash)throw new ServiceError(400,'invalid_input');
+          const contentId=route.slice('/content/'.length);
+          if(!/^(?:ld|dm|dn|cd|md|dt)[0-9]{6,}$/.test(contentId))
+            throw new ServiceError(404,'not_found');
+          const parent=await identity.getSession(req);
+          const user=parent?identityStore.getUser(parent.subject):null;
+          if(!parent||user?.state!=='active'){
+            // Authentication is required before revealing native resource location.
+            res.writeHead(303,{'Location':'/workspace','Cache-Control':'private, no-store',
+              'Referrer-Policy':'no-referrer'});res.end();return true;
+          }
+          const destination=await authorizedContentDestination({
+            contentId,viewerId:user.id,resolveResource:resolveContentResource,
+            clients,organizationStore});
+          if(!destination)throw new ServiceError(404,'not_found');
+          res.writeHead(303,{'Location':destination,'Cache-Control':'private, no-store',
+            'Referrer-Policy':'no-referrer'});res.end();return true;
         }
         if (!route.startsWith('/api/suite/')) return staticFile(req, res, route);
         const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/owner/overview': 'GET', '/api/suite/communications/self': 'GET', '/api/suite/communications/contacts': 'GET', '/api/suite/communications/search': 'POST', '/api/suite/communications/threads': 'GET', '/api/suite/communications/chat/history': 'POST', '/api/suite/communications/chat/send': 'POST', '/api/suite/communications/chat/read': 'POST', '/api/suite/communications/notifications': 'GET', '/api/suite/communications/notification/read': 'POST', '/api/suite/communications/unread': 'GET', '/api/suite/communications/mentions': 'GET', '/api/suite/communications/mention/read': 'POST', '/api/suite/communications/groups': 'GET', '/api/suite/communications/group/create': 'POST', '/api/suite/communications/group/members': 'POST', '/api/suite/communications/group/history': 'POST', '/api/suite/communications/group/send': 'POST', '/api/suite/communications/group/read': 'POST', '/api/suite/communications/mail/inbox': 'GET', '/api/suite/communications/mail/sent': 'GET', '/api/suite/communications/mail/send': 'POST', '/api/suite/communications/mail/read': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/user/active': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST', '/api/suite/organization/subscription/test-checkout': 'POST', '/api/suite/organization/subscription/test-reconcile': 'POST', '/api/suite/organization/subscription/test-history': 'POST' };

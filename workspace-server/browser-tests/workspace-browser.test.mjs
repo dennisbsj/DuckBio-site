@@ -714,9 +714,10 @@ test('Chromium owner creates a cross-contact group and safely tags a user and re
  await page.locator('#chat-form button[type=submit]').click();
  await page.locator('#chat-history').getByText('Please examine').waitFor();
  assert.equal(communicationsStore.groupHistory({groupId:group.id,actorId:worker.id}).messages.length,1);
- assert.equal(await page.locator('#chat-history code.comms-reference').count(),2);
- assert.equal(await page.locator('#chat-history a[href]').count(),0,
-   'resource mentions must not become unchecked deep-links');
+ assert.equal(await page.locator('#chat-history code.comms-reference').count(),1);
+ assert.equal(await page.locator('#chat-history a.comms-reference').count(),1);
+ assert.equal(await page.locator('#chat-history a.comms-reference').getAttribute('href'),
+  '/content/ld000001','resource links must use the authenticated gateway, not native URLs');
  await page.getByRole('button',{name:'Internal mail'}).click();
  await page.getByRole('button',{name:'New group mail'}).click();
  await page.locator('#group-name').fill('Project mail');
@@ -727,7 +728,7 @@ test('Chromium owner creates a cross-contact group and safely tags a user and re
  await page.locator('#mail-group-subject').fill('New sample');
  await page.locator('#mail-group-body').fill('Sample @ld000001 is ready.');
  await page.locator('#mail-group-form button[type=submit]').click();
- await page.locator('#mail-group-history code.comms-reference').getByText('@ld000001').waitFor();
+ await page.locator('#mail-group-history a.comms-reference').getByText('@ld000001').waitFor();
  assert.equal(communicationsStore.groupsFor(worker.id).length,2);
  await page.setViewportSize({width:390,height:720});
  const sizes=await page.evaluate(()=>({viewport:innerWidth,
@@ -756,4 +757,33 @@ test('Chromium owner creates a cross-contact group and safely tags a user and re
  await page.locator('#chat-title').getByText('Cross-team work').waitFor();
  assert.equal(await page.locator('#send-chat').isDisabled(),true,
   'workers can read owner-initiated group messages but cannot reply over chat');
+});
+
+test('Chromium Messenger opens web URLs and app resource links in new tabs without bypassing app access',{timeout:45000},async t=>{
+ const {page,origin,communicationsStore,owner,worker}=await fixture(t,{communications:true});
+ await signIn(page);
+ await page.goto(origin+'/messages');
+ await page.locator('#comms-app:not([hidden])').waitFor();
+ await page.locator('#organization-contacts').getByRole('button',{name:/Lab worker/}).click();
+ await page.locator('#chat-body').fill('Read https://example.org/article?ref=duckbio and @ld000001.');
+ await page.locator('#chat-form button[type=submit]').click();
+ const external=page.locator('#chat-history a.comms-external-link');
+ const resource=page.locator('#chat-history a.comms-reference');
+ await external.waitFor();await resource.waitFor();
+ assert.equal(await external.getAttribute('href'),'https://example.org/article?ref=duckbio');
+ assert.equal(await external.getAttribute('target'),'_blank');
+ assert.match(await external.getAttribute('rel'),/noopener/);
+ assert.equal(await resource.getAttribute('href'),'/content/ld000001');
+ assert.equal(await resource.getAttribute('target'),'_blank');
+ const attempt=await page.request.get(origin+'/content/ld000001',{maxRedirects:0});
+ assert.equal(attempt.status(),404,'unknown native content is never accessible by guessing IDs');
+ await page.getByRole('button',{name:'Internal mail',exact:true}).click();
+ await page.getByRole('button',{name:'Compose mail'}).click();
+ await page.locator('#mail-to').fill(communicationsStore.addressFor(worker.id));
+ await page.locator('#mail-subject').fill('Linked document');
+ await page.locator('#mail-body').fill('Open https://example.org and @dm000002');
+ await page.locator('#mail-form button[type=submit]').click();
+ await page.locator('#mail-list').getByText(/Linked document/).click();
+ assert.equal(await page.locator('#mail-detail a.comms-reference').getAttribute('href'),'/content/dm000002');
+ assert.equal(await page.locator('#mail-detail a.comms-external-link').getAttribute('target'),'_blank');
 });

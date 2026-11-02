@@ -82,17 +82,47 @@ function focusMessage(messageId){
   element.classList.add('comms-mentioned-message');}
 }
 function renderMessageText(target,value){
- const re=/@(?:ld|dm|dn|cd|md|dt)[0-9]{6,}\b|@u-[a-f0-9]{2,256}\b/g;
+ // Only explicit web protocols or www domains become external links.
+ // App references go through an authenticated native-resource gateway.
+ const re=/(?:https?:\/\/|www\.)[^\s<>"']+|@(?:ld|dm|dn|cd|md|dt)[0-9]{6,}\b|@u-[a-f0-9]{2,256}\b/gi;
  let previous=0;
  for(const item of value.matchAll(re)){
+  const original=item[0];
+  let token=original;
+  if(/^(?:https?:\/\/|www\.)/i.test(token))
+    token=token.replace(/[.,!?;:]+$/,'').replace(/\)+$/,m=>m.length>0?'':'');
+  if(!token)continue;
   target.append(document.createTextNode(value.slice(previous,item.index)));
-  const tag=node('code',item[0]);tag.className='comms-reference';tag.title=
-   item[0].startsWith('@u-')?'Unique user mention':
-   'Content ID · access must be confirmed in the owning app';
-  target.append(tag);previous=item.index+item[0].length;
+  let element;
+  if(/^@(?:ld|dm|dn|cd|md|dt)[0-9]{6,}$/i.test(token)){
+   element=node('a',token);
+   element.href='/content/'+token.slice(1).toLowerCase();
+   element.target='_blank';element.rel='noopener noreferrer';
+   element.referrerPolicy='no-referrer';
+   element.title='Open the resource in its DuckBio app (requires access)';
+   element.className='comms-reference';
+  }else if(/^https?:\/\/|^www\./i.test(token)){
+   try{
+    const url=new URL(/^www\./i.test(token)?'https://'+token:token);
+    if(['https:','http:'].includes(url.protocol)&&!url.username&&!url.password&&
+       url.hostname.includes('.')&&!/[\u0000-\u001f]/.test(url.href)){
+      element=node('a',token);element.href=url.href;
+      element.target='_blank';element.rel='noopener noreferrer';
+      element.referrerPolicy='no-referrer';
+      element.className='comms-external-link';
+    }
+   }catch{}
+  }
+  if(!element){
+   element=node('code',token);element.className='comms-reference';
+   element.title=token.startsWith('@u-')?'Unique user mention':'Unlinked text';
+  }
+  target.append(element);
+  previous=item.index+token.length;
  }
  target.append(document.createTextNode(value.slice(previous)));
 }
+
 function renderGroupChoices(){
  const root=$('group-available'),chosen=$('group-selected');
  root.replaceChildren();chosen.replaceChildren();
@@ -258,8 +288,8 @@ function renderMail(message){
  const root=$('mail-detail');root.replaceChildren();
  const card=node('div');card.className='comms-mail-card';
  card.append(node('h2',message.subject),node('p','From: '+message.from),
-  node('p','To: '+message.to),node('p','Sent: '+stamp(message.createdAt)),
-  node('p',message.body));
+  node('p','To: '+message.to),node('p','Sent: '+stamp(message.createdAt)));
+ const body=node('p');renderMessageText(body,message.body);card.append(body);
  root.append(card);
  $('mail-form').hidden=true;root.hidden=false;
  if(state.folder==='inbox'&&!message.readAt)
