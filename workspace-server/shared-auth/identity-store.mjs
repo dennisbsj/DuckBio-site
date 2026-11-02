@@ -315,11 +315,12 @@ function appendCookie(res, value) {
 
 /** Browser-session adapter for the portable local accounts. Origin checking here
  * supplements the broker's CSRF checks; it never replaces them. */
-export function createLocalIdentityAdapter({ store, origin, sessionTtlMs = 8 * 60 * 60_000 }) {
+export function createLocalIdentityAdapter({ store, origin, sessionTtlMs = 8 * 60 * 60_000, rememberedSessionTtlMs = 14 * 24 * 60 * 60_000 }) {
   const url = new URL(origin);
   const development = url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
   if (url.origin !== origin || (!development && url.protocol !== 'https:') || url.username || url.password) throw new Error('A secure local identity origin is required');
   const duration = ttl(sessionTtlMs, 8 * 60 * 60_000, 30 * 24 * 60 * 60_000);
+  const rememberedDuration=ttl(rememberedSessionTtlMs,14 * 24 * 60 * 60_000,30 * 24 * 60 * 60_000);
   const name = development ? 'suite_identity_dev' : '__Host-suite_identity';
   function validHost(req) { return String(req.headers.host ?? '').toLowerCase() === url.host.toLowerCase(); }
   function browserWrite(req) { return validHost(req) && req.headers.origin === origin && (!req.headers['sec-fetch-site'] || ['same-origin', 'none'].includes(req.headers['sec-fetch-site'])); }
@@ -328,22 +329,26 @@ export function createLocalIdentityAdapter({ store, origin, sessionTtlMs = 8 * 6
     const matches = String(req.headers.cookie ?? '').split(';').map(part => part.trim()).filter(part => part.startsWith(`${name}=`));
     return matches.length === 1 ? store.getSessionByToken(matches[0].slice(name.length + 1)) : null;
   }
-  function writeCookie(res, token) {
-    appendCookie(res, `${name}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(duration / 1000)}${development ? '' : '; Secure'}`);
+  function writeCookie(res, token, rememberMe=false) {
+    // Without Remember me this is a browser-session cookie, not persistent
+    // across normal browser restarts. Both modes have finite server expiry.
+    appendCookie(res, `${name}=${token}; Path=/; HttpOnly; SameSite=Lax${rememberMe ? '; Max-Age='+Math.floor(rememberedDuration / 1000) : ''}${development ? '' : '; Secure'}`);
   }
   return Object.freeze({
     async getSession(req) { return session(req); },
     async authenticate(req, res, credentials) {
       if (!browserWrite(req)) return null;
-      const result = await store.authenticatePassword({ ...credentials, ttlMs: duration });
+      const rememberMe=credentials.rememberMe===true;
+      const result = await store.authenticatePassword({email:credentials.email,
+        password:credentials.password,ttlMs: rememberMe?rememberedDuration:duration});
       if (!result) return null;
-      writeCookie(res, result.token);
+      writeCookie(res,result.token,rememberMe);
       return result.parent;
     },
     async establishSession(req, res, userId) {
       if (!browserWrite(req)) fail('csrf_expired');
       const result = store.createSession(userId, { ttlMs: duration });
-      writeCookie(res, result.token);
+      writeCookie(res,result.token,false);
       return result.parent;
     },
     async getParentSession(id) { return store.getParentSession(id); },
