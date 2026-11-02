@@ -43,7 +43,8 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
     'CREATE TABLE IF NOT EXISTS organization_invites(token_hash TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),issued_by TEXT NOT NULL,email TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),expires_at INTEGER NOT NULL,UNIQUE(org,email))',
     'CREATE TABLE IF NOT EXISTS organization_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,org TEXT NOT NULL REFERENCES organizations(id),actor TEXT NOT NULL,action TEXT NOT NULL,subject TEXT NOT NULL,details TEXT NOT NULL CHECK(json_valid(details)),recorded_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS subscription_drafts(id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),status TEXT NOT NULL CHECK(status IN (\'draft\',\'canceled\')),created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)',
-    'CREATE TABLE IF NOT EXISTS stripe_test_checkouts(draft TEXT PRIMARY KEY REFERENCES subscription_drafts(id),org TEXT NOT NULL REFERENCES organizations(id),price TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN (\'pending\',\'ready\')),session_id TEXT UNIQUE,url TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)'
+    'CREATE TABLE IF NOT EXISTS stripe_test_checkouts(draft TEXT PRIMARY KEY REFERENCES subscription_drafts(id),org TEXT NOT NULL REFERENCES organizations(id),price TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN (\'pending\',\'ready\')),session_id TEXT UNIQUE,url TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)',
+    'CREATE TABLE IF NOT EXISTS stripe_test_webhook_events(id TEXT PRIMARY KEY,type TEXT NOT NULL,object_id TEXT NOT NULL,created INTEGER NOT NULL,digest TEXT NOT NULL,org TEXT,draft TEXT,recorded_at INTEGER NOT NULL,CHECK((org IS NULL AND draft IS NULL) OR (org IS NOT NULL AND draft IS NOT NULL)))'
   ].join(';')+';');
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
@@ -182,6 +183,32 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
         db.prepare("UPDATE stripe_test_checkouts SET state='ready',session_id=?,url=?,updated_at=? WHERE draft=? AND org=?").run(session.id,url.href,clock(),draftId,organizationId);
         audit(organizationId,actorId,'checkout.test.prepared',draftId,{sessionId:session.id});
         return {id:session.id,url:url.href,alreadySaved:false};
+      });
+    },
+    // This internal ledger accepts ONLY metadata returned by the signature verifier.
+    // The HTTP caller must verify the original raw Stripe payload before calling.
+    // Recording a test event never calls applyVerifiedSeatPurchase.
+    recordVerifiedStripeTestEvent(event){
+      if(!event||typeof event!=='object'||Array.isArray(event)||
+        typeof event.id!=='string'||!/^evt_[A-Za-z0-9_]{4,128}$/.test(event.id)||
+        typeof event.type!=='string'||!/^[a-z_.]{3,120}$/.test(event.type)||
+        typeof event.objectId!=='string'||event.objectId.length<1||event.objectId.length>255||
+        !Number.isSafeInteger(event.created)||event.created<1||
+        typeof event.digest!=='string'||!/^[a-f0-9]{64}$/.test(event.digest))fail('invalid_stripe_event');
+      return tx(()=>{
+        const previous=db.prepare('SELECT * FROM stripe_test_webhook_events WHERE id=?').get(event.id);
+        if(previous){
+          if(previous.digest!==event.digest||previous.type!==event.type||
+            previous.object_id!==event.objectId||previous.created!==event.created)fail('stripe_event_conflict');
+          return {recorded:false,matched:Boolean(previous.org),draftId:previous.draft??null};
+        }
+        // A completed Checkout session is not proof of a paid invoice; matching is observational only.
+        const checkout=event.type==='checkout.session.completed'&&/^cs_test_[A-Za-z0-9_]+$/.test(event.objectId)
+          ?db.prepare("SELECT org,draft FROM stripe_test_checkouts WHERE state='ready' AND session_id=?").get(event.objectId)
+          :null;
+        db.prepare('INSERT INTO stripe_test_webhook_events(id,type,object_id,created,digest,org,draft,recorded_at) VALUES(?,?,?,?,?,?,?,?)')
+          .run(event.id,event.type,event.objectId,event.created,event.digest,checkout?.org??null,checkout?.draft??null,clock());
+        return {recorded:true,matched:Boolean(checkout),draftId:checkout?.draft??null};
       });
     },
     listSubscriptionDrafts(organizationId,actorId){
