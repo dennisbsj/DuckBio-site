@@ -24,7 +24,7 @@ function userView(user) { return { id: user.id, email: user.email, displayName: 
 
 /** Account service is independent of all business-data apps. It never migrates
  * their passwords/users, links by email, or promotes a central role to an app role. */
-export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null, ownerAccountId = null, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
+export function createAccountService({ origin, issuer = origin, clients, identityStore, authStore, assetRoot, organizationStore = null, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null, ownerAccountId = null, ownerAlertsConfigured = false, clock = Date.now, buildVersion = 'local', getClientAddress, fetchImpl = globalThis.fetch }) {
   if(ownerAccountId!==null&&!safeId(ownerAccountId))throw new Error('Invalid private owner account ID');
   const isOwner=user=>Boolean(ownerAccountId&&user?.id===ownerAccountId&&user.role==='admin'&&user.state==='active');
   const url = new URL(origin);
@@ -169,7 +169,7 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           };
           if (route === '/api/suite/account') send(res, 200, account(user));
           else if (route === '/api/suite/owner/overview') {
-            send(res,200,{ownerOnly:true,summary:organizationStore.ownerSnapshot(),
+            send(res,200,{ownerOnly:true,ownerAlertsConfigured:Boolean(ownerAlertsConfigured),summary:organizationStore.ownerSnapshot(),
               identities:identityStore.listUsers().map(row=>({id:row.id,email:row.email,
                 displayName:row.displayName,state:row.state,centralAdmin:row.role==='admin'}))});
           }

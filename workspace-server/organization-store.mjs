@@ -29,7 +29,8 @@ function validRoles(value){
   for(const [app,role] of Object.entries(value))if(!byId.get(app)?.roles.includes(role))fail('invalid_roles');
   return value;
 }
-export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveSubscriptionEvidence=null}){
+export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveSubscriptionEvidence=null,ownerAlertsOptIn=false}){
+  if(typeof ownerAlertsOptIn!=='boolean')fail('invalid_owner_alerts_config');
   // Production must inject a PRIVATE verifier of live billing evidence.
   // Neither browser requests nor sk_test_/TEST observations are accepted here.
   if(verifyLiveSubscriptionEvidence!==null&&typeof verifyLiveSubscriptionEvidence!=='function')
@@ -57,7 +58,8 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     "CREATE TABLE IF NOT EXISTS stripe_test_seat_projections(draft TEXT PRIMARY KEY REFERENCES subscription_drafts(id),org TEXT NOT NULL REFERENCES organizations(id),attempt INTEGER NOT NULL CHECK(attempt>=1),decision TEXT NOT NULL CHECK(decision IN ('candidate_paid','payment_review','cancellation_review','awaiting_payment','unavailable')),apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),period_end INTEGER,updated_at INTEGER NOT NULL)",
     "CREATE TABLE IF NOT EXISTS subscription_entitlement_shadow(subscription_id TEXT PRIMARY KEY,source TEXT NOT NULL CHECK(source='stripe_test'),org TEXT NOT NULL REFERENCES organizations(id),draft TEXT NOT NULL UNIQUE REFERENCES subscription_drafts(id),revision INTEGER NOT NULL CHECK(revision>0),decision TEXT NOT NULL CHECK(decision IN ('candidate_paid','payment_review','cancellation_review','awaiting_payment','unavailable')),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),period_end INTEGER,last_paid_invoice TEXT,updated_at INTEGER NOT NULL)",
     "CREATE TABLE IF NOT EXISTS verified_subscription_allocations(subscription_id TEXT PRIMARY KEY,source TEXT NOT NULL CHECK(source='stripe_live'),org TEXT NOT NULL REFERENCES organizations(id),revision INTEGER NOT NULL CHECK(revision>0),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),state TEXT NOT NULL CHECK(state IN ('active','canceled')),paid_through INTEGER,updated_at INTEGER NOT NULL)",
-    "CREATE TABLE IF NOT EXISTS verified_subscription_revisions(subscription_id TEXT NOT NULL REFERENCES verified_subscription_allocations(subscription_id),revision INTEGER NOT NULL CHECK(revision>0),event_key TEXT NOT NULL UNIQUE,digest TEXT NOT NULL,org TEXT NOT NULL REFERENCES organizations(id),recorded_at INTEGER NOT NULL,PRIMARY KEY(subscription_id,revision))"
+    "CREATE TABLE IF NOT EXISTS verified_subscription_revisions(subscription_id TEXT NOT NULL REFERENCES verified_subscription_allocations(subscription_id),revision INTEGER NOT NULL CHECK(revision>0),event_key TEXT NOT NULL UNIQUE,digest TEXT NOT NULL,org TEXT NOT NULL REFERENCES organizations(id),recorded_at INTEGER NOT NULL,PRIMARY KEY(subscription_id,revision))",
+    "CREATE TABLE IF NOT EXISTS owner_alert_outbox(id INTEGER PRIMARY KEY AUTOINCREMENT,audit_id INTEGER NOT NULL UNIQUE REFERENCES organization_audit(id),category TEXT NOT NULL CHECK(category IN ('organization','subscription','user','permission')),state TEXT NOT NULL CHECK(state IN ('pending','sending','sent','failed')),attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),lease_token TEXT,locked_until INTEGER,next_attempt_at INTEGER NOT NULL,sent_at INTEGER)"
   ].join(';')+';');
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
@@ -71,7 +73,22 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     if(!safeId(org)||!safeId(actor)||!db.prepare('SELECT 1 FROM members WHERE org=? AND account=? AND admin=1 AND active=1').get(org,actor))fail('access_denied');
   }
   // Append inside the same write transaction so rolled-back changes leave no audit event.
-  const audit=(org,actor,action,subject,details={})=>db.prepare('INSERT INTO organization_audit(org,actor,action,subject,details,recorded_at) VALUES(?,?,?,?,?,?)').run(org,actor,action,subject,JSON.stringify(details),clock());
+  const alertCategory=(action,details)=>
+    action==='organization.created'?'organization':
+    action==='subscription.entitlement.transition'&&
+      (details.state==='canceled'||(Array.isArray(details.deltas)&&
+       details.deltas.some(delta=>delta.delta!==0)))?'subscription':
+    ['member.added','member.updated','member.removed','member.deactivated','member.reactivated','invitation.accepted'].includes(action)?'user':
+    action==='permission.updated'?'permission':null;
+  const audit=(org,actor,action,subject,details={})=>{
+    const at=clock();
+    const result=db.prepare('INSERT INTO organization_audit(org,actor,action,subject,details,recorded_at) VALUES(?,?,?,?,?,?)')
+      .run(org,actor,action,subject,JSON.stringify(details),at);
+    const category=ownerAlertsOptIn?alertCategory(action,details):null;
+    if(category)db.prepare("INSERT INTO owner_alert_outbox(audit_id,category,state,next_attempt_at) VALUES(?,?,'pending',?)")
+      .run(Number(result.lastInsertRowid),category,at);
+    return result;
+  };
   // Test-only diagnostic freshness; Stripe's last snapshot is never a durable license.
   // A later in-flight check immediately invalidates older positive diagnostics.
   const TEST_CHECK_MAX_AGE_MS=24*60*60*1000;
@@ -96,6 +113,51 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         audit(organizationId,owner.accountId,'organization.created',organizationId,{name:name.trim()});
         return {id:organizationId,name:name.trim()};
       });
+    },
+    // INTERNAL outbox operations. No HTTP routes. Claim tokens make competing
+    // private workers mutually exclusive even across multiple Passenger processes.
+    claimOwnerAlert(){
+      if(!ownerAlertsOptIn)fail('owner_alerts_disabled');
+      return tx(()=>{
+        const now=clock();
+        const item=db.prepare("SELECT * FROM owner_alert_outbox WHERE attempts<6 AND ((state='pending' AND next_attempt_at<=?) OR (state='sending' AND locked_until<=?)) ORDER BY id LIMIT 1").get(now,now);
+        if(!item)return null;
+        const leaseToken=randomUUID(),lockedUntil=now+120000;
+        db.prepare("UPDATE owner_alert_outbox SET state='sending',attempts=attempts+1,lease_token=?,locked_until=? WHERE id=?")
+          .run(leaseToken,lockedUntil,item.id);
+        const row=db.prepare(`SELECT a.id AS auditId,a.org,o.name AS organizationName,a.actor,a.action,a.subject,a.details,a.recorded_at
+          FROM organization_audit a JOIN organizations o ON o.id=a.org WHERE a.id=?`).get(item.audit_id);
+        const details=JSON.parse(row.details);
+        return {id:item.id,leaseToken,idempotencyKey:'duckbio-owner-audit-'+row.auditId,
+          organizationId:row.org,organizationName:row.organizationName,
+          action:row.action,category:item.category,actorId:row.actor,subject:row.subject,
+          at:row.recorded_at,revision:row.action==='subscription.entitlement.transition'?
+            details.revision:null,
+          changes:row.action==='subscription.entitlement.transition'&&Array.isArray(details.deltas)?
+            details.deltas.filter(x=>byId.has(x.appId)&&Number.isSafeInteger(x.delta))
+              .map(x=>({appId:x.appId,delta:x.delta})):[]};
+      });
+    },
+    finishOwnerAlert({id,leaseToken,success}){
+      if(!ownerAlertsOptIn)fail('owner_alerts_disabled');
+      if(!Number.isSafeInteger(id)||id<1||!safeId(leaseToken)||typeof success!=='boolean')
+        fail('invalid_owner_alert');
+      return tx(()=>{
+        const prior=db.prepare("SELECT state,lease_token,attempts FROM owner_alert_outbox WHERE id=?").get(id);
+        if(!prior||prior.state!=='sending'||prior.lease_token!==leaseToken)
+          fail('owner_alert_lease_conflict');
+        const now=clock();
+        const failed=!success&&prior.attempts>=6;
+        const delay=Math.min(6*3600000,60000*2**Math.min(prior.attempts,8));
+        db.prepare('UPDATE owner_alert_outbox SET state=?,lease_token=NULL,locked_until=NULL,next_attempt_at=?,sent_at=? WHERE id=?')
+          .run(success?'sent':failed?'failed':'pending',
+            success?now:now+delay,success?now:null,id);
+        return {state:success?'sent':failed?'failed':'pending'};
+      });
+    },
+    ownerAlertSummary(){
+      const counts=db.prepare("SELECT state,count(*) AS n FROM owner_alert_outbox GROUP BY state").all();
+      return {optedIn:ownerAlertsOptIn,counts:Object.fromEntries(counts.map(x=>[x.state,x.n]))};
     },
     // INTERNAL owner snapshot. Caller must enforce authenticated central owner ID.
     // Never expose this method to organization-scoped administrator routes.
@@ -171,6 +233,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
           testDrafts:testDrafts.length>100,activity:auditRows.length>100
         },
         snapshotAt:clock(),
+        alerts:this.ownerAlertSummary(),
         financials:{available:false,reason:'Live Stripe revenue and refunds are not reconciled'}
       };
     },
@@ -694,6 +757,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         requireAdmin(organizationId,actorId);
         const id=randomUUID(),now=clock(),selected=[...apps].sort();
         db.prepare('INSERT INTO subscription_drafts VALUES(?,?,?,?,?,?,?,?)').run(id,organizationId,plan,JSON.stringify(selected),seats,'draft',now,now);
+        audit(organizationId,actorId,'subscription.draft.created',id,{plan,apps:selected,seats});
         return {id,plan,apps:selected,seats,status:'draft',createdAt:now,updatedAt:now};
       });
     },
@@ -704,7 +768,10 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         const existing=db.prepare('SELECT status FROM subscription_drafts WHERE id=? AND org=?').get(draftId,organizationId);
         if(!existing)fail('subscription_not_found');
         if(db.prepare('SELECT 1 FROM stripe_test_checkouts WHERE draft=? AND org=?').get(draftId,organizationId))fail('checkout_started');
-        if(existing.status!=='canceled')db.prepare('UPDATE subscription_drafts SET status=\'canceled\',updated_at=? WHERE id=? AND org=?').run(clock(),draftId,organizationId);
+        if(existing.status!=='canceled'){
+          db.prepare('UPDATE subscription_drafts SET status=\'canceled\',updated_at=? WHERE id=? AND org=?').run(clock(),draftId,organizationId);
+          audit(organizationId,actorId,'subscription.draft.canceled',draftId);
+        }
         return {id:draftId,status:'canceled'};
       });
     },

@@ -9,6 +9,7 @@ import { createIdentityStore } from './identity-store.mjs';
 import { createSqliteAuthStores } from './sqlite-store.mjs';
 import { createOrganizationStore } from '../organization-store.mjs';
 import { createResendInvitationMailer } from '../invitation-mailer.mjs';
+import {createResendOwnerAlertMailer,dispatchOwnerAlerts} from '../owner-alert-mailer.mjs';
 import { createStripeTestCheckout } from '../stripe-test-checkout.mjs';
 import { createStripeTestReconciler } from '../stripe-test-reconcile.mjs';
 import { createStripeTestWebhookVerifier } from '../stripe-test-webhook.mjs';
@@ -59,12 +60,22 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
   if (!/^[A-Za-z0-9._-]{1,80}$/.test(buildVersion)) throw new Error('Invalid reviewed build identity');
   const auth = createSqliteAuthStores({ databasePath: privatePath(actual.SUITE_AUTH_DB_PATH, 'session database'), clock });
   let identityStore; let nativeStore; let organizationStore; let requestHandler;
+  let ownerAlertMailer=null,ownerAlertTimer=null,ownerAlertProcessing=false;
   try {
     if (actual.SUITE_MODE === 'broker') {
+      if(actual.SUITE_OWNER_ALERTS_ENABLED&&
+         !['true','false'].includes(actual.SUITE_OWNER_ALERTS_ENABLED))
+        throw Error('Invalid owner alert opt-in');
+      const enableOwnerAlerts=actual.SUITE_OWNER_ALERTS_ENABLED==='true';
+      if(enableOwnerAlerts&&(!actual.SUITE_OWNER_ACCOUNT_ID||
+         !actual.SUITE_ORGANIZATION_DB_PATH||!actual.SUITE_RESEND_API_KEY||
+         !actual.SUITE_OWNER_ALERT_FROM||!actual.SUITE_OWNER_ALERT_EMAIL))
+        throw Error('Owner alerts require private owner, organization DB and verified mail configuration');
       identityStore = createIdentityStore({ databasePath: privatePath(actual.SUITE_IDENTITY_DB_PATH, 'identity database'), clock });
-      if(actual.SUITE_ORGANIZATION_DB_PATH) organizationStore = createOrganizationStore({databasePath:privatePath(actual.SUITE_ORGANIZATION_DB_PATH,'organization database'),clock});
+      if(actual.SUITE_ORGANIZATION_DB_PATH) organizationStore = createOrganizationStore({databasePath:privatePath(actual.SUITE_ORGANIZATION_DB_PATH,'organization database'),clock,ownerAlertsOptIn:enableOwnerAlerts});
       if (actual.SUITE_SETUP_TOKEN) identityStore.configureBootstrapToken(actual.SUITE_SETUP_TOKEN, { expiresAt: clock() + 7 * 24 * 60 * 60_000 });
-      const invitationMailer=(actual.SUITE_RESEND_API_KEY||actual.SUITE_INVITATION_FROM)
+      ownerAlertMailer=enableOwnerAlerts?createResendOwnerAlertMailer({apiKey:actual.SUITE_RESEND_API_KEY,from:actual.SUITE_OWNER_ALERT_FROM,to:actual.SUITE_OWNER_ALERT_EMAIL,origin:actual.SUITE_ORIGIN,fetchImpl}):null;
+      const invitationMailer=actual.SUITE_INVITATION_FROM
         ?createResendInvitationMailer({apiKey:actual.SUITE_RESEND_API_KEY,from:actual.SUITE_INVITATION_FROM,fetchImpl}):null;
       const stripeTestCheckout=(actual.SUITE_STRIPE_TEST_KEY||actual.SUITE_STRIPE_TEST_PRICES_JSON)
         ?createStripeTestCheckout({secretKey:actual.SUITE_STRIPE_TEST_KEY,priceMap:JSON.parse(actual.SUITE_STRIPE_TEST_PRICES_JSON||'null'),origin:actual.SUITE_ORIGIN,fetchImpl}):null;
@@ -82,7 +93,7 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
         throw new Error('Stripe test reconciliation requires private organization store and test Checkout');
       const stripeTestReconciler=actual.SUITE_STRIPE_TEST_RECONCILE_ENABLED==='true'
         ?createStripeTestReconciler({secretKey:actual.SUITE_STRIPE_TEST_KEY,fetchImpl}):null;
-      const service = createAccountService({ invitationMailer,stripeTestCheckout,stripeTestReconciler,ownerAccountId:actual.SUITE_OWNER_ACCOUNT_ID||null, origin: actual.SUITE_ORIGIN, issuer: actual.SUITE_ISSUER || actual.SUITE_ORIGIN, clients: JSON.parse(actual.SUITE_CLIENTS || 'null'), identityStore, organizationStore, authStore: auth.brokerStore, assetRoot: privatePath(actual.SUITE_ASSET_ROOT, 'login frontend'), buildVersion, clock, fetchImpl,
+      const service = createAccountService({ invitationMailer,stripeTestCheckout,stripeTestReconciler,ownerAccountId:actual.SUITE_OWNER_ACCOUNT_ID||null,ownerAlertsConfigured:Boolean(ownerAlertMailer), origin: actual.SUITE_ORIGIN, issuer: actual.SUITE_ISSUER || actual.SUITE_ORIGIN, clients: JSON.parse(actual.SUITE_CLIENTS || 'null'), identityStore, organizationStore, authStore: auth.brokerStore, assetRoot: privatePath(actual.SUITE_ASSET_ROOT, 'login frontend'), buildVersion, clock, fetchImpl,
         // Passenger supplies the request socket; arbitrary forwarded headers do
         // not select limiter buckets. Account+address buckets isolate users.
         getClientAddress: req => req.socket.remoteAddress,
@@ -143,7 +154,25 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
     catch { if (!res.headersSent) json(res, 503, { error: 'unavailable' }); else if (!res.writableEnded) res.end(); }
   });
   server.requestTimeout = 15_000; server.headersTimeout = 10_000; server.maxHeadersCount = 64;
-  return Object.freeze({ server, close() { identityStore?.close(); organizationStore?.close(); nativeStore?.close(); auth.close(); } });
+  if(ownerAlertMailer&&organizationStore){
+    // After listening, drain the durable owner alert queue on a bounded cadence.
+    // Claim leases and provider idempotency permit multiple broker processes.
+    const runOwnerAlerts=async()=>{
+      if(ownerAlertProcessing)return;
+      ownerAlertProcessing=true;
+      try{await dispatchOwnerAlerts({store:organizationStore,mailer:ownerAlertMailer,limit:10});}
+      catch{/* Never expose owner alert or provider details through public error handlers. */}
+      finally{ownerAlertProcessing=false;}
+    };
+    server.once('listening',()=>{
+      void runOwnerAlerts();
+      ownerAlertTimer=setInterval(()=>{void runOwnerAlerts();},60000);
+      ownerAlertTimer.unref?.();
+    });
+    server.once('close',()=>{if(ownerAlertTimer)clearInterval(ownerAlertTimer);});
+  }
+  return Object.freeze({ server, close() { if(ownerAlertTimer)clearInterval(ownerAlertTimer);
+    identityStore?.close(); organizationStore?.close(); nativeStore?.close(); auth.close(); } });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
