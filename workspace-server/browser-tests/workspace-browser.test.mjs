@@ -599,3 +599,42 @@ test('in-progress Stripe TEST recheck removes stale seat previews and warns admi
  assert.equal(org.testSeatCapacity('lab-a',owner.id).apps.find(a=>a.appId==='eel').candidateTestSeats,0);
  assert.equal(org.overview('lab-a',owner.id).apps.find(a=>a.id==='eel').purchased,purchasedBefore);
 });
+
+test('another unverified TEST Checkout blocks positive per-app plan preview',{timeout:45000},async t=>{
+ const checkout={priceFor:()=> 'price_test123456',async createSession(){
+  return {id:'cs_test_partialbrowser123',url:'https://checkout.stripe.com/c/pay/browser'};
+ }};
+ const checker={async inspect(snapshot){
+  return {state:'paid_test_verified',sessionId:snapshot.checkout.sessionId,
+   subscriptionId:'sub_test_partialbrowser123',invoiceId:'in_test_partialbrowser123',
+   organizationId:snapshot.draft.organizationId,draftId:snapshot.draft.id,
+   price:snapshot.checkout.price,seats:snapshot.draft.seats,licensesGranted:false,
+   lifecycle:{subscriptionStatus:'active',cancelAtPeriodEnd:false,cancelAt:null,
+    periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_create'}};
+ }};
+ const {page,org,owner}=await fixture(t,{stripeTestCheckout:checkout,stripeTestReconciler:checker});
+ const original=org.overview('lab-a',owner.id).apps.find(a=>a.id==='eel').purchased;
+ await signIn(page);
+ await page.getByRole('button',{name:'Subscriptions'}).click();
+ await page.getByRole('button',{name:'Prepare subscription'}).click();
+ await page.locator('#draft-plan').selectOption('Single');
+ await page.locator('#draft-seats').fill('3');
+ await page.locator('#buy-fields input[name=eel]').check();
+ await page.getByRole('button',{name:'Save subscription draft'}).click();
+ await page.getByRole('button',{name:'Start test checkout'}).click();
+ await page.getByRole('button',{name:'Check Stripe TEST status'}).click();
+ const summary=page.locator('#test-seat-projection');
+ await summary.locator('.test-entitlement-preview').getByText(/DuckNote: Possible increase, not activated/).waitFor();
+ const second=org.createSubscriptionDraft({organizationId:'lab-a',actorId:owner.id,
+  plan:'Single',apps:['eel'],seats:2});
+ const params={organizationId:'lab-a',actorId:owner.id,draftId:second.id};
+ org.prepareTestCheckout({...params,price:'price_test_other123'});
+ org.completeTestCheckout({...params,session:{
+  id:'cs_test_otherbrowser123',url:'https://checkout.stripe.com/c/pay/other'}});
+ await page.getByRole('button',{name:'Subscriptions'}).click();
+ await summary.locator('.test-entitlement-readiness').getByText(/DuckNote: 1 unverified Checkout\(s\)/).waitFor();
+ await summary.locator('.test-entitlement-preview').getByText(/DuckNote: Billing status requires manual review/).waitFor();
+ assert.equal(org.testSubscriptionEntitlementPlan('lab-a',owner.id).apps.find(x=>x.appId==='eel').status,'manual_review');
+ assert.equal(org.testSeatImpact('lab-a',owner.id).apps.find(x=>x.appId==='eel').status,'manual_review');
+ assert.equal(org.overview('lab-a',owner.id).apps.find(a=>a.id==='eel').purchased,original);
+});

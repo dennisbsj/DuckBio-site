@@ -420,9 +420,24 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
             ?'unavailable':row.decision,
           apps:JSON.parse(row.apps),seats:row.seats,attempt:row.attempt,
           periodEnd:row.period_end??null}));
-      return buildShadowEntitlementPlan({organizationId,apps:current.apps.map(app=>({
+      const plan=buildShadowEntitlementPlan({organizationId,apps:current.apps.map(app=>({
         id:app.id,name:app.name,purchased:app.purchased,assigned:app.assigned,reserved:app.reserved
       })),subscriptions:entries,now:clock()});
+      // A separate unverified TEST Checkout may target the SAME app and is
+      // not yet a subscription shadow row. Do not call a partial plan an increase.
+      const readiness=this.testEntitlementReadiness(organizationId,actorId);
+      const byApp=new Map(readiness.apps.map(app=>[app.appId,app]));
+      return Object.freeze({...plan,apps:plan.apps.map(app=>{
+        const source=byApp.get(app.appId);
+        const unboundCheckouts=source?.unboundCheckouts??0;
+        const unresolvedSources=source?.reviewRequired??0;
+        const blocked=unboundCheckouts>0||unresolvedSources>0;
+        return Object.freeze({...app,unboundCheckouts,unresolvedSources,
+          needsReview:app.needsReview||blocked,
+          status:blocked?'manual_review':app.status,
+          licensesGranted:false,realSeatChanges:false});
+      })});
+
     },
     // Block any interpretation of a partial TEST shadow plan as a complete
     // subscription inventory. Unbound ready checkouts have no proven subscription.
@@ -458,6 +473,11 @@ export function createOrganizationStore({databasePath,clock=Date.now}){
       const entries=db.prepare("SELECT p.decision,p.apps,p.period_end,p.attempt,r.attempt AS check_attempt,r.state AS check_state,r.completed_at AS check_completed_at FROM stripe_test_seat_projections p JOIN subscription_drafts d ON d.id=p.draft AND d.org=p.org LEFT JOIN stripe_test_reconciliation_checks r ON r.draft=p.draft AND r.org=p.org AND r.attempt=(SELECT MAX(z.attempt) FROM stripe_test_reconciliation_checks z WHERE z.draft=p.draft AND z.org=p.org) WHERE p.org=? AND d.status='draft'")
         .all(organizationId);
       const covered=new Set(),unknown=new Set();
+      const readiness=this.testEntitlementReadiness(organizationId,actorId);
+      for(const source of readiness.apps)if(source.unboundCheckouts>0||source.reviewRequired>0){
+        covered.add(source.appId);
+        unknown.add(source.appId);
+      }
       for(const entry of entries){
         for(const appId of JSON.parse(entry.apps)){
           covered.add(appId);

@@ -309,7 +309,7 @@ test('subscription shadow ledger is revisioned and independent of live seats, re
  const f=fixture(t);
  const lifecycle={subscriptionStatus:'active',cancelAtPeriodEnd:false,cancelAt:null,
   periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_create'};
- assert.equal(f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel').status,'not_evaluated');
+ assert.equal(f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel').status,'manual_review');
  assert.throws(()=>f.store.testSubscriptionEntitlementPlan('one','admin2'),/access_denied/);
  assert.equal(f.finish(f.start(),{...f.paid,lifecycle}).state,'paid_test_verified');
  let p=f.store.testSubscriptionEntitlementPlan('one','admin1');
@@ -376,7 +376,7 @@ test('unverified checkout or unpaid TEST result cannot create shadow subscriptio
  try{
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM subscription_entitlement_shadow').get().n,0);
  }finally{db.close();}
- assert.equal(f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel').status,'not_evaluated');
+ assert.equal(f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(a=>a.appId==='eel').status,'manual_review');
 });
 
 test('readiness detects an unbound Checkout not represented in paid subscription shadow',t=>{
@@ -457,4 +457,41 @@ test('TEST observation freshness expires after 24h, not just at period end',t=>{
  assert.equal(f.store.listSubscriptionDrafts('one','admin1')[0].testReconciliation.state,'paid_test_verified',
   'an old historical paid observation is kept for audit but not trusted as current');
  assert(f.store.overview('one','admin1').apps.every(a=>a.purchased===0));
+});
+
+test('a second unverified TEST Checkout blocks a positive plan for the same app',t=>{
+ const f=fixture(t);
+ const second=f.store.createSubscriptionDraft({organizationId:'one',actorId:'admin1',
+  plan:'Single',apps:['eel'],seats:2});
+ const params={organizationId:'one',actorId:'admin1',draftId:second.id};
+ f.store.prepareTestCheckout({...params,price:'price_test_second123'});
+ f.store.completeTestCheckout({...params,session:{
+  id:'cs_test_second123',url:'https://checkout.stripe.com/c/pay/second'}});
+ const lifecycle={subscriptionStatus:'active',cancelAtPeriodEnd:false,cancelAt:null,
+  periodEnd:1900000000,invoiceStatus:'paid',billingReason:'subscription_create'};
+ f.finish(f.start(),{...f.paid,lifecycle});
+ let preview=f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(x=>x.appId==='eel');
+ assert.equal(preview.candidateTestSeats,3,'verified source remains traceable as a partial TEST candidate');
+ assert.equal(preview.unboundCheckouts,1);
+ assert.equal(preview.status,'manual_review','unverified second Checkout blocks an apparent increase');
+ assert.equal(preview.needsReview,true);
+ assert.equal(f.store.testEntitlementReadiness('one','admin1').readyForManualPlanning,false);
+ assert.equal(f.store.testSeatImpact('one','admin1').apps.find(x=>x.appId==='eel').status,'manual_review');
+ assert.equal(f.store.testSeatCapacity('one','admin1').apps.find(x=>x.appId==='eel').candidateTestSeats,3);
+ assert.equal(f.store.overview('one','admin1').apps.find(x=>x.id==='eel').purchased,0);
+ const attempt=f.store.beginTestReconciliation(params);
+ const result={state:'paid_test_verified',organizationId:'one',draftId:second.id,
+  sessionId:'cs_test_second123',price:'price_test_second123',seats:2,
+  subscriptionId:'sub_test_second123',invoiceId:'in_test_second123',
+  lifecycle,licensesGranted:false};
+ assert.equal(f.store.finishTestReconciliation({...params,attempt:attempt.attempt,result}).state,'paid_test_verified');
+ preview=f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(x=>x.appId==='eel');
+ assert.equal(preview.candidateTestSeats,5);
+ assert.equal(preview.unboundCheckouts,0);
+ assert.equal(preview.status,'increase_candidate');
+ assert.equal(f.store.testEntitlementReadiness('one','admin1').readyForManualPlanning,true);
+ assert.equal(f.store.testSeatImpact('one','admin1').apps.find(x=>x.appId==='eel').status,'test_only_candidate');
+ f.reopen();
+ assert.equal(f.store.testSubscriptionEntitlementPlan('one','admin1').apps.find(x=>x.appId==='eel').candidateTestSeats,5);
+ assert.equal(f.store.overview('one','admin1').apps.find(x=>x.id==='eel').purchased,0);
 });
