@@ -84,13 +84,13 @@ function focusMessage(messageId){
 function renderMessageText(target,value){
  // Only explicit web protocols or www domains become external links.
  // App references go through an authenticated native-resource gateway.
- const re=/(?:https?:\\/\\/|www\\.)[^\\s<>"']+|@(?:ld|dm|dn|cd|md|dt)[0-9]{6,}\\b|@u-[a-f0-9]{2,256}\\b/gi;
+ const re=/(?:https?:\/\/|www\.)[^\s<>"']+|@(?:ld|dm|dn|cd|md|dt)[0-9]{6,}\b|@u-[a-f0-9]{2,256}\b/gi;
  let previous=0;
  for(const item of value.matchAll(re)){
   const original=item[0];
   let token=original;
-  if(/^(?:https?:\\/\\/|www\\.)/i.test(token))
-    token=token.replace(/[.,!?;:]+$/,'').replace(/\\)+$/,m=>m.length>0?'':'');
+  if(/^(?:https?:\/\/|www\.)/i.test(token))
+    token=token.replace(/[.,!?;:]+$/,'').replace(/\)+$/,m=>m.length>0?'':'');
   if(!token)continue;
   target.append(document.createTextNode(value.slice(previous,item.index)));
   let element;
@@ -101,11 +101,11 @@ function renderMessageText(target,value){
    element.referrerPolicy='no-referrer';
    element.title='Open the resource in its DuckBio app (requires access)';
    element.className='comms-reference';
-  }else if(/^https?:\\/\\/|^www\\./i.test(token)){
+  }else if(/^https?:\/\/|^www\./i.test(token)){
    try{
-    const url=new URL(/^www\\./i.test(token)?'https://'+token:token);
+    const url=new URL(/^www\./i.test(token)?'https://'+token:token);
     if(['https:','http:'].includes(url.protocol)&&!url.username&&!url.password&&
-       url.hostname.includes('.')&&!/[\\u0000-\\u001f]/.test(url.href)){
+       url.hostname.includes('.')&&!/[\u0000-\u001f]/.test(url.href)){
       element=node('a',token);element.href=url.href;
       element.target='_blank';element.rel='noopener noreferrer';
       element.referrerPolicy='no-referrer';
