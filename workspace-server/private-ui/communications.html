@@ -5,6 +5,7 @@
 <title>Messaging | DuckBio Workspace</title>
 <link rel="stylesheet" href="/workspace.css"><link rel="stylesheet" href="/communications.css">
 <script type="module" src="/communications.js"></script>
+<script type="module" src="/communications-launchers.js"></script>
 </head><body>
 <header class="top"><div class="brand"><span class="duck">◆</span><b>DuckBio</b><span>Messaging</span></div>
 <nav class="comms-top"><a href="/workspace">Workspace</a><a id="owner-link" href="/owner" hidden>Owner dashboard</a></nav></header>
@@ -18,9 +19,9 @@
 <small>Internal addresses work only inside DuckBio. They cannot receive internet email.</small></div>
 <div id="owner-addresses" hidden><strong>Owner mailboxes</strong><p>Support: <code>support@duckbio.internal</code></p><p>Subscriptions: <code>billing@duckbio.internal</code></p></div>
 </section>
-<section class="panel" id="mentions-panel">
-<h2>Mentions</h2><p>See when someone tags your account in a private chat or internal mail.</p>
-<div id="mentions-list" class="comms-list" aria-live="polite"></div>
+<section class="panel" id="notifications-panel">
+<h2>Notifications</h2><p>Mentions in conversations and access to content you co-author appear here.</p>
+<div id="notifications-list" class="comms-list" aria-live="polite"></div>
 </section>
 <div class="workspace-tabs" role="tablist" aria-label="Message type">
 <button type="button" id="tab-chat" class="active" aria-selected="true">Instant messages</button>

@@ -749,7 +749,7 @@ test('Chromium owner creates a cross-contact group and safely tags a user and re
    .textContent.includes('do not have organization administrator'));
  await page.goto(origin+'/messages');
  await page.locator('#comms-app:not([hidden])').waitFor();
- const tagAlert=page.locator('#mentions-list').getByRole('button',{
+ const tagAlert=page.locator('#notifications-list').getByRole('button',{
   name:/Lab owner tagged you in group chat/});
  await tagAlert.waitFor();
  await tagAlert.click();

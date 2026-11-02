@@ -75,6 +75,12 @@ function mentionControls(rootId,inputId,members){
   root.append(button(label,()=>insertMention($(inputId),contact.mention)));
  }
 }
+function focusMessage(messageId){
+ if(typeof messageId!=='string')return;
+ const element=document.getElementById('message-'+messageId);
+ if(element){element.scrollIntoView({block:'center'});
+  element.classList.add('comms-mentioned-message');}
+}
 function renderMessageText(target,value){
  const re=/@(?:ld|dm|dn|cd|md|dt)[0-9]{6,}\b|@u-[a-f0-9]{2,256}\b/g;
  let previous=0;
@@ -107,23 +113,29 @@ function newGroup(kind){
  $('group-create-title').textContent='Create '+(kind==='chat'?'group chat':'group mail');
  renderGroupChoices();$('group-create-panel').scrollIntoView({behavior:'smooth',block:'start'});
 }
-async function refreshMentions(){
- const result=await request('/api/suite/communications/mentions');
- const root=$('mentions-list');root.replaceChildren();
- if(!result.mentions.length){root.append(node('p','No mentions yet.'));return;}
- for(const m of result.mentions){
-  const label=(m.readAt?'':'● ')+m.sender.displayName+' tagged you in '+
+async function refreshNotifications(){
+ const result=await request('/api/suite/communications/notifications');
+ const root=$('notifications-list');root.replaceChildren();
+ if(!result.notifications.length){root.append(node('p','No notifications yet.'));return;}
+ for(const m of result.notifications){
+  const label=(m.readAt?'':'● ')+ (m.kind==='coauthor'?
+   'You were added as co-author to '+m.contentId+' · '+stamp(m.createdAt):
+   m.sender.displayName+' tagged you in '+
    ({chat:'chat',mail:'internal mail',group_chat:'group chat',
      group_mail:'group mail'}[m.source]||'a message')+
-   ' · '+stamp(m.createdAt);
+   ' · '+stamp(m.createdAt));
   root.append(button(label,async()=>{
    try{
-    await request('/api/suite/communications/mention/read',{notificationId:m.id});
-    await refreshMentions();
+    // A new tab must be opened immediately on click, before network awaits.
+    if(m.kind==='coauthor')window.open('/content/'+encodeURIComponent(m.contentId),
+      '_blank','noopener,noreferrer');
+    await request('/api/suite/communications/notification/read',{notificationId:m.id});
+    await refreshNotifications();
+    if(m.kind==='coauthor')return;
     if(m.groupId){
      const groups=await request('/api/suite/communications/groups');
      const group=groups.groups.find(x=>x.id===m.groupId);
-     if(group)await openGroup(group);
+     if(group){await openGroup(group);focusMessage(m.messageId);}
      else status('That private group is no longer available.');
     }else if(m.source==='chat'){
      state.group=null;
@@ -131,11 +143,11 @@ async function refreshMentions(){
      $('chat-title').textContent=m.sender.displayName;
      $('chat-mentions').replaceChildren();
      $('send-chat').disabled=false;
-     showTab('chat');await refreshChat();
+     showTab('chat');await refreshChat();focusMessage(m.messageId);
     }else{
      showTab('mail');state.folder='inbox';
      $('mail-group-panel').hidden=true;
-     await refreshMail();status('Open your internal mail inbox to read the mention.');
+     await refreshMail();status('Open the tagged mail in your inbox.');
     }
    }catch(error){status(error.message);}
   }));
@@ -177,7 +189,7 @@ async function refreshGroupHistory(){
  if(state.group?.id!==group.id)return;
  const root=$(group.kind==='chat'?'chat-history':'mail-group-history');root.replaceChildren();
  for(const m of response.messages){
-  const bubble=node('div');bubble.className='comms-bubble'+
+  const bubble=node('div');bubble.id='message-'+m.id;bubble.className='comms-bubble'+
     (m.senderId===state.self.accountId?' comms-mine':'');
   const sender=state.directory.get(m.senderId)?.displayName||
     (m.senderId===state.self.accountId?'You':m.senderId);
@@ -210,7 +222,7 @@ async function refreshChat(){
  if(!state.peer||state.peer.accountId!==peerId)return;
  const root=$('chat-history');root.replaceChildren();
  for(const m of history.messages){
-  const x=node('div');renderMessageText(x,m.body);
+  const x=node('div');x.id='message-'+m.id;renderMessageText(x,m.body);
   x.className='comms-bubble'+(m.senderId===state.self.accountId?' comms-mine':'');
   x.append(node('small',stamp(m.createdAt)));
   root.append(x);
@@ -295,7 +307,12 @@ async function start(){
  $('comms-app').hidden=false;
  const data=await request('/api/suite/communications/contacts');
  renderContacts(data.contacts);
- await refreshThreads();await refreshMail();await refreshGroups();await refreshMentions();
+ await refreshThreads();await refreshMail();await refreshGroups();await refreshNotifications();
+ const view=new URL(location.href).searchParams.get('view');
+ if(view==='mail')showTab('mail');
+ if(view==='notifications'){
+  $('notifications-panel').scrollIntoView({block:'start'});
+ }
  status('Signed in. Chat messages refresh automatically while this page is open.');
 }
 $('tab-chat').addEventListener('click',()=>showTab('chat'));
@@ -348,7 +365,7 @@ for(const [id,folder] of [['mail-inbox-button','inbox'],['mail-sent-button','sen
 }
 setInterval(async()=>{
  if(!state.self||document.hidden||state.busy)return;
- try{await refreshMentions();}catch{}
+ try{await refreshNotifications();}catch{}
  try{
   if(state.tab==='chat'){
    await refreshThreads();await refreshGroups();

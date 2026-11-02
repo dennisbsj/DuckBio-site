@@ -16,7 +16,8 @@ const validText=(x,max)=>typeof x==='string'&&x.trim().length>0&&x.length<=max&&
  !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(x);
 const fail=code=>{throw Error(code);};
 
-export function createCommunicationsStore({databasePath,clock=Date.now,ownerAccountId=null}={}){
+export function createCommunicationsStore({databasePath,clock=Date.now,ownerAccountId=null,verifyCoauthorEvent=null}={}){
+ if(verifyCoauthorEvent!==null&&typeof verifyCoauthorEvent!=='function')fail('invalid_coauthor_verifier');
  if(typeof databasePath!=='string'||!path.isAbsolute(databasePath)||
     databasePath.split(path.sep).some(x=>['public_html','docs','.github'].includes(x))||
     typeof clock!=='function'||(ownerAccountId!==null&&!validId(ownerAccountId)))
@@ -44,6 +45,8 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
   "CREATE TABLE IF NOT EXISTS conversation_group_reads(group_id TEXT NOT NULL REFERENCES conversation_groups(id),account TEXT NOT NULL,message_id TEXT NOT NULL REFERENCES conversation_group_messages(id),read_at INTEGER NOT NULL,PRIMARY KEY(group_id,account,message_id))",
   "CREATE TABLE IF NOT EXISTS message_mentions(id TEXT PRIMARY KEY,recipient TEXT NOT NULL,sender TEXT NOT NULL,source TEXT NOT NULL CHECK(source IN ('chat','mail','group_chat','group_mail')),message_id TEXT NOT NULL,group_id TEXT,created_at INTEGER NOT NULL,read_at INTEGER,UNIQUE(recipient,source,message_id))",
   "CREATE INDEX IF NOT EXISTS idx_mentions_recipient ON message_mentions(recipient,created_at DESC)",
+  "CREATE TABLE IF NOT EXISTS coauthor_notifications(id TEXT PRIMARY KEY,source_event TEXT UNIQUE NOT NULL,recipient TEXT NOT NULL,actor TEXT NOT NULL,content_id TEXT NOT NULL,app_id TEXT NOT NULL,created_at INTEGER NOT NULL,read_at INTEGER)",
+  "CREATE INDEX IF NOT EXISTS idx_coauthor_notifications ON coauthor_notifications(recipient,created_at DESC)",
   "CREATE TABLE IF NOT EXISTS internal_sync_cursors(name TEXT PRIMARY KEY,offset INTEGER NOT NULL CHECK(offset>=0))",
   "CREATE TABLE IF NOT EXISTS public_contact_delivery(submission_id TEXT PRIMARY KEY,mail_id TEXT NOT NULL UNIQUE REFERENCES internal_mails(id),contact_email TEXT NOT NULL,payload TEXT NOT NULL CHECK(json_valid(payload)),state TEXT NOT NULL CHECK(state IN ('pending','sending','accepted','failed')),attempts INTEGER NOT NULL DEFAULT 0,available_at INTEGER NOT NULL,lease_token TEXT,locked_until INTEGER,created_at INTEGER NOT NULL)"
  ].join(';')+';');
@@ -212,6 +215,70 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
    const changed=db.prepare('UPDATE message_mentions SET read_at=COALESCE(read_at,?) WHERE recipient=? AND id=? AND read_at IS NULL')
      .run(clock(),accountId,notificationId).changes;
    return {marked:changed>0};
+  },
+  // Trusted native-app events only; there is NO user-callable web route.
+  // A callback must independently validate content membership/ownership,
+  // collaborator grant and authenticity. Never accept arbitrary UI claims.
+  postCoauthorNotification({proof,reference,recipientId,actorId,contentId,appId}={}){
+   if(!verifyCoauthorEvent)fail('coauthor_integration_unavailable');
+   const prefixes={limsman:'ld',duckman:'dm',eel:'dn',goflo:'cd',methpipe:'md',mantrain:'dt'};
+   if(!validId(reference)||!validId(recipientId)||!validId(actorId)||
+      recipientId===actorId||!Object.hasOwn(prefixes,appId)||
+      typeof contentId!=='string'||!new RegExp('^'+prefixes[appId]+'[0-9]{6,}$').test(contentId))
+    fail('invalid_coauthor_event');
+   const event={reference,recipientId,actorId,contentId,appId};
+   if(verifyCoauthorEvent({proof,event})!==true)fail('coauthor_event_unverified');
+   return tx(()=>{
+    const prior=db.prepare('SELECT * FROM coauthor_notifications WHERE source_event=?').get(reference);
+    if(prior){
+     if(prior.recipient!==recipientId||prior.actor!==actorId||
+        prior.content_id!==contentId||prior.app_id!==appId)fail('coauthor_event_conflict');
+     return {id:prior.id,created:false};
+    }
+    const notificationId=randomUUID();
+    db.prepare('INSERT INTO coauthor_notifications(id,source_event,recipient,actor,content_id,app_id,created_at) VALUES(?,?,?,?,?,?,?)')
+     .run(notificationId,reference,recipientId,actorId,contentId,appId,clock());
+    return {id:notificationId,created:true};
+   });
+  },
+  notifications(accountId,{limit=50}={}){
+   if(!validId(accountId)||!Number.isSafeInteger(limit)||limit<1||limit>100)
+    fail('invalid_notification_query');
+   const mentions=db.prepare('SELECT * FROM message_mentions WHERE recipient=? ORDER BY created_at DESC,id DESC LIMIT ?')
+     .all(accountId,limit).map(x=>({id:x.id,kind:'mention',senderId:x.sender,
+       source:x.source,groupId:x.group_id,messageId:x.message_id,
+       contentId:null,appId:null,createdAt:x.created_at,readAt:x.read_at}));
+   const coauthors=db.prepare('SELECT * FROM coauthor_notifications WHERE recipient=? ORDER BY created_at DESC,id DESC LIMIT ?')
+     .all(accountId,limit).map(x=>({id:x.id,kind:'coauthor',senderId:x.actor,
+       source:'coauthor',groupId:null,messageId:null,contentId:x.content_id,
+       appId:x.app_id,createdAt:x.created_at,readAt:x.read_at}));
+   return [...mentions,...coauthors].sort((a,b)=>b.createdAt-a.createdAt||
+     b.id.localeCompare(a.id)).slice(0,limit);
+  },
+  markNotificationRead(accountId,notificationId){
+   if(!validId(accountId)||!validId(notificationId))fail('invalid_notification');
+   return tx(()=>{
+    const first=db.prepare('UPDATE message_mentions SET read_at=? WHERE recipient=? AND id=? AND read_at IS NULL')
+     .run(clock(),accountId,notificationId).changes;
+    const second=db.prepare('UPDATE coauthor_notifications SET read_at=? WHERE recipient=? AND id=? AND read_at IS NULL')
+     .run(clock(),accountId,notificationId).changes;
+    return {marked:first+second>0};
+   });
+  },
+  unreadCounts(accountId){
+   if(!validId(accountId))fail('invalid_account');
+   const one=(q,...args)=>db.prepare(q).get(...args).n;
+   const directChat=one('SELECT count(*) n FROM chat_messages WHERE recipient=? AND read_at IS NULL',accountId);
+   const directMail=one('SELECT count(*) n FROM internal_mails WHERE recipient=? AND read_at IS NULL',accountId);
+   const groups= db.prepare(`SELECT g.kind,count(*) n FROM conversation_group_messages m
+     JOIN conversation_groups g ON g.id=m.group_id
+     JOIN conversation_group_members members ON members.group_id=m.group_id AND members.account=?
+     LEFT JOIN conversation_group_reads r ON r.group_id=m.group_id AND r.message_id=m.id AND r.account=?
+     WHERE m.sender<>? AND r.read_at IS NULL GROUP BY g.kind`).all(accountId,accountId,accountId);
+   const byKind=Object.fromEntries(groups.map(x=>[x.kind,x.n]));
+   const notifications=one('SELECT count(*) n FROM message_mentions WHERE recipient=? AND read_at IS NULL',accountId)+
+     one('SELECT count(*) n FROM coauthor_notifications WHERE recipient=? AND read_at IS NULL',accountId);
+   return {chat:directChat+(byKind.chat||0),mail:directMail+(byKind.mail||0),notifications};
   },
   addressFor(account){return generateAddress(account);},
   ownerAddresses(){return ownerAccountId?
