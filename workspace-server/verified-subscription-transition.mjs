@@ -22,7 +22,7 @@ export function planVerifiedSubscriptionTransition({
    throw Error('invalid_subscription_transition');
   inventory.set(item.appId,item);
  }
- const parse=value=>{
+ const parse=(value,requireFuturePayment)=>{
   if(!value||typeof value!=='object'||Array.isArray(value)||
      !plans.has(value.plan)||!states.has(value.status)||
      !Array.isArray(value.apps)||!validRevision(value.revision)||
@@ -33,13 +33,14 @@ export function planVerifiedSubscriptionTransition({
      (value.plan==='Mixed'&&(value.apps.length<2||value.apps.length>5))||
      (value.plan==='Bundle'&&value.apps.length!==inventory.size)||
      (value.status==='active'&&
-       (!Number.isSafeInteger(value.paidThrough)||value.paidThrough<=Math.floor(now/1000))))
+       (!Number.isSafeInteger(value.paidThrough)||value.paidThrough<1||
+         (requireFuturePayment&&value.paidThrough<=Math.floor(now/1000)))))
    throw Error('invalid_subscription_transition');
   return {plan:value.plan,apps:[...value.apps].sort(),seats:value.seats,
    revision:value.revision,status:value.status,paidThrough:value.paidThrough??null};
  };
- const target=parse(next);
- const old=existing===null?null:parse(existing);
+ const target=parse(next,true);
+ const old=existing===null?null:parse(existing,false);
  if(old&&(existing.organizationId!==organizationId||
           existing.subscriptionId!==subscriptionId||
           target.revision<=old.revision))
