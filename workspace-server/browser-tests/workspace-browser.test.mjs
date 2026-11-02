@@ -12,7 +12,7 @@ import {createSqliteAuthStores} from '../shared-auth/sqlite-store.mjs';
 import {createOrganizationStore} from '../organization-store.mjs';
 import {createAccountService} from '../shared-auth/account-service.mjs';
 
-async function fixture(t, {multi=false, invitationMailer=null, stripeTestCheckout=null}={}) {
+async function fixture(t, {multi=false, invitationMailer=null, stripeTestCheckout=null, stripeTestReconciler=null}={}) {
  const temp=mkdtempSync(path.join(os.tmpdir(),'duckbio-workspace-browser-'));
  const identity=createIdentityStore({databasePath:path.join(temp,'identity.sqlite')});
  const auth=createSqliteAuthStores({databasePath:path.join(temp,'auth.sqlite')});
@@ -35,7 +35,7 @@ async function fixture(t, {multi=false, invitationMailer=null, stripeTestCheckou
  // Register cleanup before service/browser creation, including constructor failures.
  t.after(async()=>{await browser?.close();server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));identity.close();auth.close();org.close();rmSync(temp,{recursive:true,force:true});assert.deepEqual(errors,[],'uncaught browser errors');});
  const assetRoot=fileURLToPath(new URL('../private-ui/',import.meta.url));
- service=createAccountService({invitationMailer,stripeTestCheckout,origin,issuer:'https://login.example.invalid',clients:registrations,identityStore:identity,organizationStore:org,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
+ service=createAccountService({invitationMailer,stripeTestCheckout,stripeTestReconciler,origin,issuer:'https://login.example.invalid',clients:registrations,identityStore:identity,organizationStore:org,authStore:auth.brokerStore,assetRoot,getClientAddress:req=>req.socket.remoteAddress});
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:1280,height:800}});
  const page=await context.newPage();
@@ -408,6 +408,7 @@ test('admin prepares Stripe test Checkout from a saved draft with zero entitleme
  await page.locator('#subscription-drafts').getByText('Single · 2 users per app').waitFor();
  await page.getByRole('button',{name:'Start test checkout'}).click();
  await page.getByRole('button',{name:'Open Stripe test checkout'}).waitFor();
+ assert.equal(await page.getByRole('button',{name:'Check Stripe TEST status'}).count(),0,'no billing check without private opt-in');
  assert.equal(org.listSubscriptionDrafts('lab-a',owner.id)[0].checkoutState,'ready');
  assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased,before);
 });
@@ -428,4 +429,41 @@ test('admin saves and cancels subscription drafts without minting paid seats',{t
  await page.getByRole('button',{name:'Cancel draft'}).click();
  await page.locator('#subscription-drafts').getByText(/canceled/).waitFor();
  assert.equal(org.overview('lab-a',owner.id).apps.find(a=>a.id==='eel').purchased,before);
+});
+
+test('admin checks and reloads Stripe TEST billing observation without licensing changes',{timeout:45000},async t=>{
+ const checkout={priceFor:()=> 'price_test123456',async createSession(){
+  return {id:'cs_test_browser123',url:'https://checkout.stripe.com/c/pay/browser'};
+ }};
+ const observations=[];
+ const checker={async inspect(snapshot){
+  observations.push(snapshot);
+  return {state:'pending',reason:'payment_unpaid',licensesGranted:false};
+ }};
+ const {page,org,owner}=await fixture(t,{stripeTestCheckout:checkout,stripeTestReconciler:checker});
+ await signIn(page);
+ const before=org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased;
+ await page.getByRole('button',{name:'Subscriptions'}).click();
+ await page.getByRole('button',{name:'Prepare subscription'}).click();
+ await page.locator('#draft-plan').selectOption('Single');
+ await page.locator('#draft-seats').fill('2');
+ await page.locator('#buy-fields input[name=eel]').check();
+ await page.getByRole('button',{name:'Save subscription draft'}).click();
+ await page.getByRole('button',{name:'Start test checkout'}).click();
+ await page.getByRole('button',{name:'Check Stripe TEST status'}).waitFor();
+ await page.locator('#subscription-drafts').getByText('Stripe TEST status: not checked', {exact:false}).waitFor();
+ await page.getByRole('button',{name:'Check Stripe TEST status'}).click();
+ await page.locator('#subscription-drafts').getByText('Stripe TEST status: Payment not verified', {exact:false}).waitFor();
+ assert.equal(observations.length,1);
+ assert.equal(observations[0].checkout.sessionId,'cs_test_browser123');
+ const saved=org.listSubscriptionDrafts('lab-a',owner.id)[0];
+ assert.equal(saved.testReconciliation.state,'pending');
+ assert.equal(saved.testReconciliation.reason,'payment_unpaid');
+ assert.equal(saved.testReconciliation.attempt,1);
+ assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased,before);
+ await page.reload();
+ await page.getByRole('button',{name:'Subscriptions'}).click();
+ await page.locator('#subscription-drafts').getByText('Stripe TEST status: Payment not verified', {exact:false}).waitFor();
+ assert.equal(await page.getByRole('button',{name:'Check Stripe TEST status'}).count(),1);
+ assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased,before);
 });
