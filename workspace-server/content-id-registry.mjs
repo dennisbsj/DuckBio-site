@@ -1,4 +1,5 @@
 import {DatabaseSync} from 'node:sqlite';
+import {randomUUID} from 'node:crypto';
 import {mkdirSync,existsSync,chmodSync,realpathSync} from 'node:fs';
 import path from 'node:path';
 
@@ -11,7 +12,7 @@ const validName=x=>typeof x==='string'&&x.trim().length>0&&x.length<=200&&
  !/[\u0000-\u001f\u007f]/.test(x);
 const fail=code=>{throw Error(code);};
 export const CONTENT_PREFIXES=prefixes;
-export const CONTENT_MENTION_PATTERN=/(?:^|[^\p{L}\p{N}_])@((?:ld|dm|dn|cd|md|dt)[1-9][0-9]{5,})\b/gu;
+export const CONTENT_MENTION_PATTERN=/(?:^|[^\p{L}\p{N}_])@((?:ld|dm|dn|cd|md|dt)(?=[0-9]{6,}(?:\\b|$))0*[1-9][0-9]*)\b/gu;
 const canonicalName=name=>name.normalize('NFKC').trim().replace(/\s+/gu,' ').toLocaleLowerCase('en-US');
 const formatId=(prefix,sequence)=>prefix+String(sequence).padStart(6,'0');
 export function extractContentMentions(text){
@@ -86,7 +87,7 @@ export function createContentIdRegistry({
      fail('resource_name_conflict');
     // SQLite AUTOINCREMENT uses one GLOBAL sequence, across every app.
     const assigned=db.prepare(`INSERT INTO content_registry(content_id,app_id,organization_id,resource_type,source_key,name,canonical_name,created_at)
-      VALUES(?,?,?,?,?,?,?,?)`).run('pending-'+Date.now()+'-'+Math.random(),
+      VALUES(?,?,?,?,?,?,?,?)`).run('pending-'+randomUUID(),
        appId,organizationId,type,sourceKey,record.name,key,clock());
     const sequence=Number(assigned.lastInsertRowid);
     if(!Number.isSafeInteger(sequence)||sequence<1)fail('resource_sequence_exhausted');
@@ -98,7 +99,7 @@ export function createContentIdRegistry({
    });
   },
   archive({proof,contentId}={}){
-   if(typeof contentId!=='string'||!/^(?:ld|dm|dn|cd|md|dt)[1-9][0-9]{5,}$/.test(contentId))
+   if(typeof contentId!=='string'||!/^(?:ld|dm|dn|cd|md|dt)(?=[0-9]{6,}(?:\\b|$))0*[1-9][0-9]*$/.test(contentId))
     fail('invalid_resource_id');
    return tx(()=>{
     const row=db.prepare('SELECT * FROM content_registry WHERE content_id=?').get(contentId);
@@ -110,7 +111,7 @@ export function createContentIdRegistry({
    });
   },
   inspect({contentId,viewerId}={}){
-   if(typeof contentId!=='string'||!/^(?:ld|dm|dn|cd|md|dt)[1-9][0-9]{5,}$/.test(contentId)||
+   if(typeof contentId!=='string'||!/^(?:ld|dm|dn|cd|md|dt)(?=[0-9]{6,}(?:\\b|$))0*[1-9][0-9]*$/.test(contentId)||
       !id(viewerId))return null;
    const row=db.prepare('SELECT * FROM content_registry WHERE content_id=? AND archived_at IS NULL').get(contentId);
    if(!row)return null;
