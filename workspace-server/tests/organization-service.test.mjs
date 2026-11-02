@@ -374,6 +374,16 @@ test('reconciliation API checks only the selected admin\'s own ready test Checko
  assert.equal(completed.observation.licensesGranted,false);
  assert(Number.isSafeInteger(completed.observation.checkedAt));
  assert.equal(f.organizationStore.listSubscriptionDrafts('org-a',owner.id)[0].testReconciliation.state,'paid_test_verified');
+ const listing=await admin.call('/api/suite/organization/subscriptions',{organizationId:'org-a'});
+ assert.equal(listing.status,200);
+ const capacity=(await listing.json()).testSeatImpact;
+ assert.equal(capacity.testOnly,true);
+ assert.equal(capacity.licensesGranted,false);
+ assert.equal(capacity.realSeatChanges,false);
+ assert.equal(capacity.apps.find(x=>x.appId==='eel').status,'manual_review',
+  'a legacy paid observation without lifecycle information may not promise usable seats');
+ assert.equal(capacity.apps.find(x=>x.appId==='eel').candidateTestSeats,0);
+
  const historyRoute='/api/suite/organization/subscription/test-history';
  assert.equal((await outsider.call(historyRoute,input)).status,401);
  assert.equal((await admin.call(historyRoute,input,'POST',false)).status,403);
