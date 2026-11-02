@@ -676,6 +676,23 @@ test('Chromium private Messaging UI supports owner chat, virtual mail and mobile
  await page.locator('#contact-search').fill('Lab owner');
  await page.getByRole('button',{name:'Search all organizations'}).click();
  await page.locator('#search-results').getByText('No users found.').waitFor();
+ // Owner-initiated chat remains readable, but a normal user cannot reply.
+ const ownerThread=page.locator('#chat-threads').getByRole('button',{name:/Lab owner/});
+ await ownerThread.waitFor();await ownerThread.click();
+ await page.locator('#chat-history').getByText('Hello from DuckBio').waitFor();
+ assert.equal(await page.locator('#send-chat').isDisabled(),true);
+ assert.match(await page.locator('#comms-status').textContent(),/read-only/);
+ const rejected=await page.evaluate(async recipientId=>{
+  const csrf=(await (await fetch('/api/suite/auth/session')).json()).csrfToken;
+  const response=await fetch('/api/suite/communications/chat/send',{
+   method:'POST',credentials:'same-origin',
+   headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},
+   body:JSON.stringify({recipientId,body:'Forged owner reply',clientId:crypto.randomUUID()})
+  });
+  return response.status;
+ },owner.id);
+ assert.equal(rejected,403,'the server must independently reject a forged reply');
+ assert.equal(communicationsStore.chatHistory(worker.id,owner.id).length,1);
  await page.getByRole('button',{name:'Internal mail'}).click();
  await page.getByRole('button',{name:'Mail DuckBio support'}).click();
  assert.equal(await page.locator('#mail-to').inputValue(),'support@duckbio.internal');
