@@ -12,7 +12,7 @@ const validName=x=>typeof x==='string'&&x.trim().length>0&&x.length<=200&&
  !/[\u0000-\u001f\u007f]/.test(x);
 const fail=code=>{throw Error(code);};
 export const CONTENT_PREFIXES=prefixes;
-export const CONTENT_MENTION_PATTERN=/(?:^|[^\p{L}\p{N}_])@((?:ld|dm|dn|cd|md|dt)(?=[0-9]{6,}(?:\\b|$))0*[1-9][0-9]*)\b/gu;
+export const CONTENT_MENTION_PATTERN=/(?:^|[^\p{L}\p{N}_])@((?:ld|dm|dn|cd|md|dt)[0-9]{6,})\b/gu;
 const canonicalName=name=>name.normalize('NFKC').trim().replace(/\s+/gu,' ').toLocaleLowerCase('en-US');
 const formatId=(prefix,sequence)=>prefix+String(sequence).padStart(6,'0');
 export function extractContentMentions(text){
@@ -99,7 +99,7 @@ export function createContentIdRegistry({
    });
   },
   archive({proof,contentId}={}){
-   if(typeof contentId!=='string'||!/^(?:ld|dm|dn|cd|md|dt)(?=[0-9]{6,}(?:\\b|$))0*[1-9][0-9]*$/.test(contentId))
+   if(typeof contentId!=='string'||!/^(?:ld|dm|dn|cd|md|dt)[0-9]{6,}$/.test(contentId))
     fail('invalid_resource_id');
    return tx(()=>{
     const row=db.prepare('SELECT * FROM content_registry WHERE content_id=?').get(contentId);
@@ -111,7 +111,7 @@ export function createContentIdRegistry({
    });
   },
   inspect({contentId,viewerId}={}){
-   if(typeof contentId!=='string'||!/^(?:ld|dm|dn|cd|md|dt)(?=[0-9]{6,}(?:\\b|$))0*[1-9][0-9]*$/.test(contentId)||
+   if(typeof contentId!=='string'||!/^(?:ld|dm|dn|cd|md|dt)[0-9]{6,}$/.test(contentId)||
       !id(viewerId))return null;
    const row=db.prepare('SELECT * FROM content_registry WHERE content_id=? AND archived_at IS NULL').get(contentId);
    if(!row)return null;
