@@ -500,5 +500,15 @@ test('admin sees renewal and cancellation lifecycle as TEST observations only',{
  await page.getByRole('button',{name:'Check Stripe TEST status'}).click();
  await page.locator('#subscription-drafts').getByText(/Payment not verified.*Subscription: Canceled/).waitFor();
  assert.equal(org.listSubscriptionDrafts('lab-a',owner.id)[0].testReconciliation.state,'pending');
+ await page.getByRole('button',{name:'View TEST history'}).click();
+ const entries=page.locator('#subscription-drafts .test-billing-history li');
+ await entries.first().waitFor();
+ assert.equal(await entries.count(),2);
+ assert.match(await entries.first().textContent(),/#2.*pending.*canceled/);
+ assert.match(await entries.nth(1).textContent(),/#1.*paid_test_verified.*active/);
+ assert(!String(await page.locator('#subscription-drafts').textContent()).includes('sub_test_browser123'),
+  'provider IDs must remain private');
+ await page.getByRole('button',{name:'Hide TEST history'}).click();
+ assert.equal(await page.locator('#subscription-drafts .test-billing-history').isVisible(),false);
  assert.equal(org.overview('lab-a',owner.id).apps.find(x=>x.id==='eel').purchased,original);
 });
