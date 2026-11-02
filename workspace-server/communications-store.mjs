@@ -35,7 +35,8 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
   "CREATE TABLE IF NOT EXISTS internal_mails(id TEXT PRIMARY KEY,sender TEXT NOT NULL,recipient TEXT NOT NULL,from_address TEXT NOT NULL,to_address TEXT NOT NULL,subject TEXT NOT NULL,body TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN ('user','billing','contact')),created_at INTEGER NOT NULL,read_at INTEGER,system_reference TEXT UNIQUE,client_id TEXT,UNIQUE(sender,client_id))",
   "CREATE INDEX IF NOT EXISTS idx_mail_inbox ON internal_mails(recipient,created_at)",
   "CREATE INDEX IF NOT EXISTS idx_mail_sent ON internal_mails(sender,created_at)",
-  "CREATE TABLE IF NOT EXISTS internal_sync_cursors(name TEXT PRIMARY KEY,offset INTEGER NOT NULL CHECK(offset>=0))"
+  "CREATE TABLE IF NOT EXISTS internal_sync_cursors(name TEXT PRIMARY KEY,offset INTEGER NOT NULL CHECK(offset>=0))",
+  "CREATE TABLE IF NOT EXISTS public_contact_delivery(submission_id TEXT PRIMARY KEY,mail_id TEXT NOT NULL UNIQUE REFERENCES internal_mails(id),contact_email TEXT NOT NULL,payload TEXT NOT NULL CHECK(json_valid(payload)),state TEXT NOT NULL CHECK(state IN ('pending','sending','accepted','failed')),attempts INTEGER NOT NULL DEFAULT 0,available_at INTEGER NOT NULL,lease_token TEXT,locked_until INTEGER,created_at INTEGER NOT NULL)"
  ].join(';')+';');
  for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))
   chmodSync(databasePath+suffix,0o600);
@@ -177,6 +178,78 @@ export function createCommunicationsStore({databasePath,clock=Date.now,ownerAcco
    if(!validId(accountId)||!validId(id))fail('invalid_account');
    return db.prepare('UPDATE internal_mails SET read_at=? WHERE recipient=? AND id=? AND read_at IS NULL')
     .run(clock(),accountId,id).changes;
+  },
+  // Public contact handler MUST verify Turnstile and exact Origin first.
+  // Persist internal owner mail and external delivery job atomically. The
+  // public endpoint never directly claims actual external mail delivery.
+  acceptPublicContact({submissionId,name,email,organization='',subject,message}={}){
+   if(!ownerAccountId||!validId(submissionId)||!validText(name,120)||
+      typeof email!=='string'||email.length>254||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||
+      /[\r\n]/.test(email)||typeof organization!=='string'||
+      organization.length>180||/[\r\n]/.test(organization)||/[\r\n]/.test(name)||
+      !validText(subject,120)||/[\r\n]/.test(subject)||!validText(message,5000))
+    fail('invalid_contact');
+   const clean={name:name.trim(),email:email.trim().toLowerCase(),
+     organization:organization.trim(),subject:subject.trim(),message:message.trim()};
+   return tx(()=>{
+    const previous=db.prepare('SELECT payload FROM public_contact_delivery WHERE submission_id=?')
+      .get(submissionId);
+    if(previous){
+     if(JSON.stringify(clean)!==previous.payload)fail('contact_submission_conflict');
+     return {accepted:true,internalDelivered:true,externalStatus:'queued',duplicate:true};
+    }
+    const now=clock();
+    const recent=db.prepare('SELECT count(*) AS n FROM public_contact_delivery WHERE contact_email=? AND created_at>?')
+      .get(clean.email,now-3600000).n;
+    const total=db.prepare('SELECT count(*) AS n FROM public_contact_delivery WHERE created_at>?')
+      .get(now-3600000).n;
+    if(recent>=5||total>=200)fail('contact_rate_limited');
+    const id=randomUUID(),body=[
+      'New DuckBio website contact','',
+      'Name: '+clean.name,
+      'External email: '+clean.email,
+      'Organization: '+(clean.organization||'Not provided'),
+      'Subject: '+clean.subject,'',
+      clean.message
+    ].join('\n');
+    db.prepare(`INSERT INTO internal_mails(id,sender,recipient,from_address,to_address,
+     subject,body,kind,created_at,system_reference) VALUES(?,?,?,?,?,?,?,'contact',?,?)`)
+      .run(id,'duckbio-contact-form',ownerAccountId,'form@duckbio.internal',
+        OWNER_SUPPORT,'Website: '+clean.subject,body,now,'contact:'+submissionId);
+    db.prepare("INSERT INTO public_contact_delivery(submission_id,mail_id,contact_email,payload,state,available_at,created_at) VALUES(?,?,?,?,'pending',?,?)")
+      .run(submissionId,id,clean.email,JSON.stringify(clean),now,now);
+    return {accepted:true,internalDelivered:true,externalStatus:'queued',duplicate:false};
+   });
+  },
+  claimPublicContactDelivery(){
+   return tx(()=>{
+    const now=clock();
+    const row=db.prepare("SELECT * FROM public_contact_delivery WHERE attempts<6 AND ((state='pending' AND available_at<=?) OR (state='sending' AND locked_until<=?)) ORDER BY created_at,submission_id LIMIT 1")
+      .get(now,now);
+    if(!row)return null;
+    const leaseToken=randomUUID();
+    db.prepare("UPDATE public_contact_delivery SET state='sending',attempts=attempts+1,lease_token=?,locked_until=? WHERE submission_id=?")
+      .run(leaseToken,now+120000,row.submission_id);
+    return {submissionId:row.submission_id,leaseToken,
+      idempotencyKey:'duckbio-contact-'+row.submission_id,...JSON.parse(row.payload)};
+   });
+  },
+  finishPublicContactDelivery({submissionId,leaseToken,accepted}={}){
+   if(!validId(submissionId)||!validId(leaseToken)||typeof accepted!=='boolean')
+    fail('invalid_contact_delivery');
+   return tx(()=>{
+    const row=db.prepare('SELECT state,lease_token,attempts FROM public_contact_delivery WHERE submission_id=?')
+      .get(submissionId);
+    if(!row||row.state!=='sending'||row.lease_token!==leaseToken)
+     fail('contact_delivery_lease_conflict');
+    const now=clock(),exhausted=row.attempts>=6;
+    const delay=Math.min(6*3600000,60000*2**Math.min(row.attempts,8));
+    const state=accepted?'accepted':exhausted?'failed':'pending';
+    db.prepare("UPDATE public_contact_delivery SET state=?,lease_token=NULL,locked_until=NULL,available_at=? WHERE submission_id=?")
+      .run(state,accepted?now:now+delay,submissionId);
+    return {state};
+   });
   },
   // Private cross-database delivery progress. Insert into the communications
   // DB before moving the watermark so a restart safely replays undelivered
