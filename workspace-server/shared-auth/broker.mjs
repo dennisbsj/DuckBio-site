@@ -208,6 +208,15 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
   }
 
   return Object.freeze({
+    // For trusted native backends only. The secret and broker proof must remain
+    // server-side; neither browser cookies nor user-supplied IDs are accepted.
+    async authenticateNativeSession(req,body){
+      if(req.headers.cookie||req.headers['sec-fetch-site'])
+        throw new BrokerError(401,'invalid_client');
+      const client=authenticateClient(req,body);
+      const result=await liveProof(client,body?.sessionToken);
+      return result?{...result.assertion,appId:client.appId}:null;
+    },
     verifyCsrf,
     credentialWork,
     authenticateCredentials,

@@ -175,6 +175,33 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           res.writeHead(303,{'Location':destination,'Cache-Control':'private, no-store',
             'Referrer-Policy':'no-referrer'});res.end();return true;
         }
+        if(route==='/api/suite/native/communications/unread'){
+          if(req.method!=='POST')throw new ServiceError(405,'method_not_allowed');
+          if(parsed.search||parsed.hash)throw new ServiceError(400,'invalid_input');
+          if(!communicationsEnabled)throw new ServiceError(503,'unavailable');
+          const body=await jsonBody(req);
+          // No browser identity, arbitrary account ID or client-provided counts.
+          if(Object.keys(body).length!==1||typeof body.sessionToken!=='string')
+            throw new ServiceError(400,'invalid_input');
+          let assertion;
+          try{assertion=await broker.authenticateNativeSession(req,body);}
+          catch{throw new ServiceError(401,'invalid_client');}
+          if(!assertion?.active)throw new ServiceError(401,'invalid_credentials');
+          const actor=identityStore.getUser(assertion.subject);
+          if(!actor||actor.state!=='active'||!canCommunicate(actor))
+            throw new ServiceError(403,'access_denied');
+          // A broker grant alone does not override native app membership.
+          // Match the exact mapped organization where one exists.
+          const boundOrg=assertion.localIdentity?.organizationId;
+          const memberships=organizationStore.organizationsFor(actor.id);
+          if(!isOwner(actor)&&!memberships.some(org=>
+             (boundOrg===undefined||org.id===boundOrg)&&
+             organizationStore.accessFor({organizationId:org.id,
+               accountId:actor.id,appId:assertion.appId})))
+            throw new ServiceError(403,'access_denied');
+          send(res,200,{counts:communicationsStore.unreadCounts(actor.id)});
+          return true;
+        }
         if (!route.startsWith('/api/suite/')) return staticFile(req, res, route);
         const methods = { '/api/suite/account': 'GET', '/api/suite/account/login': 'POST', '/api/suite/setup': 'POST', '/api/suite/invitations/accept': 'POST', '/api/suite/account/password': 'POST', '/api/suite/account/logout': 'POST', '/api/suite/admin/users': ['GET', 'PATCH'], '/api/suite/admin/invitations': 'POST', '/api/suite/admin/native-users': 'GET', '/api/suite/admin/grants': ['PUT', 'DELETE'], '/api/suite/admin/backup': 'POST', '/api/suite/owner/overview': 'GET', '/api/suite/communications/self': 'GET', '/api/suite/communications/contacts': 'GET', '/api/suite/communications/search': 'POST', '/api/suite/communications/threads': 'GET', '/api/suite/communications/chat/history': 'POST', '/api/suite/communications/chat/send': 'POST', '/api/suite/communications/chat/read': 'POST', '/api/suite/communications/notifications': 'GET', '/api/suite/communications/notification/read': 'POST', '/api/suite/communications/unread': 'GET', '/api/suite/communications/mentions': 'GET', '/api/suite/communications/mention/read': 'POST', '/api/suite/communications/groups': 'GET', '/api/suite/communications/group/create': 'POST', '/api/suite/communications/group/members': 'POST', '/api/suite/communications/group/history': 'POST', '/api/suite/communications/group/send': 'POST', '/api/suite/communications/group/read': 'POST', '/api/suite/communications/mail/inbox': 'GET', '/api/suite/communications/mail/sent': 'GET', '/api/suite/communications/mail/send': 'POST', '/api/suite/communications/mail/read': 'POST', '/api/suite/organizations': 'GET', '/api/suite/organization/select': 'POST', '/api/suite/organization/overview': 'POST', '/api/suite/organization/audit': 'POST', '/api/suite/organization/matrix': 'POST', '/api/suite/organization/permission/set': 'POST', '/api/suite/organization/user/save': 'POST', '/api/suite/organization/user/remove': 'POST', '/api/suite/organization/user/active': 'POST', '/api/suite/organization/invite': 'POST', '/api/suite/organization/invite/list': 'POST', '/api/suite/organization/invite/revoke': 'POST', '/api/suite/organization/invite/preview': 'GET', '/api/suite/organization/invite/accept': 'POST', '/api/suite/organization/subscriptions': 'POST', '/api/suite/organization/subscription/draft': 'POST', '/api/suite/organization/subscription/cancel': 'POST', '/api/suite/organization/subscription/test-checkout': 'POST', '/api/suite/organization/subscription/test-reconcile': 'POST', '/api/suite/organization/subscription/test-history': 'POST' };
         if (!methods[route]) return false;
