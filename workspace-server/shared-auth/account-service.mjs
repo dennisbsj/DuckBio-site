@@ -9,7 +9,7 @@ import {OWNER_SUPPORT,SECURITY_SENDER} from '../communications-store.mjs';
 const APP_NAMES = Object.freeze({ goflo: 'GoFlo', eel: 'EEL', methpipe: 'MethPipe', mantrain: 'ManTrain', duckman: 'DuckMan', limsman: 'LIMSMan' });
 const STATIC_APPS = new Set(['goflo', 'methpipe', 'mantrain']);
 // Each native app must have an explicit private client origin; retired domains are not fallbacks.
-const FILES = new Set(['index.html', 'login.css', 'app.js', 'app-registry.mjs', 'auth-client.mjs', 'config.mjs', 'admin.html', 'admin.js', 'admin.css', 'workspace.html', 'workspace.css', 'workspace.js', 'owner.html', 'owner.js', 'communications.html', 'communications.js', ...Object.keys(APP_NAMES).map(id => `assets/${id}.svg`), 'assets/favicon.svg']);
+const FILES = new Set(['index.html', 'login.css', 'app.js', 'app-registry.mjs', 'auth-client.mjs', 'config.mjs', 'admin.html', 'admin.js', 'admin.css', 'workspace.html', 'workspace.css', 'workspace.js', 'owner.html', 'owner.js', 'communications.html', 'communications.js', 'communications.css', ...Object.keys(APP_NAMES).map(id => `assets/${id}.svg`), 'assets/favicon.svg']);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
 class ServiceError extends Error { constructor(status, code) { super(code); this.status = status; this.code = code; } }
 const safeId = value => typeof value === 'string' && value.length > 0 && value.length <= 128 && !/[\u0000-\u0020\u007f]/.test(value);
