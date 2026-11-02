@@ -1,7 +1,7 @@
 // Private same-origin messaging UI. No SMTP, WebSocket or external service.
 // Chat refreshes with bounded polling; all real permissions are server-side.
 const $=id=>document.getElementById(id);
-const state={csrf:null,self:null,contacts:[],directory:new Map(),selectedGroupMembers:new Set(),groupKind:'chat',group:null,peer:null,folder:'inbox',busy:false,tab:'chat'};
+const state={csrf:null,self:null,contacts:[],directory:new Map(),selectedGroupMembers:new Set(),groupKind:'chat',group:null,groupWritable:true,peer:null,folder:'inbox',busy:false,tab:'chat'};
 const node=(tag,text)=>{const x=document.createElement(tag);if(text!==undefined)x.textContent=String(text);return x;};
 const status=text=>{$('comms-status').textContent=text;};
 function button(label,action){
@@ -31,7 +31,7 @@ function showTab(tab){
 }
 function directoryItem(label,contact){
  return button(label,()=>{
-  state.group=null;
+  state.group=null;state.groupWritable=true;
   state.peer={accountId:contact.accountId,displayName:contact.displayName,
    system:contact.system===true};
   $('chat-title').textContent=contact.displayName;
@@ -160,8 +160,13 @@ async function openGroup(group){
   showTab('mail');$('mail-form').hidden=true;$('mail-detail').hidden=true;
   $('mail-group-panel').hidden=false;$('mail-group-title').textContent=group.title;
  }
- const {members}=await request('/api/suite/communications/group/members',{groupId:group.id});
+ const {members,canSend}=await request('/api/suite/communications/group/members',{groupId:group.id});
  if(state.group?.id!==group.id)return;
+ state.groupWritable=canSend===true;
+ if(group.kind==='chat'){
+  $('send-chat').disabled=!state.groupWritable;
+  if(!state.groupWritable)status('This owner announcement chat is read-only. Send an internal mail to reply.');
+ }
  mentionControls(group.kind==='chat'?'chat-mentions':'mail-group-mentions',
   group.kind==='chat'?'chat-body':'mail-group-body',members);
  await refreshGroupHistory();
@@ -214,7 +219,8 @@ async function refreshChat(){
 }
 async function sendChat(event){
  event.preventDefault();
- if(state.busy||(!state.peer&&!state.group)||state.peer?.system)return;
+ if(state.busy||(!state.peer&&!state.group)||state.peer?.system||
+  (state.group?.kind==='chat'&&!state.groupWritable))return;
  const body=$('chat-body').value.trim();
  if(!body)return;
  state.busy=true;
