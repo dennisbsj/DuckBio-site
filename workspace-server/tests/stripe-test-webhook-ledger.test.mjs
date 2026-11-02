@@ -80,7 +80,8 @@ test('late association links signed test Checkout events only to their exact loc
  const db=new DatabaseSync(dbPath);
  try{
   const saved=db.prepare('SELECT org,draft FROM stripe_test_webhook_events WHERE id=?').get(early.id);
-  assert.deepEqual(saved,{org:'one',draft:a.id});
+  assert.equal(saved.org,'one');
+  assert.equal(saved.draft,a.id);
   assert.equal(db.prepare('SELECT count(*) AS n FROM stripe_test_webhook_events').get().n,1,'no duplicate events');
  }finally{db.close();}
  assert(store.overview('one','admin1').apps.every(x=>x.purchased===0));
