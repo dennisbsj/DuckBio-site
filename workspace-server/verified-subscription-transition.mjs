@@ -32,6 +32,8 @@ export function planVerifiedSubscriptionTransition({
      (value.plan==='Single'&&value.apps.length!==1)||
      (value.plan==='Mixed'&&(value.apps.length<2||value.apps.length>5))||
      (value.plan==='Bundle'&&value.apps.length!==inventory.size)||
+     (value.paidThrough!==null&&value.paidThrough!==undefined&&
+       (!Number.isSafeInteger(value.paidThrough)||value.paidThrough<1))||
      (value.status==='active'&&
        (!Number.isSafeInteger(value.paidThrough)||value.paidThrough<1||
          (requireFuturePayment&&value.paidThrough<=Math.floor(now/1000)))))
