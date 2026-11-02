@@ -58,6 +58,10 @@ test('private first-admin setup establishes local account, preserves scope and d
   assert.equal(owner.isAdmin, true);
   const account = await (await admin.call('/api/suite/account')).json();
   assert.equal(account.user.id, owner.id);
+  assert.deepEqual(Object.fromEntries(account.apps.map(app=>[app.id,app.name])),{
+    goflo:'CytoDuck',eel:'DuckNote',methpipe:'DuckPipe',mantrain:'DuckTrain',
+    duckman:'DuckMan',limsman:'LabDuck'
+  },'customer-facing app names must match DuckBio branding without changing IDs');
   assert.deepEqual(account.apps.filter(app => app.enabled).map(app => app.id).sort(), ['goflo', 'mantrain', 'methpipe']);
   assert.equal((await admin.call('/api/suite/setup', details)).status, 403);
   assert.equal((await admin.call('/api/suite/admin/users', { userId: owner.id, state: 'disabled' }, 'PATCH')).status, 409);
