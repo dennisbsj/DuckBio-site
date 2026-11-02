@@ -335,7 +335,10 @@ test('reconciliation API checks only the selected admin\'s own ready test Checko
  const observations=[];
  const checker={async inspect(snapshot){
   observations.push(snapshot);
-  return {state:'paid_test_verified',invoiceId:'in_test_mock1234',licensesGranted:false};
+  return {state:'paid_test_verified',invoiceId:'in_test_mock1234',subscriptionId:'sub_test_mock1234',
+   sessionId:snapshot.checkout.sessionId,organizationId:snapshot.draft.organizationId,
+   draftId:snapshot.draft.id,price:snapshot.checkout.price,seats:snapshot.draft.seats,
+   licensesGranted:false};
  }};
  const f=await fixture(t,{stripeTestReconciler:checker});
  const admin=f.browser(),outsider=f.browser();await admin.preflight();await outsider.preflight();
@@ -358,9 +361,19 @@ test('reconciliation API checks only the selected admin\'s own ready test Checko
   session:{id:'cs_test_mock1234',url:'https://checkout.stripe.com/c/pay/mock'}});
  const result=await admin.call(route,input);
  assert.equal(result.status,200);
- assert.deepEqual(await result.json(),{reconciliation:{
-  state:'paid_test_verified',invoiceId:'in_test_mock1234',licensesGranted:false
- },mode:'test',licensesGranted:false});
+ const completed=await result.json();
+ assert.deepEqual(completed.reconciliation,{
+  state:'paid_test_verified',invoiceId:'in_test_mock1234',subscriptionId:'sub_test_mock1234',
+  sessionId:'cs_test_mock1234',organizationId:'org-a',draftId:d.id,price:'price_test12345',
+  seats:3,licensesGranted:false
+ });
+ assert.equal(completed.mode,'test');
+ assert.equal(completed.licensesGranted,false);
+ assert.equal(completed.observation.state,'paid_test_verified');
+ assert.equal(completed.observation.attempt,1);
+ assert.equal(completed.observation.licensesGranted,false);
+ assert(Number.isSafeInteger(completed.observation.checkedAt));
+ assert.equal(f.organizationStore.listSubscriptionDrafts('org-a',owner.id)[0].testReconciliation.state,'paid_test_verified');
  assert.equal(observations.length,1);
  assert.deepEqual(observations[0],{
   draft:{id:d.id,organizationId:'org-a',plan:'Single',apps:['eel'],seats:3},
@@ -386,5 +399,8 @@ test('reconciliation API fails closed on Stripe errors and on disabled integrati
  const result=await admin.call('/api/suite/organization/subscription/test-reconcile',body);
  assert.equal(result.status,503);
  assert.deepEqual(await result.json(),{error:'reconciliation_unavailable'});
+ const saved=f.organizationStore.listSubscriptionDrafts('org-a',owner.id)[0].testReconciliation;
+ assert.equal(saved.state,'unavailable');
+ assert.equal(saved.attempt,1);
  assert(f.organizationStore.overview('org-a',owner.id).apps.every(x=>x.purchased===0));
 });

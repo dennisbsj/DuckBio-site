@@ -90,9 +90,9 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     let status = error.status ?? 503; let code = error.code ?? 'unavailable';
     if (error instanceof OrganizationError) {
       status = ['access_denied','invalid_invitation'].includes(code) ? 403
-        : ['app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required','invitation_exists','member_exists','checkout_started','checkout_price_changed','checkout_conflict'].includes(code) ? 409
+        : ['app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required','invitation_exists','member_exists','checkout_started','checkout_price_changed','checkout_conflict','reconciliation_superseded'].includes(code) ? 409
         : 400;
-      if (!['access_denied','app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required','invitation_exists','member_exists','member_not_found','invalid_invitation','invalid_subscription','subscription_not_found','invalid_permission','invalid_roles','invalid_member','checkout_started','checkout_price_changed','checkout_conflict','invalid_checkout','checkout_not_found'].includes(code)) code = 'invalid_input';
+      if (!['access_denied','app_seats_exhausted','last_organization_admin','duplicate_organization_email','organization_locked','app_access_required','invitation_exists','member_exists','member_not_found','invalid_invitation','invalid_subscription','subscription_not_found','invalid_permission','invalid_roles','invalid_member','checkout_started','checkout_price_changed','checkout_conflict','invalid_checkout','checkout_not_found','reconciliation_superseded','invalid_reconciliation','reconciliation_limit'].includes(code)) code = 'invalid_input';
     }
     if (error instanceof IdentityStoreError) {
       if (code === 'invalid_setup_token') status = 403;
@@ -212,20 +212,22 @@ export function createAccountService({ origin, issuer = origin, clients, identit
           else if (route === '/api/suite/organization/subscription/test-reconcile') {
             requireSelection(body.organizationId);
             if(!stripeTestReconciler)throw new ServiceError(503,'reconciliation_unavailable');
-            const snapshot=organizationStore.testReconciliationSnapshot({
+            const started=organizationStore.beginTestReconciliation({
               organizationId:body.organizationId,actorId:user.id,draftId:body.draftId});
-            let result;
-            try{result=await stripeTestReconciler.inspect(snapshot);}
-            catch{throw new ServiceError(503,'reconciliation_unavailable');}
-            // The Stripe read is asynchronous: revalidate current login, organization
-            // membership and pinned Checkout before exposing any attestation result.
+            let result,failed=false;
+            try{result=await stripeTestReconciler.inspect(started.snapshot);}
+            catch{failed=true;result={state:'unavailable',licensesGranted:false};}
+            // Never commit the result of an asynchronous read unless the original
+            // session and the selected organization still belong to the same admin.
             const current=await authenticated(req);
-            if(current.user.id!==user.id||current.parent.id!==parent.id)throw new ServiceError(403,'access_denied');
+            if(current.user.id!==user.id||current.parent.id!==parent.id)
+              throw new ServiceError(403,'access_denied');
             requireSelection(body.organizationId);
-            const latest=organizationStore.testReconciliationSnapshot({
-              organizationId:body.organizationId,actorId:user.id,draftId:body.draftId});
-            if(JSON.stringify(latest)!==JSON.stringify(snapshot))throw new ServiceError(409,'checkout_conflict');
-            send(res,200,{reconciliation:result,mode:'test',licensesGranted:false});
+            const observed=organizationStore.finishTestReconciliation({
+              organizationId:body.organizationId,actorId:user.id,draftId:body.draftId,
+              attempt:started.attempt,result});
+            if(failed)throw new ServiceError(503,'reconciliation_unavailable');
+            send(res,200,{reconciliation:result,observation:observed,mode:'test',licensesGranted:false});
           }
           else if (route === '/api/suite/organization/subscription/cancel') {
             requireSelection(body.organizationId);
