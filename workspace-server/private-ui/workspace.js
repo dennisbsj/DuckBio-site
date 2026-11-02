@@ -306,7 +306,7 @@ async function refreshSubscriptions(){
   const plan=result.testEntitlementPlan;
   if(plan?.testOnly===true&&plan.licensesGranted===false&&
      plan.realSeatChanges===false&&Array.isArray(plan.apps)){
-   const evaluated=plan.apps.filter(a=>a.subscriptionCount>0);
+   const evaluated=plan.apps.filter(a=>a.subscriptionCount>0||a.unboundCheckouts>0);
    if(evaluated.length){
     const preview=el('div',undefined,'test-entitlement-preview');
     preview.append(el('strong','Subscription-based TEST entitlement preview (no real seat changes):'));
