@@ -97,6 +97,83 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         return {id:organizationId,name:name.trim()};
       });
     },
+    // INTERNAL owner snapshot. Caller must enforce authenticated central owner ID.
+    // Never expose this method to organization-scoped administrator routes.
+    ownerSnapshot(){
+      const counts=db.prepare(`SELECT
+        (SELECT count(*) FROM organizations) AS organizations,
+        (SELECT count(DISTINCT account) FROM members) AS memberAccounts,
+        (SELECT count(*) FROM members WHERE active=1) AS activeMemberships,
+        (SELECT count(*) FROM organization_invites WHERE expires_at>?) AS pendingInvitations,
+        (SELECT count(*) FROM verified_subscription_allocations WHERE state='active') AS activeVerifiedSubscriptions,
+        (SELECT count(*) FROM subscription_drafts WHERE status='draft') AS unpaidDrafts`).get(clock());
+      const organizations=db.prepare(`SELECT o.id,o.name,
+        (SELECT count(*) FROM members m WHERE m.org=o.id) AS memberships,
+        (SELECT count(*) FROM members m WHERE m.org=o.id AND m.active=1) AS activeMembers,
+        (SELECT count(*) FROM members m WHERE m.org=o.id AND m.admin=1 AND m.active=1) AS admins,
+        (SELECT count(*) FROM organization_invites i WHERE i.org=o.id AND i.expires_at>?) AS pendingInvitations,
+        (SELECT count(*) FROM verified_subscription_allocations s WHERE s.org=o.id AND s.state='active') AS verifiedSubscriptions,
+        (SELECT count(*) FROM subscription_drafts d WHERE d.org=o.id AND d.status='draft') AS unpaidDrafts
+        FROM organizations o ORDER BY o.name,o.id LIMIT 201`).all(clock());
+      const membershipRows=db.prepare(`SELECT o.id AS organizationId,o.name AS organizationName,
+        m.account AS accountId,m.name,m.email,m.admin,m.active,
+        (SELECT count(*) FROM assignments a WHERE a.org=m.org AND a.account=m.account) AS appRoles
+        FROM members m JOIN organizations o ON o.id=m.org
+        ORDER BY o.name,m.name,m.account LIMIT 301`).all();
+      const subscriptionRows=db.prepare(`SELECT s.org AS organizationId,o.name AS organizationName,
+        s.subscription_id,s.plan,s.apps,s.seats,s.state,s.revision,s.paid_through
+        FROM verified_subscription_allocations s JOIN organizations o ON o.id=s.org
+        ORDER BY o.name,s.subscription_id LIMIT 201`).all();
+      const testDrafts=db.prepare(`SELECT d.org AS organizationId,d.plan,d.apps,d.seats,d.status,d.created_at
+        FROM subscription_drafts d ORDER BY d.created_at DESC,d.id DESC LIMIT 101`).all();
+      const capacity=db.prepare(`SELECT app,sum(purchased) AS purchased,
+        (SELECT count(*) FROM assignments a WHERE a.app=seats.app) AS assigned
+        FROM seats GROUP BY app`).all();
+      const auditRows=db.prepare(`SELECT a.id,a.org,o.name AS organizationName,a.actor,a.action,a.subject,a.details,a.recorded_at
+        FROM organization_audit a JOIN organizations o ON o.id=a.org
+        ORDER BY a.id DESC LIMIT 101`).all();
+      return {
+        totals:{...counts},
+        organizations:organizations.slice(0,200).map(x=>({...x})),
+        memberships:membershipRows.slice(0,300).map(x=>({...x,admin:Boolean(x.admin),active:Boolean(x.active)})),
+        subscriptions:subscriptionRows.slice(0,200).map(x=>({
+          organizationId:x.organizationId,organizationName:x.organizationName,
+          plan:x.plan,apps:JSON.parse(x.apps),seats:x.seats,
+          state:x.state,revision:x.revision,paidThrough:x.paid_through,
+          // IDs are intentionally omitted from the browser snapshot.
+          source:'verified_private_ledger'
+        })),
+        testDrafts:testDrafts.slice(0,100).map(x=>({
+          organizationId:x.organizationId,plan:x.plan,apps:JSON.parse(x.apps),
+          seats:x.seats,state:x.status,createdAt:x.created_at,
+          source:'unpaid_test_draft'
+        })),
+        capacity:capacity.map(x=>({appId:x.app,purchased:x.purchased,assigned:x.assigned})),
+        activity:auditRows.slice(0,100).map(x=>{
+          const summary=JSON.parse(x.details);
+          return {
+            id:x.id,organizationId:x.org,organizationName:x.organizationName,
+            actorId:x.actor,action:x.action,subject:x.subject,at:x.recorded_at,
+            mode:x.action.startsWith('checkout.test.')?'test':'workspace',
+            // Do not return raw event details: they may contain emails, provider IDs
+            // or values which do not belong in the owner-facing activity timeline.
+            ...(x.action==='subscription.entitlement.transition'?{
+              revision:Number.isSafeInteger(summary.revision)?summary.revision:null,
+              deltas:Array.isArray(summary.deltas)?summary.deltas.filter(y=>byId.has(y.appId)&&
+                Number.isSafeInteger(y.delta)).map(y=>({appId:y.appId,delta:y.delta})):[],
+              state:summary.state==='canceled'?'canceled':'active'
+            }:{})
+          };
+        }),
+        truncated:{
+          organizations:organizations.length>200,memberships:membershipRows.length>300,
+          subscriptions:subscriptionRows.length>200,
+          testDrafts:testDrafts.length>100,activity:auditRows.length>100
+        },
+        snapshotAt:clock(),
+        financials:{available:false,reason:'Live Stripe revenue and refunds are not reconciled'}
+      };
+    },
     auditLog(organizationId,actorId){
       requireAdmin(organizationId,actorId);
       return db.prepare('SELECT id,actor,action,subject,details,recorded_at FROM organization_audit WHERE org=? ORDER BY id DESC LIMIT 50').all(organizationId)

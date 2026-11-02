@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="referrer" content="no-referrer">
+  <title>DuckBio owner control panel</title>
+  <link rel="stylesheet" href="/workspace.css">
+  <script src="/owner.js" type="module"></script>
+</head>
+<body>
+<header class="top"><div class="brand"><span class="duck">◆</span><b>DuckBio</b><span>Owner control panel</span></div><a href="/workspace">Workspace</a></header>
+<main>
+  <section class="hero">
+    <span class="eyebrow">PRIVATE · CENTRAL OWNER ONLY</span>
+    <h1>DuckBio operations</h1>
+    <p>Organizations, identities, verified subscription allocations and recent administration activity.</p>
+    <p>This view is read-only. TEST drafts are not paying subscriptions. Live revenue data is not yet connected.</p>
+    <div class="actions"><button type="button" id="refresh">Refresh snapshot</button></div>
+    <p id="owner-status" role="status" aria-live="polite">Verifying central owner session…</p>
+  </section>
+  <div id="owner-content" hidden>
+    <section class="panel">
+      <h2>Overview</h2>
+      <div id="owner-stats" class="seats"></div>
+      <p id="owner-snapshot-time"></p>
+    </section>
+    <section class="panel">
+      <h2>Organizations</h2>
+      <div class="table-scroll"><table><thead><tr><th>Organization</th><th>Members</th><th>Admins</th><th>Pending invitations</th><th>Verified subscriptions</th><th>Unpaid drafts</th></tr></thead><tbody id="owner-organizations"></tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>Users</h2>
+      <p>Central DuckBio identities and their memberships are separate. A user can belong to multiple organizations.</p>
+      <label>Filter accounts<input type="search" id="owner-filter" placeholder="Name, email or organization"></label>
+      <div class="table-scroll"><table><thead><tr><th>Identity / member</th><th>Organization</th><th>Role</th><th>State</th><th>App assignments</th></tr></thead><tbody id="owner-users"></tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>Verified subscription ledger</h2>
+      <p>Only independently verified private allocations appear here. These figures are not payment receipts or calculated revenue.</p>
+      <div class="table-scroll"><table><thead><tr><th>Organization</th><th>Plan / apps</th><th>Seats per app</th><th>State</th><th>Revision</th><th>Paid through</th></tr></thead><tbody id="owner-subscriptions"></tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>Per-app license capacity</h2>
+      <div id="owner-capacity" class="seats"></div>
+    </section>
+    <section class="panel">
+      <h2>Unpaid subscription drafts</h2>
+      <p>TEST draft and Checkout records are not confirmed customers or purchased seats.</p>
+      <div class="table-scroll"><table><thead><tr><th>Organization</th><th>Plan</th><th>Apps</th><th>Seats per app</th><th>State</th></tr></thead><tbody id="owner-drafts"></tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>Recent activity</h2>
+      <p>Includes organization membership, invitation, permissions and verified subscription transitions. Stripe TEST observations are marked as TEST.</p>
+      <div class="table-scroll"><table><thead><tr><th>When</th><th>Organization</th><th>Actor</th><th>Action</th><th>Subject</th><th>Change</th></tr></thead><tbody id="owner-activity"></tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>Billing and notifications</h2>
+      <p id="owner-financial">Stripe revenue, refunds and disputes are not yet reconciled; MRR is unavailable.</p>
+      <p id="owner-notifications">Automatic email notifications are not yet configured. Important changes are recorded in the private audit log.</p>
+    </section>
+    <p id="owner-truncation"></p>
+  </div>
+</main>
+</body></html>

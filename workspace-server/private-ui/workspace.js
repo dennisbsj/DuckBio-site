@@ -149,7 +149,10 @@ async function chooseOrganization(orgId){
 }
 async function load(){
  await csrf();
+ $('owner-control-link').hidden=true;
  try{
+  const accountInfo=await request('/api/suite/account');
+  $('owner-control-link').hidden=accountInfo.ownerPanel!==true;
   const data=await request('/api/suite/organizations');
   state.orgs=data.organizations||[];
   $('logout').hidden=false;
@@ -190,7 +193,7 @@ $('login-form').addEventListener('submit',async event=>{
   await load();
  }catch(e){status(e.message);}finally{state.busy=false;}
 });
-$('logout').addEventListener('click',async()=>{try{await request('/api/suite/account/logout',{});state.overview=null;state.selected=null;showPortal(false);status('Signed out. Sign in again to choose an organization.');}catch(e){status(e.message);}});
+$('logout').addEventListener('click',async()=>{try{await request('/api/suite/account/logout',{});state.overview=null;state.selected=null;$('owner-control-link').hidden=true;showPortal(false);status('Signed out. Sign in again to choose an organization.');}catch(e){status(e.message);}});
 // Organization switching is intentionally not available during an authenticated session.
 $('create').addEventListener('click',()=>edit(null));
 $('cancel-edit').addEventListener('click',()=>{$('edit-panel').hidden=true;});
