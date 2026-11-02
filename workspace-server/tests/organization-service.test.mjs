@@ -10,13 +10,15 @@ import { createSqliteAuthStores } from '../shared-auth/sqlite-store.mjs';
 import { createAccountService } from '../shared-auth/account-service.mjs';
 import { createOrganizationStore } from '../organization-store.mjs';
 
-async function fixture(t, { allNative = false, beforeRoster, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null } = {}) {
+async function fixture(t, { allNative = false, beforeRoster, invitationMailer = null, stripeTestCheckout = null, stripeTestReconciler = null, prebootstrapOwner = false } = {}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'suite-service-'));
   const identityStore = createIdentityStore({ databasePath: path.join(directory, 'identity.sqlite') });
   const stores = createSqliteAuthStores({ databasePath: path.join(directory, 'auth.sqlite') });
   const organizationStore = createOrganizationStore({ databasePath: path.join(directory, 'private', 'org.sqlite') });
   const setupToken = randomBytes(32).toString('base64url');
   identityStore.configureBootstrapToken(setupToken);
+  const ownerAccount=prebootstrapOwner?await identityStore.bootstrap(setupToken,{
+    email:'owner@example.test',displayName:'DuckBio Owner',password:'Owner password 12345'}):null;
   writeFileSync(path.join(directory, 'index.html'), '<html><head></head><body>local accounts</body></html>');
   const clients = ['goflo', 'eel', 'methpipe', 'mantrain', 'duckman', 'limsman'].map(id => ({ id, appId: id, secret: randomBytes(32).toString('base64url'), redirectUris: [`https://${id}.celluloidconsulting.net/auth/callback`], nativeOrigin: (allNative || ['eel', 'duckman', 'limsman'].includes(id)) ? `https://${id}.celluloidconsulting.net` : undefined }));
   let service;
@@ -24,7 +26,7 @@ async function fixture(t, { allNative = false, beforeRoster, invitationMailer = 
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const nativeCalls = [];
-  service = createAccountService({ invitationMailer, stripeTestCheckout, stripeTestReconciler, origin, issuer: 'https://login.celluloidconsulting.net', clients, identityStore, organizationStore, authStore: stores.brokerStore, assetRoot: directory, buildVersion: 'test-local-service', getClientAddress: req => req.socket.remoteAddress,
+  service = createAccountService({ invitationMailer, stripeTestCheckout, stripeTestReconciler,ownerAccountId:ownerAccount?.id??null, origin, issuer: 'https://login.celluloidconsulting.net', clients, identityStore, organizationStore, authStore: stores.brokerStore, assetRoot: directory, buildVersion: 'test-local-service', getClientAddress: req => req.socket.remoteAddress,
     fetchImpl: async (url, options) => {
       nativeCalls.push({ url, options });
       const appId = clients.find(client => client.nativeOrigin && url === `${client.nativeOrigin}/api/suite/native-users`)?.appId;
@@ -46,7 +48,7 @@ async function fixture(t, { allNative = false, beforeRoster, invitationMailer = 
     }
     return { call, async preflight() { const response = await call('/api/suite/auth/session'); const data = await response.json(); csrf = data.csrfToken; return data; } };
   }
-  return { identityStore, organizationStore, origin, setupToken, nativeCalls, browser };
+  return { identityStore, organizationStore, origin, setupToken, ownerAccount, nativeCalls, browser };
 }
 
 
@@ -435,4 +437,64 @@ test('reconciliation API fails closed on Stripe errors and on disabled integrati
  assert.equal(saved.state,'unavailable');
  assert.equal(saved.attempt,1);
  assert(f.organizationStore.overview('org-a',owner.id).apps.every(x=>x.purchased===0));
+});
+
+test('owner API is disabled without explicitly pinned central owner account',async t=>{
+ const f=await fixture(t),client=f.browser();
+ await client.preflight();
+ const bootstrap=await client.call('/api/suite/setup',{
+  setupToken:f.setupToken,email:'primary@example.test',
+  displayName:'Primary',password:'Owner password 12345'});
+ assert.equal(bootstrap.status,201);
+ assert.equal((await client.call('/api/suite/owner/overview')).status,403);
+ const account=(await (await client.call('/api/suite/account')).json());
+ assert.equal(account.ownerPanel,false);
+});
+test('private owner dashboard aggregates all organization changes but excludes other users',async t=>{
+ const f=await fixture(t,{prebootstrapOwner:true}),owner=f.browser(),member=f.browser();
+ assert.equal((await member.call('/api/suite/owner/overview')).status,401);
+ await owner.preflight();
+ assert.equal((await owner.call('/api/suite/account/login',{
+  email:'owner@example.test',password:'Owner password 12345'})).status,200);
+ assert.equal((await (await owner.call('/api/suite/account')).json()).ownerPanel,true);
+ const worker=await f.identityStore.createUser({
+  email:'worker@example.test',displayName:'Worker',password:'Worker password 12345'});
+ f.organizationStore.setupOrganization({organizationId:'one',name:'Lab One',owner:{
+  accountId:f.ownerAccount.id,name:'DuckBio Owner',nickname:'Owner',email:'owner@example.test'}});
+ f.organizationStore.setupOrganization({organizationId:'two',name:'Lab Two',owner:{
+  accountId:worker.id,name:'Worker',nickname:'W',email:'worker@example.test'}});
+ f.organizationStore.applyVerifiedSeatPurchase({reference:'synthetic-legacy-owner-report',
+  organizationId:'one',plan:'Single',apps:['eel'],seats:3});
+ f.organizationStore.saveMember({organizationId:'one',actorId:f.ownerAccount.id,member:{
+  accountId:worker.id,name:'Worker',nickname:'W',email:'worker@example.test',
+  admin:false,roles:{eel:'scientist'}}});
+ const draft=f.organizationStore.createSubscriptionDraft({organizationId:'one',
+  actorId:f.ownerAccount.id,plan:'Single',apps:['eel'],seats:2});
+ assert(draft.id);
+ const response=await owner.call('/api/suite/owner/overview');
+ assert.equal(response.status,200);
+ assert.equal(response.headers.get('cache-control'),'private, no-store');
+ const result=await response.json();
+ assert.equal(result.ownerOnly,true);
+ assert.equal(result.summary.totals.organizations,2);
+ assert.equal(result.summary.totals.memberAccounts,2);
+ assert.equal(result.summary.totals.activeMemberships,3);
+ assert.equal(result.summary.totals.unpaidDrafts,1);
+ assert.equal(result.summary.totals.activeVerifiedSubscriptions,0);
+ assert.equal(result.summary.financials.available,false);
+ assert.equal(result.summary.organizations.find(x=>x.id==='one').memberships,2);
+ assert.equal(result.summary.capacity.find(x=>x.appId==='eel').purchased,3);
+ assert.equal(result.summary.capacity.find(x=>x.appId==='eel').assigned,1);
+ assert.equal(result.summary.memberships.filter(x=>x.accountId===worker.id).length,2);
+ assert(result.identities.find(x=>x.id===worker.id));
+ assert(result.summary.activity.some(x=>x.action==='member.added'));
+ assert(result.summary.activity.every(x=>!Object.hasOwn(x,'details')));
+ assert(!JSON.stringify(result).includes('synthetic-legacy-owner-report'));
+ assert.equal(result.summary.testDrafts[0].source,'unpaid_test_draft');
+ await member.preflight();
+ assert.equal((await member.call('/api/suite/account/login',{
+  email:'worker@example.test',password:'Worker password 12345'})).status,200);
+ assert.equal((await member.call('/api/suite/owner/overview')).status,403);
+ assert.equal((await (await member.call('/api/suite/account')).json()).ownerPanel,false);
+ assert.equal((await member.call('/api/suite/owner/overview',{anything:'x'})).status,405);
 });
