@@ -136,3 +136,26 @@ test('lifecycle state must match payment attestation and include only known fiel
  assert.equal(f.finish(attempt,{...f.paid,lifecycle:base}).state,'paid_test_verified');
  assert.equal(f.store.listSubscriptionDrafts('one','admin1')[0].testReconciliation.lifecycle.subscriptionStatus,'active');
 });
+
+test('test billing history is bounded, ordered, restart-safe and never crosses tenants',t=>{
+ const f=fixture(t);
+ assert.throws(()=>f.store.testReconciliationHistory({...f.params,actorId:'admin2'}),/access_denied/);
+ assert.throws(()=>f.store.testReconciliationHistory({...f.params,organizationId:'two',actorId:'admin2'}),/checkout_not_found/);
+ assert.deepEqual(f.store.testReconciliationHistory(f.params),[]);
+ for(let n=0;n<13;n++){
+  const started=f.start();
+  const result=n%2?{state:'pending',reason:'invoice_not_paid',licensesGranted:false}:
+    {state:'unavailable',licensesGranted:false};
+  f.finish(started,result);
+ }
+ let history=f.store.testReconciliationHistory(f.params);
+ assert.equal(history.length,10);
+ assert.equal(history[0].attempt,13);
+ assert.equal(history[9].attempt,4);
+ assert(history.every(x=>x.licensesGranted===false&&!('invoiceId' in x)&&!('sessionId' in x)));
+ f.reopen();
+ history=f.store.testReconciliationHistory(f.params);
+ assert.equal(history.length,10);
+ assert.equal(history[0].attempt,13);
+ assert.equal(f.store.overview('one','admin1').apps.find(x=>x.id==='eel').purchased,0);
+});
