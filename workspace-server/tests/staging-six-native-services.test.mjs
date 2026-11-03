@@ -17,7 +17,7 @@ const hash=s=>createHash('sha256').update(s).digest('hex');
 const git=(dir,...args)=>execFileSync('git',args,{
  cwd:dir,encoding:'utf8',stdio:['ignore','pipe','ignore'],timeout:12000
 }).trim();
-function setup(t){
+function setup(t,{legacyDuckNote=false}={}){
  const home=mkdtempSync(join(tmpdir(),'duckbio-native-unit-test-'));
  chmodSync(home,0o700);
  t.after(()=>rmSync(home,{recursive:true,force:true}));
@@ -34,10 +34,10 @@ function setup(t){
   if(kind){
    const entry=join(root,kind.entrypoint);
    mkdirSync(dirname(entry),{mode:0o700,recursive:true});
-   writeFileSync(entry,name==='DuckNote'?
+   writeFileSync(entry,name==='DuckNote'&&!legacyDuckNote?
     '// Inert fixture: verifyDuckNoteRuntimeDir(appRoot,process.env.DUCKNOTE_RUNTIME_DIR)\n':
     '// Synthetic staging entrypoint fixture; never executed\n');
-   if(name==='DuckNote')
+   if(name==='DuckNote'&&!legacyDuckNote)
     writeFileSync(join(root,'server','runtime-directory.js'),
      '// Synthetic DUCKNOTE_RUNTIME_DIR fixture; never imported\n');
    const workflow=join(root,kind.workflow);
@@ -128,6 +128,14 @@ test('six real local Git fixtures produce distinct native service units matched 
  assert.equal(plan.manifest.services.find(s=>s.appId==='eel').storageKind,'postgresql');
  assert.equal(plan.manifest.services.find(s=>s.appId==='limsman').storageKind,
   'sqlite-config-and-sessions');
+});
+
+test('legacy committed DuckNote source cannot pass the private-runtime systemd plan',
+ {timeout:60000},t=>{
+ const f=setup(t,{legacyDuckNote:true});
+ assert.equal(validateQaLock(f.lock).ok,true);
+ assert.throws(()=>build(f),/ducknote_private_runtime_source_not_verified/);
+ assert.deepEqual(readdirSync(f.output),[]);
 });
 
 test('never materializes app secrets, customer info, credentials, databases or environment files',
