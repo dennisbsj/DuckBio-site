@@ -253,15 +253,18 @@ requests, checkout, installation, service start, database write, customer
 data or native app modification is performed. Failures print only fixed
 codes and app IDs, never source paths or configuration secrets.
 
-**Expected current blocker:** The existing QA lock's central Workspace
-commit is `5e0924e9844d36de75ca8e10c08048b3db373359`, while newer
-central commits include staging preparation helpers not covered by all
-six apps' pinned browser CI. A staging source set using those later
-central revisions therefore **must fail** this gate until a new central
-candidate has been independently re-tested with every native app and
-a replacement immutable QA lock is reviewed. Do not work around the
-gate by changing the configured SHA or falsely marking earlier CI as
-evidence for a newer build.
+**Current six-app-tested source candidate:** The immutable QA lock
+references Workspace commit `233ca6d376efa2fbddca042cea5106aae92679c0`,
+including the offline seven-source gate. All six native integration
+workflows were re-run against this **exact** candidate and their new
+immutable `main` source SHAs and green CI runs have been recorded in
+[SIX_APP_SOURCE_QA_BASELINE.md](SIX_APP_SOURCE_QA_BASELINE.md).
+A local staging source set using a **different** central commit or newer
+native changes **must fail** until those exact source combinations have
+new successful integration CI evidence and a newly reviewed QA lock.
+Never bypass the gate by changing the configured SHA or claiming historical
+CI certifies untested newer source. The source gate remains offline-only:
+it does **not** authorize a seven-service deployment.
 
 This is a conservative **source compatibility** gate only. Even a PASS
 does not demonstrate a running seven-origin environment, correct native
