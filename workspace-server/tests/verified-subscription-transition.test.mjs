@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {planVerifiedSubscriptionTransition as plan} from '../verified-subscription-transition.mjs';
 const now=1800000000000;
-const inventory=()=>['limsman','goflo','methpipe','eel','duckman','mantrain']
+const inventory=()=>['limsman','goflo','methpipe','eel','duckman','mantrain','dataduck']
  .map(appId=>({appId,purchased:0,assigned:0,reserved:0}));
 const next=(overrides={})=>({plan:'Single',apps:['eel'],seats:3,
  status:'active',paidThrough:1900000000,revision:1,...overrides});
