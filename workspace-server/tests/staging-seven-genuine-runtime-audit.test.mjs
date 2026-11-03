@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,mkdtempSync,chmodSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {createSyntheticStagingConfig}
@@ -11,12 +13,15 @@ import {auditSevenGenuineStaging,
 
 const lock=JSON.parse(readFileSync(new URL(
  '../six-native-current-compat-lock.json',import.meta.url),'utf8'));
+const privateFixture=mkdtempSync(join(tmpdir(),'duckbio-seven-genuine-fixture-'));
+chmodSync(privateFixture,0o700);
+process.once('exit',()=>rmSync(privateFixture,{recursive:true,force:true}));
 const sourceRoot='/srv/duckbio-private/seven-reviewed-sources';
 const names=['workspace','goflo','eel','methpipe','mantrain','duckman','limsman'];
 const repos=['DuckBio-site','CytoDuck','DuckNote','DuckPipe',
  'DuckTrain','DuckMan','LabDuck'];
 const config=()=>createSyntheticStagingConfig({
- baseDomain:'duckbio.net',privateRoot:'/srv/duckbio-private/staging',
+ baseDomain:'duckbio.net',privateRoot:privateFixture,
  buildSha:lock.central.sha
 });
 const clone=x=>structuredClone(x);
