@@ -6,13 +6,17 @@ const validCount=value=>Number.isSafeInteger(value)&&value>=0;
 const validRevision=value=>Number.isSafeInteger(value)&&value>0;
 const plans=new Set(['Single','Mixed','Bundle']);
 const states=new Set(['active','canceled']);
+// Historic six-app Bundle subscriptions must remain readable and renewable.
+// They are NOT valid for creating new Bundle subscriptions after DataDuck joins.
+const legacySix=new Set(['limsman','goflo','methpipe','eel','duckman','mantrain']);
+const isLegacyBundle=apps=>Array.isArray(apps)&&apps.length===legacySix.size&&apps.every(id=>legacySix.has(id));
 
 export function planVerifiedSubscriptionTransition({
   organizationId,subscriptionId,knownApps,existing=null,next,now=Date.now()
 }={}){
  if(!validId(organizationId)||!validId(subscriptionId)||
     !Number.isSafeInteger(now)||now<0||
-    !Array.isArray(knownApps)||knownApps.length!==6||
+    !Array.isArray(knownApps)||knownApps.length!==7||
     !next||typeof next!=='object'||Array.isArray(next))
   throw Error('invalid_subscription_transition');
  const inventory=new Map();
@@ -22,7 +26,8 @@ export function planVerifiedSubscriptionTransition({
    throw Error('invalid_subscription_transition');
   inventory.set(item.appId,item);
  }
- const parse=(value,requireFuturePayment)=>{
+ const legacyExisting=existing!==null&&existing?.plan==='Bundle'&&isLegacyBundle(existing.apps);
+ const parse=(value,requireFuturePayment,allowLegacyBundle=false)=>{
   if(!value||typeof value!=='object'||Array.isArray(value)||
      !plans.has(value.plan)||!states.has(value.status)||
      !Array.isArray(value.apps)||!validRevision(value.revision)||
@@ -30,8 +35,10 @@ export function planVerifiedSubscriptionTransition({
      new Set(value.apps).size!==value.apps.length||
      value.apps.some(id=>!inventory.has(id))||
      (value.plan==='Single'&&value.apps.length!==1)||
-     (value.plan==='Mixed'&&(value.apps.length<2||value.apps.length>5))||
-     (value.plan==='Bundle'&&value.apps.length!==inventory.size)||
+     (value.plan==='Mixed'&&(value.apps.length<2||value.apps.length>inventory.size-1))||
+     (value.plan==='Bundle'&&!(value.apps.length===inventory.size&&
+       value.apps.every(id=>inventory.has(id)) ||
+       allowLegacyBundle&&isLegacyBundle(value.apps)))||
      (value.paidThrough!==null&&value.paidThrough!==undefined&&
        (!Number.isSafeInteger(value.paidThrough)||value.paidThrough<1))||
      (value.status==='active'&&
@@ -41,8 +48,8 @@ export function planVerifiedSubscriptionTransition({
   return {plan:value.plan,apps:[...value.apps].sort(),seats:value.seats,
    revision:value.revision,status:value.status,paidThrough:value.paidThrough??null};
  };
- const target=parse(next,true);
- const old=existing===null?null:parse(existing,false);
+ const target=parse(next,true,legacyExisting);
+ const old=existing===null?null:parse(existing,false,true);
  if(old&&(existing.organizationId!==organizationId||
           existing.subscriptionId!==subscriptionId||
           target.revision<=old.revision))
