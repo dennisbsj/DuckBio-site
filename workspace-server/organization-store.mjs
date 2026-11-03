@@ -346,13 +346,18 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     // Only call from a separate VERIFIED billing adapter. No browser purchase endpoint exists.
     applyVerifiedSeatPurchase({reference,organizationId,plan,apps,seats}){
       if(!safeId(reference)||!safeId(organizationId)||!['Single','Mixed','Bundle'].includes(plan)||!Array.isArray(apps)||!Number.isSafeInteger(seats)||seats<1||seats>10000||new Set(apps).size!==apps.length||apps.some(x=>!byId.has(x)))fail('invalid_purchase');
-      if((plan==='Single'&&apps.length!==1)||(plan==='Mixed'&&(apps.length<2||apps.length>APPLICATIONS.length-1))||(plan==='Bundle'&&apps.length!==APPLICATIONS.length))fail('invalid_purchase');
+      const legacySixBundle=plan==='Bundle'&&apps.length===6&&
+        ['limsman','goflo','methpipe','eel','duckman','mantrain'].every(id=>apps.includes(id));
+      if((plan==='Single'&&apps.length!==1)||(plan==='Mixed'&&(apps.length<2||apps.length>APPLICATIONS.length-1))||(plan==='Bundle'&&apps.length!==APPLICATIONS.length&&!legacySixBundle))fail('invalid_purchase');
       const selection=[...apps].sort();
       const digest=createHash('sha256').update(JSON.stringify([organizationId,plan,selection,seats])).digest('hex');
       return tx(()=>{
         if(!db.prepare('SELECT 1 FROM organizations WHERE id=?').get(organizationId))fail('organization_not_found');
         const old=db.prepare('SELECT digest FROM receipts WHERE reference=?').get(reference);
         if(old){if(old.digest!==digest)fail('purchase_reference_conflict');return {applied:false};}
+        // Preserve idempotent historical six-app receipts, but never sell a
+        // NEW six-app Bundle under the seven-app catalog.
+        if(legacySixBundle)fail('invalid_purchase');
         db.prepare('INSERT INTO receipts VALUES(?,?,?,?)').run(reference,organizationId,digest,clock());
         for(const app of selection)db.prepare('UPDATE seats SET purchased=purchased+? WHERE org=? AND app=?').run(seats,organizationId,app);
         return {applied:true,apps:selection,seats};
