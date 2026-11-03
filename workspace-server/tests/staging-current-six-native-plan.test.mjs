@@ -158,6 +158,15 @@ test('historical and current six-app source snapshots both remain individually s
  const bad=structuredClone(current);
  bad.apps.push({...bad.apps[0],id:'dataduck'});
  assert.equal(validateSixNativeStagingSnapshot(bad).ok,false);
+ const unreviewed=structuredClone(current);
+ unreviewed.apps[0].sha='f'.repeat(40);
+ assert.equal(validateSixNativeStagingSnapshot(unreviewed).ok,false);
+ const fabricated=structuredClone(current);
+ fabricated.apps[0].runId+=1;
+ assert.equal(validateSixNativeStagingSnapshot(fabricated).ok,false);
+ const wrongWorkflow=structuredClone(current);
+ wrongWorkflow.apps[1].workflowId+=1;
+ assert.equal(validateSixNativeStagingSnapshot(wrongWorkflow).ok,false);
 });
 test('current exact six-app source can build six native service units and seven host Caddy without running services',
  {timeout:120000},t=>{
