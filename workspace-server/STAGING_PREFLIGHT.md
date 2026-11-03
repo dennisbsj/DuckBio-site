@@ -278,3 +278,21 @@ does not demonstrate a running seven-origin environment, correct native
 service provisioning, private TLS, real authentication, live licensed seats,
 backups or production readiness. Any staging deployment still requires
 separately approved trusted hosting and the remaining release gates.
+
+## Validate the actual systemd and Caddy plan syntax before host installation
+
+The initial staging systemd template used to assume the Node executable was `/usr/bin/node`, which is not universally correct. The service-plan generator now uses the **actual Node interpreter** running the generator by default, permits an explicit `--node-binary /absolute/stable/path/to/node`, and refuses an absent, non-executable or unsupported Node release. Supported staging runtimes are Node.js 22.13 or later. The private plan manifest records the verified Node version, and `ExecStart` refers to that exact executable. The operator must recheck that the path survives restarts and Node upgrades on the target host.
+
+```bash
+cd workspace-server
+npm run staging:service-plan -- \
+  --config /srv/duckbio-private/staging/workspace-staging.json \
+  --service-user duckbio-staging \
+  --listen-port 3307 \
+  --node-binary "$(command -v node)" \
+  --confirm-plan-only
+```
+
+The [offline infrastructure CI workflow](../.github/workflows/workspace-staging-service-templates.yml) now builds completely disposable synthetic-only config, private UI and service-plan files, runs Ubuntu's `systemd-analyze verify` on the generated unit, and parses/validates the generated Caddyfile with Caddy 2.10.2 in a **network-disabled container**. A temporary CI-only service user is created so unit validation can resolve its identity. The Docker image itself is downloaded using normal GitHub-hosted CI infrastructure; the Caddy validation process cannot contact external DNS or TLS providers.
+
+These checks establish **template syntax and selected configuration invariants only**. They do not install the unit or proxy, check file permissions for the intended real staging user, prove that TLS certificate issuance works, ensure Node remains installed at the specified absolute path, exercise production internet traffic, or validate the seven native and central services simultaneously. The actual server requires independent operator review of the generated templates, staging isolation and safe backup/rollback before any activation.
