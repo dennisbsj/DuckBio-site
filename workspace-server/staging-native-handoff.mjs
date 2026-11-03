@@ -3,7 +3,7 @@
 // organization mappings, payment credentials, or a runnable service config.
 // Requires separately approved private owner-only staging directories.
 import {randomBytes} from 'node:crypto';
-import {closeSync,chmodSync,fsyncSync,linkSync,openSync,unlinkSync,writeFileSync} from 'node:fs';
+import {closeSync,chmodSync,fsyncSync,linkSync,openSync,readdirSync,unlinkSync,writeFileSync} from 'node:fs';
 import {dirname,join,resolve,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {approvedPrivateRoot} from './staging-generate-config.mjs';
@@ -43,6 +43,9 @@ export function writeScopedNativeRegistration({config,appId,outputRoot}={}){
     destinationRoot.startsWith(centralRoot+sep)||
     centralRoot.startsWith(destinationRoot+sep))
   throw Error('native_handoff_must_use_separate_private_root');
+ // One output directory = one single app registration. Never mix client keys.
+ if(readdirSync(destinationRoot).length!==0)
+  throw Error('native_handoff_destination_must_be_empty');
  const path=join(destinationRoot,OUTPUT_PREFIX+appId+'.json');
  const tmp=join(destinationRoot,ATOMIC_TMP_PREFIX+
   randomBytes(16).toString('hex')+'.tmp');
