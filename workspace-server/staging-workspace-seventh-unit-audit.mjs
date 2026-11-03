@@ -82,7 +82,7 @@ export function expectedSeventhWorkspaceUnit(config,{
   'Type=simple',
   'User=duckbio-staging',
   'Group=duckbio-staging',
-  'WorkingDirectory='+cwd,
+  'WorkingDirectory='+cwd+'/',
   'Environment=NODE_ENV=production',
   'Environment=SUITE_ENV_FILE='+configPath,
   'Environment=PORT=3307',
