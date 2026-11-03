@@ -14,13 +14,13 @@ const SOURCE_ROOT=fileURLToPath(new URL('./',import.meta.url));
 const REPO_ROOT=resolve(SOURCE_ROOT,'..');
 const UI_ROOT=join(SOURCE_ROOT,'private-ui');
 const ICON_ROOT=join(REPO_ROOT,'assets','app-icons');
-const UI_FILES=Object.freeze([
+export const UI_FILES=Object.freeze([
  'index.html','admin.html','workspace.html','workspace.css','workspace.js',
  'owner.html','owner.js',
  'communications.html','communications.css','communications.js',
  'communications-launchers.js','connect.html','connect.css','connect.js'
 ]);
-const ICON_FILES=Object.freeze({
+export const ICON_FILES=Object.freeze({
  goflo:'goflo-cropped.svg',eel:'eel.svg',methpipe:'methpipe.svg',
  mantrain:'mantrain.svg',duckman:'duckman-cropped.svg',limsman:'limsman.svg'
 });
