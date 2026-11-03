@@ -22,11 +22,21 @@ This is **not necessarily the latest Workspace `main`**; any later central chang
 | App | Immutable native commit | Coordinated central-version HTTPS evidence |
 | --- | --- | --- |
 | CytoDuck (`goflo`) | `dad05d5b9e8ac0cf3372c4526d9c4d941960742c` | [Chromium against real broker](https://github.com/dennisbsj/CytoDuck/actions/runs/41639968678), [build](https://github.com/dennisbsj/CytoDuck/actions/runs/41639968640) |
-| DuckNote (`eel`) | `73413e6378a0650c3525184a1311cf828be593ce` | [React + Node + PostgreSQL + real broker Chromium](https://github.com/dennisbsj/DuckNote/actions/runs/41640370147), [full CI](https://github.com/dennisbsj/DuckNote/actions/runs/41640370364) |
+| DuckNote (`eel`) | `ba691bef4f98e63083e5646c00efff1fc3f19a83` | [React + Node + PostgreSQL + real broker Chromium](https://github.com/dennisbsj/DuckNote/actions/runs/41646354024), [full CI](https://github.com/dennisbsj/DuckNote/actions/runs/41646354106) |
 | DuckPipe (`methpipe`) | `7061981b0b3b1fdab23fffe2eddb5f3730901cea` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckPipe/actions/runs/41639842792) |
 | DuckTrain (`mantrain`) | `fff8d5fdba9bfaf5b6f9ab658b7d8cd214290346` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckTrain/actions/runs/41639939459) |
 | DuckMan (`duckman`) | `a42f27148e9cbe51aec80e9f78bd905e6dfc9221` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckMan/actions/runs/41639884085), [full verify](https://github.com/dennisbsj/DuckMan/actions/runs/41639884187) |
 | LabDuck (`limsman`) | `3aff9ec7138000d4aa1120014d606db2585f45c6` | [Native + real broker Chromium](https://github.com/dennisbsj/LabDuck/actions/runs/41640060636) |
+
+**DuckNote staging listener security update:** This snapshot incorporates
+DuckNote PR #142: explicit `HOST=127.0.0.1` now binds its actual Express
+HTTP server to loopback behind the seven-origin Caddy proxy, and the
+DuckNote native staging preflight requires that exact host. The real
+native/React/PostgreSQL + Workspace Chromium integration was re-run with
+that binding and the revised DuckNote `main` commit; the other five
+app revisions and common Workspace source are unchanged. An omitted
+`HOST` deliberately retains historical behavior outside staging, so
+operators must not treat unspecified binding as safe for private staging.
 
 The CI workflows for the six app commits above checkout the **same fixed Workspace
 SHA**, rather than each using a different historical broker version. Each existing
