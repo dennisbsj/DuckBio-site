@@ -186,11 +186,8 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
       fail('invalid_org_native_link');
   }
   function nativeOrgLinkRow(userId,appId,workspaceOrganizationId) {
-    // The monotonically increasing AUTOINCREMENT audit ID is the generation
-    // of the currently active link. A revoke/rebind of the exact same native
-    // tuple (even within the same millisecond) must NOT reproduce that ID.
-    // One SQLite statement reads the tuple and its latest audit generation
-    // consistently. A missing/revoked generation is never an access candidate.
+    // An AUTOINCREMENT audit row is a stable link generation. It changes
+    // after revoke/rebind even when native IDs and timestamps are unchanged.
     return db.prepare(`SELECT l.*,
       (SELECT a.id FROM suite_identity_org_native_audit a
        WHERE a.user_id=l.user_id AND a.app_id=l.app_id
@@ -289,9 +286,17 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
       return {applied:true};
     });
   }
-  function hasNativeOrgLinks(){
-    return Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='suite_identity_org_native_links'").get())&&
-      Boolean(db.prepare('SELECT 1 FROM suite_identity_org_native_links LIMIT 1').get());
+  function hasNativeOrgHistory(){
+    // Both live mappings AND revocation/migration audit history must survive
+    // a full backup. After a last link is revoked, portable v1 is still
+    // incomplete and must never appear to be a recoverable full export.
+    const tableExists = name => Boolean(db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"
+    ).get(name));
+    return (tableExists('suite_identity_org_native_links') &&
+      Boolean(db.prepare('SELECT 1 FROM suite_identity_org_native_links LIMIT 1').get())) ||
+      (tableExists('suite_identity_org_native_audit') &&
+      Boolean(db.prepare('SELECT 1 FROM suite_identity_org_native_audit LIMIT 1').get()));
   }
   function parentSession(row) {
     return row ? { id: row.id, subject: row.user_id, displayName: row.display_name, expiresAt: row.expires_at, passwordChangeRequired: false } : null;
@@ -459,7 +464,7 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
       // create an incomplete backup. Operators must use an SQLite snapshot
       // and a future reviewed portable v2 export/migration instead.
       return transaction(() => {
-        if(hasNativeOrgLinks())fail('org_native_links_require_database_backup');
+        if(hasNativeOrgHistory())fail('org_native_links_require_database_backup');
         return {
         format: 'celluloid-local-identity', version: 1, exportedAt: clock(),
         users: db.prepare('SELECT * FROM suite_identity_users ORDER BY id').all().map(row => ({ ...publicUser(row), ...(includePasswordHashes && row.credential ? { credential: JSON.parse(row.credential) } : {}) })),
@@ -482,6 +487,9 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
         if (new Set(grants.map(grant => `${grant.appId}\0${grant.localUserId}`)).size !== grants.length) fail('invalid_import');
       } catch { fail('invalid_import'); }
       return transaction(() => {
+        // A v1 restore into an apparently empty account store can still
+        // overwrite/mix a previously verified tenant's retained audit trail.
+        if(hasNativeOrgHistory())fail('org_native_links_require_database_backup');
         if (db.prepare('SELECT COUNT(*) AS count FROM suite_identity_users').get().count > 0) fail('import_requires_empty_store');
         db.exec('DELETE FROM suite_identity_sessions; DELETE FROM suite_identity_invitations; DELETE FROM suite_identity_bootstrap;');
         for (const user of users) insertUser(user);
