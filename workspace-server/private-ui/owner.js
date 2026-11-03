@@ -19,7 +19,7 @@ function stat(label,value){
 const date=ms=>Number.isFinite(ms)&&ms>0?new Date(ms).toLocaleString('en-GB'):'—';
 const day=seconds=>Number.isFinite(seconds)&&seconds>0?new Date(seconds*1000).toLocaleDateString('en-GB'):'—';
 const appNames={limsman:'LabDuck',goflo:'CytoDuck',methpipe:'DuckPipe',
- eel:'DuckNote',duckman:'DuckMan',mantrain:'DuckTrain'};
+ eel:'DuckNote',duckman:'DuckMan',mantrain:'DuckTrain',dataduck:'DataDuck'};
 const apps=ids=>Array.isArray(ids)?ids.map(id=>appNames[id]||id).join(', '):'—';
 function renderUsers(){
  if(!latest)return;
