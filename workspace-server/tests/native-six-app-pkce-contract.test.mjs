@@ -185,7 +185,8 @@ test('six separate first-party native clients exchange only their own PKCE codes
  f.identity.grantAppAccess({userId:f.worker.id,appId:'duckman',
   localUserId:'native-duckman-worker',organizationId:'lab-b'});
  assert.equal((await f.native(duckman,'/api/suite/native/communications/unread',
-  {sessionToken:proofs.get('duckman')})).status,403);
+  {sessionToken:proofs.get('duckman')})).status,401,
+  'changing the registered native organization invalidates the old broker proof');
  assert.equal((await f.native(goflo,'/api/suite/native/communications/unread',
   {sessionToken:proofs.get('goflo')})).status,200);
  f.identity.revokeAppAccess(f.worker.id,'goflo');
