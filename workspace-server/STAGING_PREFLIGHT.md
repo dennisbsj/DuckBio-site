@@ -63,3 +63,33 @@ It checks:
 3. DuckNote's public `/health` reports `ok: true` and `database: true`; LabDuck's `/api.php?action=health` identifies its **Node** runtime and schema version 1.
 
 A failed probe is not automatically retried. Network access must be enabled and valid DNS/TLS already configured; otherwise the check fails safely. A PASS demonstrates **only these limited anonymous HTTPS contracts**, not end-to-end authenticated SSO, native user mapping, real paid entitlements, backups, restore or production readiness. Complete the additional manual release gates above separately. Do not use the command against live production/customer origins.
+
+## Generate a new private synthetic-only staging configuration (optional)
+
+Once a **separate staging server and a domain owned/approved by the operator** are available, the private Workspace source can create an owner-only broker configuration without manually inventing or reusing six client secrets. This command does **not** provision a server, control DNS/TLS, register real user accounts, install native apps, send mail, or create databases.
+
+On a trusted Linux staging machine, first create a private directory **outside all Git repositories and outside the public website** with permissions 0700. The existing directory must have no symlinks in its resolved path:
+
+```bash
+install -d -m 700 /srv/duckbio-private/staging
+cd workspace-server
+npm run staging:generate -- \\
+  --base-domain YOUR-APPROVED-DOMAIN \\
+  --private-root /srv/duckbio-private/staging \\
+  --build-sha YOUR-REVIEWED-40-CHAR-WORKSPACE-COMMIT \\
+  --confirm-synthetic-only
+```
+
+Replace the example domain and SHA with the **actually reviewed values**. For `--base-domain`, use the controlled parent DNS domain only (no protocol, paths or ports). The generator derives the seven staging-labelled hostnames `staging-workspace.<domain>` and `staging-{goflo,eel,methpipe,mantrain,duckman,limsman}.<domain>`. This is only an offline naming convention: **no address is assumed to exist or be owned simply because it passes validation**. Arrange DNS/TLS ownership separately before any network test.
+
+The resulting `workspace-staging.json` contains a random 48-byte client secret for **each** native app and an independent one-time `SUITE_SETUP_TOKEN`. The file is owner-only (0600); the command does not print tokens or passwords, never overwrites an existing file (including a symlink), and removes incomplete temporary output after errors. Staging database and UI paths are defined but not created. The parent directory must already exist and be owner-only, and Git worktrees, `docs`, and `public_html` are rejected. Do not include the JSON or any extracted keys in version control, CI logs, support tickets, or screenshots.
+
+Use the existing offline validator before any startup:
+
+```bash
+npm run staging:preflight -- --config /srv/duckbio-private/staging/workspace-staging.json
+```
+
+The private backend still requires a **separately reviewed copy** of the private Workspace UI in the configured `SUITE_ASSET_ROOT` before web access. Only configure a native app with **its own** client secret from the file; never give the full JSON to native apps or browsers. The central setup token must be securely removed from runtime configuration after the one-time synthetic administrator bootstrap. **Never point this generator, its keys or the resulting databases at real production services.**
+
+Since regenerating would silently invalidate existing native app secrets, the generator deliberately cannot rotate an existing file. Any later SHA/configuration update or secret rotation requires a separate reviewed, backed-up procedure; do not delete the generated file to bypass that safeguard. The previous manual release gates and verified restore/rollback remain mandatory.
