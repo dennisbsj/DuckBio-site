@@ -5,6 +5,7 @@ on:
     paths:
       - 'workspace-server/staging-*.mjs'
       - 'workspace-server/tests/staging-service-plan.test.mjs'
+      - 'workspace-server/tests/staging-proxy-https-live.mjs'
       - 'workspace-server/private-ui/**'
       - 'workspace-server/package.json'
       - '.github/workflows/workspace-staging-service-templates.yml'
@@ -13,6 +14,7 @@ on:
     paths:
       - 'workspace-server/staging-*.mjs'
       - 'workspace-server/tests/staging-service-plan.test.mjs'
+      - 'workspace-server/tests/staging-proxy-https-live.mjs'
       - 'workspace-server/private-ui/**'
       - 'workspace-server/package.json'
       - '.github/workflows/workspace-staging-service-templates.yml'
@@ -150,7 +152,7 @@ jobs:
           DUCKBIO_PROXY_TEST_CONFIG="$STAGING_QA_TMP/workspace-staging.json" \
             DUCKBIO_PROXY_TEST_CA="$qa/cert.pem" \
             DUCKBIO_PROXY_TEST_PORT=18443 \
-            node --test tests/staging-proxy-https-live.test.mjs
+            node --test tests/staging-proxy-https-live.mjs
           echo 'PASS real Caddy TLS and Workspace Node synthetic loopback integration (CI only)'
       - name: Remove all synthetic plan files
         if: always()
