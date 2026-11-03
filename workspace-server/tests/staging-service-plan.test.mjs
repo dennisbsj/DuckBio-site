@@ -71,6 +71,8 @@ test('creates only two reviewed, uninstalled service/proxy templates, never star
  assert.doesNotMatch(unit,/^User=root$/m);
  assert.doesNotMatch(unit,/0\.0\.0\.0|ExecStartPre|sudo|curl|wget|chown|chmod|npm install/);
  assert.match(caddy,/^staging-workspace\.duckbio\.net \{$/m);
+ assert.match(caddy,/@wrongHost not host staging-workspace\.duckbio\.net/);
+ assert.match(caddy,/respond @wrongHost 421/);
  assert.match(caddy,/reverse_proxy 127\.0\.0\.1:3307/);
  assert.doesNotMatch(caddy,/header_up Host/,
   'proxy must preserve original HTTP Host for backend origin validation');
