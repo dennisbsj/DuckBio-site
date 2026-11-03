@@ -2928,3 +2928,55 @@ html body.support-faq-page .duckbio-prop-brand--coat {
   html body.support-faq-page .duckbio-prop-brand--mug{font-size:clamp(3.5px,.68vw,6px)}
   html body.support-faq-page .duckbio-prop-brand--coat{font-size:clamp(3px,.54vw,5px)}
 }
+
+
+/* DuckBio: DataDuck-style 3D illustrations, 2026-11-03. Preview 448px; details 1254px. */
+html body img.suite-sprite.logo-limsduck {
+ background-image:url("icons/duckbio-20261103/labduck-448.webp") !important;
+ background-size:100% 100% !important;
+ background-position:center center !important;
+ background-repeat:no-repeat !important;
+}
+html body .product-hero img.suite-sprite.logo-limsduck {
+ background-image:url("icons/duckbio-20261103/labduck-1254.webp") !important;
+}
+
+html body img.suite-sprite.logo-ducknote {
+ background-image:url("icons/duckbio-20261103/ducknote-448.webp") !important;
+ background-size:100% 100% !important;
+ background-position:center center !important;
+ background-repeat:no-repeat !important;
+}
+html body .product-hero img.suite-sprite.logo-ducknote {
+ background-image:url("icons/duckbio-20261103/ducknote-1254.webp") !important;
+}
+
+html body img.suite-sprite.logo-duckman {
+ background-image:url("icons/duckbio-20261103/duckman-448.webp") !important;
+ background-size:100% 100% !important;
+ background-position:center center !important;
+ background-repeat:no-repeat !important;
+}
+html body .product-hero img.suite-sprite.logo-duckman {
+ background-image:url("icons/duckbio-20261103/duckman-1254.webp") !important;
+}
+
+html body img.suite-sprite.logo-ducktrain {
+ background-image:url("icons/duckbio-20261103/ducktrain-448.webp") !important;
+ background-size:100% 100% !important;
+ background-position:center center !important;
+ background-repeat:no-repeat !important;
+}
+html body .product-hero img.suite-sprite.logo-ducktrain {
+ background-image:url("icons/duckbio-20261103/ducktrain-1254.webp") !important;
+}
+
+html body img.suite-sprite.logo-methduck {
+ background-image:url("icons/duckbio-20261103/duckpipe-448.webp") !important;
+ background-size:100% 100% !important;
+ background-position:center center !important;
+ background-repeat:no-repeat !important;
+}
+html body .product-hero img.suite-sprite.logo-methduck {
+ background-image:url("icons/duckbio-20261103/duckpipe-1254.webp") !important;
+}
