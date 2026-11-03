@@ -268,3 +268,19 @@ does not demonstrate a running seven-origin environment, correct native
 service provisioning, private TLS, real authentication, live licensed seats,
 backups or production readiness. Any staging deployment still requires
 separately approved trusted hosting and the remaining release gates.
+
+## Current seven-source CI candidate (separate from historical baseline)
+
+The initial [historical QA baseline](SIX_APP_SOURCE_QA_BASELINE.md) remains immutable and must not be interpreted as approval of later Workspace source changes. The newer [staging source candidate](STAGING_CANDIDATE.md) and [machine-readable candidate lock](six-app-staging-candidate-lock.json) pin a later central SHA and six native commits.
+
+All six native HTTPS CI runs checked out the same central Workspace SHA and completed independently and successfully on their own native `main` commits. Review exact GitHub run IDs before preparing any release, and optionally audit their private CI evidence with an appropriately scoped read-only token:
+
+```bash
+cd workspace-server
+npm run staging:candidate:audit
+DUCKBIO_QA_READ_TOKEN='READ_ONLY_PRIVATE_GITHUB_TOKEN' npm run staging:candidate:audit:remote
+```
+
+The seven-source checkout gate defaults to the historical lock for backwards compatibility. To require the **newer candidate** instead, explicitly add `--candidate-source-lock` after `--confirm-offline-sources`. The gate still requires seven clean owner-only local Git checkout folders at the candidate's exact SHAs and a private `SUITE_BUILD_SHA` matching its Workspace commit.
+
+Source-only checks never prove seven simultaneously deployed HTTPS services, central and native sessions working together, real DNS/TLS, payment entitlements, live backup or production approval.
