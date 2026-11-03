@@ -28,5 +28,5 @@ jobs:
         working-directory: workspace-server
       - run: npx playwright install --with-deps chromium
         working-directory: workspace-server
-      - run: node --test browser-tests/workspace-browser.test.mjs
+      - run: node --test --test-concurrency=1 browser-tests/*.test.mjs
         working-directory: workspace-server
