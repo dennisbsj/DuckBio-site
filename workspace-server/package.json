@@ -7,12 +7,13 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check shared-auth/runtime.mjs && node --check shared-auth/account-service.mjs && node --check organization-store.mjs && node --check private-ui/workspace.js && node --check private-ui/owner.js && node --check owner-alert-mailer.mjs && node --check private-messaging-store.mjs && node --check content-id-registry.mjs && node --check private-content-launch.mjs && node --check message-references.mjs && node --check communications-store.mjs && node --check owner-internal-audit-delivery.mjs && node --check public-contact-relay.mjs && node --check private-ui/communications.js && node --check private-ui/communications-launchers.js && node --check stripe-test-webhook.mjs && node --check stripe-test-webhook-handler.mjs && node --check stripe-test-reconcile.mjs && node --check subscription-entitlement-planner.mjs && node --check verified-subscription-transition.mjs && node --check stripe-live-readonly.mjs && node --check stripe-live-webhook.mjs && node --check stripe-live-event-ledger.mjs && node --check staging-preflight.mjs && node --check staging-readonly-smoke.mjs && node --check staging-generate-config.mjs && node --check staging-recovery-drill.mjs && node --check six-app-source-qa-audit.mjs",
+    "check": "node --check shared-auth/runtime.mjs && node --check shared-auth/account-service.mjs && node --check organization-store.mjs && node --check private-ui/workspace.js && node --check private-ui/owner.js && node --check owner-alert-mailer.mjs && node --check private-messaging-store.mjs && node --check content-id-registry.mjs && node --check private-content-launch.mjs && node --check message-references.mjs && node --check communications-store.mjs && node --check owner-internal-audit-delivery.mjs && node --check public-contact-relay.mjs && node --check private-ui/communications.js && node --check private-ui/communications-launchers.js && node --check stripe-test-webhook.mjs && node --check stripe-test-webhook-handler.mjs && node --check stripe-test-reconcile.mjs && node --check subscription-entitlement-planner.mjs && node --check verified-subscription-transition.mjs && node --check stripe-live-readonly.mjs && node --check stripe-live-webhook.mjs && node --check stripe-live-event-ledger.mjs && node --check staging-preflight.mjs && node --check staging-readonly-smoke.mjs && node --check staging-generate-config.mjs && node --check staging-recovery-drill.mjs && node --check six-app-source-qa-audit.mjs && node --check staging-prepare-ui.mjs",
     "staging:preflight": "node staging-preflight.mjs",
     "staging:smoke": "node staging-readonly-smoke.mjs",
     "staging:generate": "node staging-generate-config.mjs",
     "staging:recovery-drill": "node staging-recovery-drill.mjs",
     "staging:source-audit": "node six-app-source-qa-audit.mjs --offline",
-    "staging:source-audit:remote": "node six-app-source-qa-audit.mjs --remote"
+    "staging:source-audit:remote": "node six-app-source-qa-audit.mjs --remote",
+    "staging:prepare-ui": "node staging-prepare-ui.mjs"
   }
 }

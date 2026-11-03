@@ -12,7 +12,7 @@ import {NATIVE_APP_IDS,stagingHttpsOrigin,
 const OUTPUT_NAME='workspace-staging.json';
 const TOKEN=()=>randomBytes(48).toString('base64url');
 
-function approvedPrivateRoot(value){
+export function approvedPrivateRoot(value){
  if(typeof value!=='string'||!isAbsolute(value))throw Error('private_root_required');
  const root=resolve(value);
  const segments=root.split(sep).map(x=>x.toLowerCase());
