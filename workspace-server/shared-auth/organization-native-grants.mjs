@@ -85,14 +85,14 @@ export function createWorkspaceScopedNativeLinks({
     const row = db.prepare(`SELECT * FROM ${table}
       WHERE workspace_user_id=? AND workspace_organization_id=? AND app_id=?
         AND revoked_at IS NULL`).get(...key(input));
-    return row && Object.freeze({
+    return row ? Object.freeze({
       workspaceAccountId: row.workspace_user_id,
       workspaceOrganizationId: row.workspace_organization_id,
       appId: row.app_id,
       nativeUserId: row.native_user_id,
       nativeOrganizationId: row.native_organization_id,
       revision: row.revision
-    });
+    }) : null;
   }
   function transact(fn) {
     db.exec('BEGIN IMMEDIATE');
