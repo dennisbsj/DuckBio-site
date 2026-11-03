@@ -123,7 +123,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       (details.state==='canceled'||(Array.isArray(details.deltas)&&
        details.deltas.some(delta=>delta.delta!==0)))?'subscription':
     ['member.added','member.updated','member.removed','member.deactivated','member.reactivated','invitation.accepted'].includes(action)?'user':
-    action==='permission.updated'?'permission':null;
+    ['permission.updated','role.defaults.updated','role.custom.created','role.custom.updated','role.custom.deleted'].includes(action)?'permission':null;
   const audit=(org,actor,action,subject,details={})=>{
     const at=clock();
     const result=db.prepare('INSERT INTO organization_audit(org,actor,action,subject,details,recorded_at) VALUES(?,?,?,?,?,?)')
@@ -240,6 +240,15 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
           category='security';
           description='New organization administrator activated in '+label+
             '. Account: '+x.subject+'. Review your private owner panel.';
+        }else if(['role.defaults.updated','role.custom.created',
+                   'role.custom.updated','role.custom.deleted'].includes(x.action)){
+          category='security';
+          const app=byId.get(details.appId)?.name||'an app';
+          // Role policy updates can change every assigned user's effective
+          // authorization. Never include raw permissions or personal data.
+          description='An organization application role policy changed in '+label+
+            '. App: '+app+'. Role: '+String(details.role||'unknown')+
+            '. Actor account: '+x.actor+'. Review the change in your private owner panel.';
         }else if(x.action==='permission.updated'&&details.enabled===true){
           category='security';
           const app=byId.get(details.appId)?.name||'an app';
