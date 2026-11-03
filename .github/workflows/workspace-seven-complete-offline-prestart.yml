@@ -1,0 +1,54 @@
+name: Exact seven source and service unit templates - source-only staging gate
+
+on:
+  pull_request:
+    paths:
+      - 'workspace-server/staging-workspace-seventh-unit-audit.mjs'
+      - 'workspace-server/staging-seven-complete-prestart-gate.mjs'
+      - 'workspace-server/tests/staging-workspace-seventh-unit-audit.test.mjs'
+      - 'workspace-server/SEVEN_COMPLETE_OFFLINE_PRESTART.md'
+      - '.github/workflows/workspace-seven-complete-offline-prestart.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-server/staging-workspace-seventh-unit-audit.mjs'
+      - 'workspace-server/staging-seven-complete-prestart-gate.mjs'
+      - 'workspace-server/tests/staging-workspace-seventh-unit-audit.test.mjs'
+      - 'workspace-server/SEVEN_COMPLETE_OFFLINE_PRESTART.md'
+      - '.github/workflows/workspace-seven-complete-offline-prestart.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  exact-seventh-workspace-unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Validate read-only standalone Workspace unit and combined seven-service gate
+        working-directory: workspace-server
+        run: |
+          node --check staging-workspace-seventh-unit-audit.mjs
+          node --check staging-seven-complete-prestart-gate.mjs
+          node --test tests/staging-workspace-seventh-unit-audit.test.mjs
+      - name: Preserve historical and current six-native prestart coverage
+        working-directory: workspace-server
+        run: |
+          node --test tests/staging-seven-prestart-gate.test.mjs tests/staging-current-six-native-plan.test.mjs
+      - name: Preserve Workspace source UI and standalone unit generator tests
+        working-directory: workspace-server
+        run: |
+          node --test tests/staging-service-plan.test.mjs tests/staging-prepare-ui.test.mjs
+      - name: Check six native exact reviewed snapshot offline without private repo credentials
+        working-directory: workspace-server
+        run: node six-native-current-compat-audit.mjs --offline
