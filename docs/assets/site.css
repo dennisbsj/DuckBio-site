@@ -2856,3 +2856,75 @@ html body.support-faq-page .duckbio-real-hero>.duckbio-real-hero-image{
 @media(max-width:360px){
  .duckbio-real-hero .duckbio-real-hero-benefits{grid-template-columns:1fr}
 }
+
+
+/* DuckBio precise props logos Support 20261103
+   Official SVG assets positioned with the scene's 3:1 intrinsic image ratio.
+   This avoids asking an image generator to imitate the corporate logo. */
+html body.support-faq-page .duckbio-real-hero--support .duckbio-prop-brand-stage {
+  position:absolute;
+  z-index:1;
+  left:0;
+  top:50%;
+  width:100%;
+  height:auto;
+  aspect-ratio:3 / 1;
+  transform:translateY(-50%);
+  pointer-events:none;
+  isolation:isolate;
+}
+html body.support-faq-page .duckbio-prop-brand {
+  position:absolute;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:.23em;
+  line-height:1.04;
+  font-family:Inter,system-ui,Arial,sans-serif;
+  font-weight:790;
+  letter-spacing:-.04em;
+  white-space:nowrap;
+  text-shadow:0 1px 2px rgba(0,0,0,.15);
+  pointer-events:none;
+}
+html body.support-faq-page .duckbio-prop-brand > img {
+  display:block;
+  width:1.4em;
+  height:1.4em;
+  max-width:none;
+  object-fit:contain;
+  flex:0 0 auto;
+}
+html body.support-faq-page .duckbio-prop-brand em { color:#00adfd;font-style:normal; }
+html body.support-faq-page .duckbio-prop-brand--laptop {
+  left:43.3%;
+  top:58%;
+  transform:translate(-50%,-50%) perspective(600px) rotateY(-8deg) rotate(-1deg);
+  color:#eaf5ff;
+  font-size:clamp(7px,1.02vw,20px);
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.35));
+}
+html body.support-faq-page .duckbio-prop-brand--mug {
+  left:85.1%;
+  top:67%;
+  transform:translate(-50%,-50%) rotate(5deg);
+  color:#063553;
+  font-size:clamp(6px,.68vw,14px);
+  text-shadow:none;
+}
+html body.support-faq-page .duckbio-prop-brand--coat {
+  left:72.2%;
+  top:67.5%;
+  transform:translate(-50%,-50%) rotate(-2deg);
+  color:#063553;
+  font-size:clamp(5px,.54vw,11px);
+  text-shadow:none;
+}
+@media(max-width:850px){
+  html body.support-faq-page .duckbio-real-hero--support .duckbio-prop-brand-stage{
+    top:auto;bottom:0;transform:none;order:2;
+  }
+  html body.support-faq-page .duckbio-prop-brand--laptop{font-size:clamp(4px,1vw,8px)}
+  html body.support-faq-page .duckbio-prop-brand--mug{font-size:clamp(3.5px,.68vw,6px)}
+  html body.support-faq-page .duckbio-prop-brand--coat{font-size:clamp(3px,.54vw,5px)}
+}
