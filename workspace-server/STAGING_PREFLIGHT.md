@@ -93,3 +93,18 @@ npm run staging:preflight -- --config /srv/duckbio-private/staging/workspace-sta
 The private backend still requires a **separately reviewed copy** of the private Workspace UI in the configured `SUITE_ASSET_ROOT` before web access. Only configure a native app with **its own** client secret from the file; never give the full JSON to native apps or browsers. The central setup token must be securely removed from runtime configuration after the one-time synthetic administrator bootstrap. **Never point this generator, its keys or the resulting databases at real production services.**
 
 Since regenerating would silently invalidate existing native app secrets, the generator deliberately cannot rotate an existing file. Any later SHA/configuration update or secret rotation requires a separate reviewed, backed-up procedure; do not delete the generated file to bypass that safeguard. The previous manual release gates and verified restore/rollback remain mandatory.
+
+## Disposable SQLite recovery drill (no staging server or credentials required)
+
+Before deploying a staging database or creating real DNS records, the private Workspace repository can exercise a **completely temporary synthetic recovery** using the same runtime and SQLite adapters. This is a local test of startup, native app isolation and **offline** backup/restore mechanics, not a copy of any existing installation:
+
+```bash
+cd workspace-server
+npm run staging:recovery-drill -- --confirm-disposable-only
+```
+
+The command intentionally accepts **no source database path, config path, hostname, private key or customer identifier**. It creates an owner-only temporary directory, generates fresh synthetic six-app credentials, starts Workspace **only on 127.0.0.1**, and uses its real HTTP endpoints to bootstrap an imaginary administrator. It verifies no native app seats were granted. It shuts down Workspace before touching SQLite, creates verified binary copies of all four private SQLite databases (auth, identity, organizations, communications), restores the copies into a new empty temporary directory, then restarts the private Workspace runtime there. It confirms the original synthetic administrator can log in with the same test password and the synthetic organization survives while native app grants remain empty. It checks SQLite `PRAGMA quick_check` on source and copied files and deletes all temporary material at the end.
+
+Every external network call in the drill is blocked. Although the synthetic configuration contains staging-labelled `duckbio.net` origin strings for validation, the process never resolves or contacts those names. No public website, live app, server account, external backup, private staging environment or production database is accessed.
+
+**Important:** This exercise copies files only after the synthetic runtime has stopped and closed its databases. Copying SQLite files from a running service, especially a WAL-mode database, is **not** a safe backup plan. A real environment requires an operator-approved hot-backup/snapshot procedure, private encryption, access controls, retention, off-host backup verification, credentials/session-rotation review, recovery-point objectives and a genuine restoration test against the selected server. A PASS here is **not** proof that a live staging or production backup is safe, recoverable or deployed.
