@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "policyVersion": "2026-10-24.1",
-  "suite": "Celluloid Science Apps",
+  "suite": "DuckBio Science Apps",
   "principles": {
     "denyByDefault": true,
     "adminHasAllPermissions": true,
@@ -203,6 +203,41 @@
           "workspace.view",
           "report.view",
           "audit.view"
+        ]
+      }
+    },
+    "DataDuck": {
+      "enforcement": "server_workspace",
+      "roleSource": "authenticated local DataDuck role with verified Workspace organization and seat",
+      "roles": {
+        "Analyst": [
+          "workspace.view",
+          "project.view",
+          "project.create",
+          "project.edit",
+          "dataset.view",
+          "dataset.import",
+          "dataset.derive",
+          "figure.view",
+          "figure.create",
+          "data.export"
+        ],
+        "Reviewer": [
+          "workspace.view",
+          "project.view",
+          "dataset.view",
+          "figure.view",
+          "data.export"
+        ],
+        "ReadOnly": [
+          "workspace.view",
+          "project.view",
+          "dataset.view",
+          "figure.view",
+          "data.export"
+        ],
+        "Admin": [
+          "*"
         ]
       }
     }
