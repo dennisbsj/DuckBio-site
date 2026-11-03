@@ -74,7 +74,9 @@ export function auditSevenLocalSources({sourcesRoot,workspaceBuildSha,lock,
    if(head!==row.sha)throw Error('checkout_sha_mismatch');
    if(checkedGit(directory,['status','--porcelain','--untracked-files=normal'],
        runGit)!=='')throw Error('checkout_not_clean');
-   if(row.workflow){
+   // The central Workspace source has its own CI workflow but does not
+   // checkout itself: only the SIX native workflows must pin the broker.
+   if(row.id&&row.workflow){
     const workflow=checkedGit(directory,['show','HEAD:'+row.workflow],runGit);
     if(!validatePinnedWorkflow(workflow,lock.central.sha))
      throw Error('native_workspace_pin_mismatch');
