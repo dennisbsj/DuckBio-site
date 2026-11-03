@@ -89,16 +89,21 @@ export function auditSevenLocalSources({sourcesRoot,workspaceBuildSha,lock,
 const invoked=process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url);
 if(invoked){
  const args=process.argv.slice(2);
- if(args.length!==5||args[0]!=='--config'||
+ const candidate=args.length===6&&args[5]==='--candidate-source-lock';
+ if((args.length!==5&&!candidate)||args[0]!=='--config'||
     args[2]!=='--sources-root'||args[4]!=='--confirm-offline-sources'){
-  console.error('Usage: node staging-seven-source-gate.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS --confirm-offline-sources');
+  console.error('Usage: node staging-seven-source-gate.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS --confirm-offline-sources [--candidate-source-lock]');
   process.exitCode=2;
  }else{
   try{
    const config=readPrivateConfiguration(args[1]);
    if(!validateWorkspaceStagingConfig(config).ok)throw Error('invalid_config');
+   // Candidate selection is a single explicit, repository-owned immutable
+   // lock name; never load an arbitrary path or a caller-supplied lock file.
+   const lockName=candidate?'six-app-staging-candidate-lock.json':
+    'six-app-source-qa-lock.json';
    const lock=JSON.parse(await import('node:fs').then(
-    fs=>fs.readFileSync(new URL('./six-app-source-qa-lock.json',import.meta.url),'utf8')));
+    fs=>fs.readFileSync(new URL('./'+lockName,import.meta.url),'utf8')));
    const report=auditSevenLocalSources({sourcesRoot:args[3],
     workspaceBuildSha:config.SUITE_BUILD_SHA,lock});
    if(!report.ok){
