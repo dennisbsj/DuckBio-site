@@ -8,7 +8,7 @@ import {createStripeLiveEventLedger} from './stripe-live-event-ledger.mjs';
 import {planVerifiedSubscriptionTransition} from './verified-subscription-transition.mjs';
 
 const policy=JSON.parse(readFileSync(fileURLToPath(new URL('../suite-permissions.json',import.meta.url)),'utf8'));
-export const APPLICATIONS=Object.freeze([['limsman','LabDuck','LIMSMan'],['goflo','CytoDuck','GoFlo'],['methpipe','DuckPipe','MethPipe'],['eel','DuckNote','EEL'],['duckman','DuckMan','DuckMan'],['mantrain','DuckTrain','ManTrain']].map(([id,name,key])=>Object.freeze({id,name,roles:Object.freeze(Object.keys(policy.apps[key].roles)),rolePermissions:Object.freeze(policy.apps[key].roles),permissions:Object.freeze([...new Set(Object.values(policy.apps[key].roles).flat().filter(p=>p!=='*'))].sort())})));
+export const APPLICATIONS=Object.freeze([['limsman','LabDuck','LIMSMan'],['goflo','CytoDuck','GoFlo'],['methpipe','DuckPipe','MethPipe'],['eel','DuckNote','EEL'],['duckman','DuckMan','DuckMan'],['mantrain','DuckTrain','ManTrain'],['dataduck','DataDuck','DataDuck'].map(([id,name,key])=>Object.freeze({id,name,roles:Object.freeze(Object.keys(policy.apps[key].roles)),rolePermissions:Object.freeze(policy.apps[key].roles),permissions:Object.freeze([...new Set(Object.values(policy.apps[key].roles).flat().filter(p=>p!=='*'))].sort())})));
 const byId=new Map(APPLICATIONS.map(x=>[x.id,x]));
 const inviteHash=x=>createHash('sha256').update(x).digest('hex');
 const safeToken=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{43}$/.test(x);
@@ -69,6 +69,9 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
   if(!db.prepare('PRAGMA table_info(stripe_test_reconciliation_checks)').all().some(row=>row.name==='lifecycle'))
     db.exec("ALTER TABLE stripe_test_reconciliation_checks ADD COLUMN lifecycle TEXT CHECK(lifecycle IS NULL OR json_valid(lifecycle))");
 
+  // Existing organizations were provisioned with six seat rows. Adding DataDuck
+  // must seed the seventh row at zero without granting any purchased seats.
+  db.exec("INSERT OR IGNORE INTO seats(org,app,purchased) SELECT id,'dataduck',0 FROM organizations");
   for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))chmodSync(databasePath+suffix,0o600);
   const tx=work=>{db.exec('BEGIN IMMEDIATE');try{const result=work();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
   const liveEventLedger=createStripeLiveEventLedger({db,clock});
@@ -343,7 +346,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     // Only call from a separate VERIFIED billing adapter. No browser purchase endpoint exists.
     applyVerifiedSeatPurchase({reference,organizationId,plan,apps,seats}){
       if(!safeId(reference)||!safeId(organizationId)||!['Single','Mixed','Bundle'].includes(plan)||!Array.isArray(apps)||!Number.isSafeInteger(seats)||seats<1||seats>10000||new Set(apps).size!==apps.length||apps.some(x=>!byId.has(x)))fail('invalid_purchase');
-      if((plan==='Single'&&apps.length!==1)||(plan==='Mixed'&&(apps.length<2||apps.length>5))||(plan==='Bundle'&&apps.length!==6))fail('invalid_purchase');
+      if((plan==='Single'&&apps.length!==1)||(plan==='Mixed'&&(apps.length<2||apps.length>APPLICATIONS.length-1))||(plan==='Bundle'&&apps.length!==APPLICATIONS.length))fail('invalid_purchase');
       const selection=[...apps].sort();
       const digest=createHash('sha256').update(JSON.stringify([organizationId,plan,selection,seats])).digest('hex');
       return tx(()=>{
@@ -818,7 +821,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     },
     createSubscriptionDraft({organizationId,actorId,plan,apps,seats}){
       if(!['Single','Mixed','Bundle'].includes(plan)||!Array.isArray(apps)||!Number.isSafeInteger(seats)||seats<1||seats>10000||new Set(apps).size!==apps.length||apps.some(id=>!byId.has(id)))fail('invalid_subscription');
-      if((plan==='Single'&&apps.length!==1)||(plan==='Mixed'&&(apps.length<2||apps.length>5))||(plan==='Bundle'&&apps.length!==APPLICATIONS.length))fail('invalid_subscription');
+      if((plan==='Single'&&apps.length!==1)||(plan==='Mixed'&&(apps.length<2||apps.length>APPLICATIONS.length-1))||(plan==='Bundle'&&apps.length!==APPLICATIONS.length))fail('invalid_subscription');
       return tx(()=>{
         requireAdmin(organizationId,actorId);
         const id=randomUUID(),now=clock(),selected=[...apps].sort();
