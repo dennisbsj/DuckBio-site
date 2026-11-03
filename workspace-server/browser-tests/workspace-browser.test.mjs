@@ -981,6 +981,10 @@ test('native connect page completes real CSRF, PKCE and app-bound browser login 
  const code=callback.searchParams.get('code');
  assert.match(code,/^[A-Za-z0-9_-]{32,128}$/);
  assert.equal(callback.searchParams.size,2,'no credentials or client tokens leak to the app callback');
+ const sessionCookie=(await context.cookies(origin)).find(cookie=>cookie.name.includes('suite_identity'));
+ assert(sessionCookie,'Connect login must create a central identity cookie');
+ assert(sessionCookie.expires<0,'Connect login without Remember me must use a browser-session cookie');
+ assert(sessionCookie.httpOnly,'Connect login must never expose the identity cookie to JavaScript');
  const exchanged=await fetch(origin+'/api/suite/auth/exchange',{method:'POST',
   headers:{Authorization:'Basic '+Buffer.from(client.id+':'+client.secret).toString('base64'),
    'Content-Type':'application/json'},
@@ -997,6 +1001,40 @@ test('native connect page completes real CSRF, PKCE and app-bound browser login 
   body:JSON.stringify({clientId:client.id,redirectUri:client.redirectUris[0],
    code,state,codeVerifier:verifier})});
  assert.equal(replay.status,401,'browser authorization code cannot be reused');
+});
+
+test('native Connect Remember me opt-in produces a bounded 14-day HttpOnly Workspace session',{timeout:65000},async t=>{
+ const {page,origin,identity,worker,registrations,context}=await fixture(t);
+ identity.grantAppAccess({userId:worker.id,appId:'eel',localUserId:'native-worker',
+  organizationId:'lab-a'});
+ const client=registrations.find(x=>x.appId==='eel');
+ const verifier=randomBytes(32).toString('base64url');
+ const state=randomBytes(32).toString('base64url');
+ const challenge=(await import('node:crypto')).createHash('sha256').update(verifier).digest('base64url');
+ const query=new URLSearchParams({appId:'eel',redirectUri:client.redirectUris[0],state,codeChallenge:challenge});
+ await context.route('https://example.invalid/**',route=>
+  route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Native callback fixture</title>'}));
+ await page.goto(origin+'/connect?'+query);
+ await page.locator('#login:not([hidden])').waitFor();
+ assert.equal(await page.locator('#remember-me').isChecked(),false,'Remember me is never preselected');
+ await page.locator('#remember-me').check();
+ await page.locator('#email').fill('worker@example.test');
+ await page.locator('#password').fill('Worker passphrase 123456');
+ await page.getByRole('button',{name:'Sign in and continue'}).click();
+ await page.waitForURL(/https:\/\/example\.invalid\/eel\/auth\/callback\?/);
+ assert.equal(new URL(page.url()).searchParams.get('state'),state);
+ const sessionCookie=(await context.cookies(origin)).find(cookie=>cookie.name.includes('suite_identity'));
+ assert(sessionCookie,'remembered Connect session must create a central identity cookie');
+ assert(sessionCookie.httpOnly,'remembered session remains inaccessible to JavaScript');
+ assert(sessionCookie.expires>Date.now()/1000+12*86400,'remembered session lasts beyond twelve days');
+ assert(sessionCookie.expires<Date.now()/1000+15*86400,'remembered session cannot outlive fourteen days');
+ const next=new URLSearchParams(query);
+ next.set('state',randomBytes(32).toString('base64url'));
+ next.set('codeChallenge',randomBytes(32).toString('base64url'));
+ await page.goto(origin+'/connect?'+next);
+ await page.locator('#active:not([hidden])').waitFor();
+ assert.match(await page.locator('#identity').textContent(),/Lab worker/);
+ assert.equal(await page.locator('#login').isVisible(),false,'existing signed-in session requires no new credentials');
 });
 
 test('native connect page confirms an existing Workspace session before issuing an app code',{timeout:55000},async t=>{

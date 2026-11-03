@@ -93,6 +93,6 @@ $('login').addEventListener('submit',event=>{
  if(!$('login').reportValidity())return;
  const email=$('email').value.trim(),password=$('password').value;
  if(!email||!password)return;
- void continueToApp({email,password});
+ void continueToApp({email,password,rememberMe:$('remember-me').checked});
 });
 void initialize();
