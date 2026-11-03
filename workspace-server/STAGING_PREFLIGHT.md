@@ -11,12 +11,15 @@ cd workspace-server
 npm run staging:preflight -- --config /srv/duckbio-private/workspace-staging.json
 ```
 
+**Runtime startup guard:** When the private Workspace server is started with `SUITE_STAGING_ACK` present (including a value loaded through `SUITE_ENV_FILE`), it validates the complete synthetic staging profile **before creating SQLite databases or initializing the broker**. An invalid, empty or misspelled acknowledgement now fails closed. This is an additional guard for deliberately marked staging environments, **not** a production-mode restriction and **not** a substitute for independently running this CLI preflight, verifying file permissions, ownership, DNS, TLS and staging isolation. Runtimes without that staging marker remain unchanged; do not treat omitting the marker as permission to bypass staging review.
+
 The command exits **0 only if every local gate passes**; otherwise it exits nonzero, printing **only fixed error codes**, never client secrets, user IDs, database content, or config values. No outward connections are attempted.
 
 The private JSON file must use string values for the runtime's settings:
 
 - `SUITE_STAGING_ACK=synthetic-accounts-only` (explicit operator acknowledgement; it is **not** enforced by the runtime itself).
 - `SUITE_MODE=broker`, `SUITE_BUILD_SHA=<the reviewed full 40-character Git commit>`, canonical HTTPS `SUITE_ORIGIN`, and either the same `SUITE_ISSUER` or no override.
+- `SUITE_ORIGIN` and all six `nativeOrigin` values must be **clearly staging-labelled public-looking HTTPS names**, such as `https://staging-workspace.YOUR-DOMAIN` and `https://ducknote-staging.YOUR-DOMAIN`; these are placeholders, not deployed addresses. The check rejects ordinary production origins, retired `celluloidconsulting.net` hosts, loopback/IP literals, reserved/example domains, GitHub Pages and shared Pages-like hostnames, and non-default HTTPS ports. Labels `staging`, `stage` or `qa` must appear in a subdomain. This is **only a static string policy**, not DNS ownership, network reachability, TLS certificate verification or proof that an address is safe to visit. Validate all real hosts independently before any staging DNS or server changes.
 - `SUITE_CLIENTS` is a **JSON-encoded string**, not a nested object. It contains exactly six independent private client registrations. Each has `id`, `appId`, `secret`, `nativeOrigin` and a single `redirectUris` entry matching `<nativeOrigin>/auth/callback`. Secret values must be private, unique and at least 32 characters.
 - `SUITE_AUTH_DB_PATH`, `SUITE_IDENTITY_DB_PATH`, `SUITE_ORGANIZATION_DB_PATH`, `SUITE_COMMUNICATIONS_DB_PATH` and `SUITE_ASSET_ROOT` are distinct absolute private paths. They must never resolve through `docs` or `public_html`, including symlinks.
 - Outbound owner alerts, mail providers, public contact handlers and Stripe (including TEST Checkout) must be **disabled** for this isolated, synthetic-only validation profile.
