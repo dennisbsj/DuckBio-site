@@ -84,6 +84,10 @@ test('refuses unreviewed central SHA or missing native app before inspecting sou
  assert.equal((await run(f,{config:invalid})).ok,false);
  const broken=clone(lock);broken.apps.pop();
  assert.equal((await run(f,{lock:broken})).ok,false);
+ const fabricated=clone(lock);fabricated.apps[0].runId+=1;
+ assert.equal((await run(f,{lock:fabricated})).ok,false);
+ const newCode=clone(lock);newCode.apps[1].sha='f'.repeat(40);
+ assert.equal((await run(f,{lock:newCode})).ok,false);
  assert.deepEqual(f.calls,{sources:0,units:0,processes:0,http:0});
 });
 test('rejects source gate failure before contacting any systemd or HTTPS host',
