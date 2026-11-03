@@ -1,0 +1,48 @@
+name: Six native broker proof boundaries - staging acceptance harness CI
+
+on:
+  pull_request:
+    paths:
+      - 'workspace-server/staging-six-native-auth-proof-audit.mjs'
+      - 'workspace-server/tests/staging-six-native-auth-proof-audit.test.mjs'
+      - 'workspace-server/SIX_NATIVE_AUTHENTICATED_STAGING_ACCEPTANCE.md'
+      - '.github/workflows/workspace-six-native-auth-proof-qa.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-server/staging-six-native-auth-proof-audit.mjs'
+      - 'workspace-server/tests/staging-six-native-auth-proof-audit.test.mjs'
+      - 'workspace-server/SIX_NATIVE_AUTHENTICATED_STAGING_ACCEPTANCE.md'
+      - '.github/workflows/workspace-six-native-auth-proof-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  six-native-auth-proof-negative-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Check no-mutation broker proof witness syntax
+        working-directory: workspace-server
+        run: node --check staging-six-native-auth-proof-audit.mjs
+      - name: Reject stale/revoked, wrong-tenant, cross-app, and synthetic-stub impersonation
+        working-directory: workspace-server
+        run: |
+          node --test tests/staging-six-native-auth-proof-audit.test.mjs tests/staging-seven-genuine-runtime-audit.test.mjs
+      - name: Preserve six-native real broker PKCE/child revocation HTTP contract
+        working-directory: workspace-server
+        run: node --test tests/native-six-app-pkce-contract.test.mjs
+      - name: Preserve exact current main compatibility snapshot offline
+        working-directory: workspace-server
+        run: node six-native-current-compat-audit.mjs --offline
