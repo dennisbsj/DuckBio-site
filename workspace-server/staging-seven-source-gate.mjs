@@ -9,6 +9,7 @@ import {approvedPrivateRoot} from './staging-generate-config.mjs';
 import {readPrivateConfiguration,validateWorkspaceStagingConfig}
  from './staging-preflight.mjs';
 import {validateQaLock,validatePinnedWorkflow} from './six-app-source-qa-audit.mjs';
+import {validateCurrentCompatLock} from './six-native-current-compat-audit.mjs';
 
 const nameOf=row=>row.repo.split('/')[1];
 const validRemote=(value,repo)=>{
@@ -34,8 +35,13 @@ function checkedGit(path,args,runGit){
 // CI workflows, not a newer service-plan source tree by implicit inheritance.
 export function auditSevenLocalSources({sourcesRoot,workspaceBuildSha,lock,
  runGit=execFileSync}={}){
- const schema=validateQaLock(lock);
- if(!schema.ok)return {ok:false,verified:0,errors:['invalid_source_qa_lock']};
+ // Preserve the historical lock unchanged while also permitting the new
+ // independently reviewed, exactly six-native current-Workspace QA snapshot.
+ // Both schemas are allowlisted, fixed-source and deny extra app IDs.
+ const historical=validateQaLock(lock);
+ const current=validateCurrentCompatLock(lock);
+ if(!historical.ok&&!current.ok)
+  return {ok:false,verified:0,errors:['invalid_source_qa_lock']};
  if(typeof workspaceBuildSha!=='string'||
     workspaceBuildSha!==lock.central.sha)
   return {ok:false,verified:0,errors:['workspace_version_not_six_app_verified']};

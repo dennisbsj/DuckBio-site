@@ -1,0 +1,48 @@
+name: Seven genuine native staging services - read-only runtime gate tests
+
+on:
+  pull_request:
+    paths:
+      - 'workspace-server/staging-seven-genuine-runtime-audit.mjs'
+      - 'workspace-server/staging-seven-source-gate.mjs'
+      - 'workspace-server/tests/staging-seven-genuine-runtime-audit.test.mjs'
+      - 'workspace-server/SEVEN_GENUINE_STAGING_ACCEPTANCE.md'
+      - '.github/workflows/workspace-seven-genuine-staging-readonly.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-server/staging-seven-genuine-runtime-audit.mjs'
+      - 'workspace-server/staging-seven-source-gate.mjs'
+      - 'workspace-server/tests/staging-seven-genuine-runtime-audit.test.mjs'
+      - 'workspace-server/SEVEN_GENUINE_STAGING_ACCEPTANCE.md'
+      - '.github/workflows/workspace-seven-genuine-staging-readonly.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  seven-original-staging-safety:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Validate source and read-only runtime auditor syntax
+        working-directory: workspace-server
+        run: |
+          node --check staging-seven-source-gate.mjs
+          node --check staging-seven-genuine-runtime-audit.mjs
+      - name: Reject stubs, mismatched processes, missing sources and HTTPS failures
+        working-directory: workspace-server
+        run: node --test tests/staging-seven-genuine-runtime-audit.test.mjs tests/staging-seven-source-gate.test.mjs
+      - name: Verify independently pinned six-native source evidence without network
+        working-directory: workspace-server
+        run: node six-native-current-compat-audit.mjs --offline
