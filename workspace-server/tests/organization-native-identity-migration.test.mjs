@@ -47,7 +47,7 @@ function fixture(t){
 async function user(store,n){return store.createUser({email:'org-user-'+n+'@example.test',
  displayName:'Test '+n,password:PASSWORD});}
 
-test('opt-in schema requires private trusted mutation and native ownership verifiers',t=>{
+test('opt-in schema requires private trusted mutation and native ownership verifiers',async t=>{
  const directory=mkdtempSync(path.join(os.tmpdir(),'duckbio-optin-'));
  t.after(()=>rmSync(directory,{recursive:true,force:true}));
  const databasePath=path.join(directory,'db.sqlite');
@@ -56,8 +56,8 @@ test('opt-in schema requires private trusted mutation and native ownership verif
  t.after(()=>legacy.close());
  assert.equal(legacy.getOrganizationNativeLink({userId:randomUUID(),
   appId:'goflo',workspaceOrganizationId:'org-alpha'}),null);
- assert.throws(()=>legacy.bindVerifiedOrganizationNativeLink({}),/org_native_links_disabled/);
- assert.throws(()=>legacy.migrateVerifiedLegacyNativeLink({}),/org_native_links_disabled/);
+ await assert.rejects(legacy.bindVerifiedOrganizationNativeLink({}),/org_native_links_disabled/);
+ await assert.rejects(legacy.migrateVerifiedLegacyNativeLink({}),/org_native_links_disabled/);
 });
 
 test('first opt-in open preserves legacy user, session and grant without auto-promoting them',async t=>{
