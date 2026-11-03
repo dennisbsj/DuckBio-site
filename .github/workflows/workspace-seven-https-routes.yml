@@ -1,0 +1,139 @@
+name: Seven synthetic staging HTTPS routes (real Workspace, native routing stubs)
+
+on:
+  pull_request:
+    paths:
+      - 'workspace-server/staging-seven-*.mjs'
+      - 'workspace-server/tests/staging-seven-https-routes.mjs'
+      - 'workspace-server/staging-generate-config.mjs'
+      - 'workspace-server/staging-prepare-ui.mjs'
+      - 'workspace-server/six-app-source-qa-lock.json'
+      - 'workspace-server/private-ui/**'
+      - '.github/workflows/workspace-seven-https-routes.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-server/staging-seven-*.mjs'
+      - 'workspace-server/tests/staging-seven-https-routes.mjs'
+      - 'workspace-server/staging-generate-config.mjs'
+      - 'workspace-server/staging-prepare-ui.mjs'
+      - 'workspace-server/six-app-source-qa-lock.json'
+      - 'workspace-server/private-ui/**'
+      - '.github/workflows/workspace-seven-https-routes.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  seven-https-loopback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run Caddy against real Workspace and SIX NON-NATIVE loopback routing stubs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd workspace-server
+          root="$(mktemp -d)"
+          chmod 700 "$root"
+          qa="$root/tls"
+          runtime_root="$root/runtime"
+          source_root="$root/source"
+          output_root="$root/output"
+          install -d -m 700 "$qa" "$runtime_root" "$source_root" "$output_root"
+          container="duckbio-seven-qa-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          workspace_pid=""
+          stub_pid=""
+          cleanup() {
+            result="$?"
+            if [[ "$result" -ne 0 ]]; then
+              echo 'Synthetic seven-host CI failed; bounded process diagnostics:'
+              docker logs "$container" 2>&1 | tail -25 || true
+              tail -25 "$root/workspace.log" 2>/dev/null || true
+              tail -25 "$root/stubs.log" 2>/dev/null || true
+            fi
+            docker rm -f "$container" >/dev/null 2>&1 || true
+            for pid in "$stub_pid" "$workspace_pid"; do
+              if [[ -n "$pid" ]]; then
+                kill "$pid" >/dev/null 2>&1 || true
+                wait "$pid" >/dev/null 2>&1 || true
+              fi
+            done
+            rm -rf -- "$root"
+          }
+          trap cleanup EXIT
+          checked_out_sha="$(git rev-parse --verify HEAD)"
+          source_sha="$(node -e 'console.log(JSON.parse(require("node:fs").readFileSync("six-app-source-qa-lock.json","utf8")).central.sha)')"
+          node staging-generate-config.mjs \
+            --base-domain duckbio.net --private-root "$runtime_root" \
+            --build-sha "$checked_out_sha" --confirm-synthetic-only
+          node staging-prepare-ui.mjs --config "$runtime_root/workspace-staging.json" \
+            --confirm-first-install
+          node staging-generate-config.mjs \
+            --base-domain duckbio.net --private-root "$source_root" \
+            --build-sha "$source_sha" --confirm-synthetic-only
+          node staging-seven-proxy-plan.mjs \
+            --config "$source_root/workspace-staging.json" \
+            --private-output-root "$output_root" --confirm-uninstalled-only
+
+          names='DNS:staging-workspace.duckbio.net,DNS:staging-goflo.duckbio.net,DNS:staging-eel.duckbio.net,DNS:staging-methpipe.duckbio.net,DNS:staging-mantrain.duckbio.net,DNS:staging-duckman.duckbio.net,DNS:staging-limsman.duckbio.net'
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -sha256 \
+            -keyout "$qa/key.pem" -out "$qa/cert.pem" \
+            -subj '/CN=staging-workspace.duckbio.net' \
+            -addext "subjectAltName=$names" >/dev/null 2>&1
+          chmod 600 "$qa/key.pem" "$qa/cert.pem"
+          node --input-type=module - \
+            "$output_root/seven-origin-proxy-plan/Caddyfile.seven-origin-staging" \
+            "$qa/Caddyfile.qa" <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync,writeFileSync} from 'node:fs';
+          const template=readFileSync(process.argv[2],'utf8');
+          const starts=[...template.matchAll(/^([a-z0-9.-]+) \{$/gm)];
+          assert.equal(starts.length,7,'exactly seven reviewed host routes required');
+          const expected=['workspace','goflo','eel','methpipe','mantrain','duckman','limsman']
+            .map(id=>'staging-'+id+'.duckbio.net').sort();
+          assert.deepEqual(starts.map(x=>x[1]).sort(),expected);
+          const sites=template.replace(/^([a-z0-9.-]+) \{$/gm,
+            (_,host)=>host+' {\n  bind 127.0.0.1\n  tls /qa/cert.pem /qa/key.pem');
+          const global=[
+            '{','  admin off','  auto_https off','  https_port 18443','}',''
+          ].join('\n');
+          writeFileSync(process.argv[3],global+'\n'+sites,{flag:'wx',mode:0o600});
+          NODE
+          # Source plan is never activated; only a private CI-only copy
+          # binds local TLS on unprivileged port 18443 with no ACME.
+          docker run --rm --network none --read-only \
+            --tmpfs /tmp --tmpfs /data --tmpfs /config \
+            -v "$qa:/qa:ro" caddy:2.10.2 caddy validate \
+            --config /qa/Caddyfile.qa --adapter caddyfile
+
+          NODE_ENV=production PORT=3307 \
+            SUITE_ENV_FILE="$runtime_root/workspace-staging.json" \
+            node shared-auth/runtime.mjs > "$root/workspace.log" 2>&1 &
+          workspace_pid="$!"
+          node staging-seven-loopback-stubs.mjs \
+            --config "$source_root/workspace-staging.json" \
+            --confirm-disposable-routing-stubs-only \
+            > "$root/stubs.log" 2>&1 &
+          stub_pid="$!"
+          docker run --detach --name "$container" --network host \
+            --user "$(id -u):$(id -g)" \
+            --cap-drop ALL --cap-add NET_BIND_SERVICE \
+            --security-opt no-new-privileges --read-only \
+            --tmpfs /tmp --tmpfs /data --tmpfs /config \
+            -v "$qa:/qa:ro" caddy:2.10.2 caddy run \
+            --config /qa/Caddyfile.qa --adapter caddyfile >/dev/null
+
+          DUCKBIO_SEVEN_RUNTIME_CONFIG="$runtime_root/workspace-staging.json" \
+            DUCKBIO_SEVEN_STUB_CONFIG="$source_root/workspace-staging.json" \
+            DUCKBIO_SEVEN_CA="$qa/cert.pem" \
+            DUCKBIO_SEVEN_PROXY_FILE="$output_root/seven-origin-proxy-plan/Caddyfile.seven-origin-staging" \
+            DUCKBIO_SEVEN_MANIFEST="$output_root/seven-origin-proxy-plan/routing-manifest.json" \
+            node --test tests/staging-seven-https-routes.mjs
+          echo 'PASS: seven HTTPS hosts, real Workspace and SIX ROUTING STUBS ONLY (not real native apps)'
