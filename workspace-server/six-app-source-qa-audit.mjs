@@ -77,16 +77,19 @@ export function validatePinnedWorkflow(content,centralSha){
  return repos.length===1&&pins.length===1&&pins[0][1]===centralSha;
 }
 
-export async function auditQaLock(lock,{fetchImpl=globalThis.fetch}={}){
+export async function auditQaLock(lock,{fetchImpl=globalThis.fetch,readToken=null}={}){
  const schema=validateQaLock(lock);
  if(!schema.ok)return {...schema,verifiedApps:0};
  if(typeof fetchImpl!=='function')return {ok:false,errors:['missing_fetch'],verifiedApps:0};
+ if(readToken!==null&&(typeof readToken!=='string'||readToken.length<16||/[\r\n]/.test(readToken)))
+  return {ok:false,errors:['invalid_read_only_token'],verifiedApps:0};
  const errors=[];
  const github=async(endpoint)=>{
   const result=await fetchImpl('https://api.github.com/repos/'+endpoint,{
    method:'GET',redirect:'error',
    headers:{Accept:'application/vnd.github+json',
-    'User-Agent':'DuckBio-public-source-qa-evidence'},
+    'User-Agent':'DuckBio-private-source-qa-evidence',
+    ...(readToken?{Authorization:'Bearer '+readToken}:{})},
    signal:AbortSignal.timeout(12000)
   });
   if(!result?.ok)throw Error('github_read_failed');
@@ -146,14 +149,16 @@ if(isMain){
    const markdown=readFileSync(
     new URL('./SIX_APP_SOURCE_QA_BASELINE.md',import.meta.url),'utf8');
    const docs=validateDocumentation(lock,markdown);
+   const token=process.env.DUCKBIO_QA_READ_TOKEN||null;
    const result=docs.ok&&args[0]==='--remote'?
-    await auditQaLock(lock):docs;
+    token?await auditQaLock(lock,{readToken:token}):
+     {ok:false,errors:['private_read_token_required']}:docs;
    if(!result.ok){
     console.error('Source QA audit: FAIL ('+result.errors.join(', ')+')');
     process.exitCode=1;
    }else{
     console.log('Source QA audit: PASS ('+
-     (args[0]==='--remote'?'public GitHub historical evidence for six apps':
+     (args[0]==='--remote'?'authorized private GitHub historical evidence for six apps':
        'locked offline manifest and documentation')+
      '; source-only, NOT deployment or current-head approval)');
    }
