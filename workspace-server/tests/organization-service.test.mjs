@@ -333,7 +333,7 @@ test('subscription draft HTTP API is CSRF protected, org locked and cannot mint 
  assert.equal((await (await admin.call('/api/suite/organization/subscriptions',{organizationId:'org-a'})).json()).drafts.length,1);
  assert.equal((await admin.call('/api/suite/organization/subscription/cancel',{organizationId:'org-b',draftId:draft.id})).status,403);
  assert.equal((await admin.call('/api/suite/organization/subscription/cancel',{organizationId:'org-a',draftId:draft.id})).status,200);
- assert.deepEqual(f.organizationStore.overview('org-a',owner.id).apps.map(x=>x.purchased),[0,0,0,0,0,0]);
+ assert.deepEqual(f.organizationStore.overview('org-a',owner.id).apps.map(x=>x.purchased),[0,0,0,0,0,0,0]);
 });
 
 test('reconciliation API checks only the selected admin\'s own ready test Checkout',async t=>{
