@@ -10,21 +10,23 @@ passed their real-native + real-broker browser integration suites against it.
 ## Shared Workspace identity/account/organization broker
 
 - Repository: `dennisbsj/DuckBio-site`.
-- **Precisely tested Workspace commit:** `5e0924e9844d36de75ca8e10c08048b3db373359`.
-- [Pinned central CI, Node.js 22 and 24 PASS](https://github.com/dennisbsj/DuckBio-site/actions/runs/41629386714).
-- This is **not necessarily the latest Workspace `main`**; any later central changes must
+- **Precisely tested Workspace commit:** `233ca6d376efa2fbddca042cea5106aae92679c0`.
+- [Pinned central CI, Node.js 22 and 24 PASS](https://github.com/dennisbsj/DuckBio-site/actions/runs/41639036030).
+- This candidate includes the offline staging source gate, but this record still certifies **source/CI compatibility only**, not a simultaneous seven-service installation. The six native browser/HTTPS workflows were rerun specifically against this candidate, rather than reusing test evidence from the older central snapshot.
+
+This is **not necessarily the latest Workspace `main`**; any later central changes must
   be independently retested against all six native app versions before revising this snapshot.
 
 ## Native app `main` sources and evidence
 
 | App | Immutable native commit | Coordinated central-version HTTPS evidence |
 | --- | --- | --- |
-| CytoDuck (`goflo`) | `b450dc9bb40851f1e58c0bfd79505c28509cf702` | [Chromium against real broker](https://github.com/dennisbsj/CytoDuck/actions/runs/41630512546), [build](https://github.com/dennisbsj/CytoDuck/actions/runs/41630512651) |
-| DuckNote (`eel`) | `1e34258c95d4a1db98e01ac0f055f2d27d864a50` | [React + Node + PostgreSQL + real broker Chromium](https://github.com/dennisbsj/DuckNote/actions/runs/41630925678), [full CI](https://github.com/dennisbsj/DuckNote/actions/runs/41630925667) |
-| DuckPipe (`methpipe`) | `e3080c47074b43103a72a298a819ba28dffb1460` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckPipe/actions/runs/41629904033) |
-| DuckTrain (`mantrain`) | `df2c0a690d98fccacac6f7400fc94770d6afaf13` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckTrain/actions/runs/41630385999) |
-| DuckMan (`duckman`) | `35d5db0f86f60928e0fe74604a46cdaa585a6412` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckMan/actions/runs/41630577902), [full verify](https://github.com/dennisbsj/DuckMan/actions/runs/41630577922) |
-| LabDuck (`limsman`) | `ce0f055f43e7d6e366219930fc00e250c4d8a6c5` | [Native + real broker Chromium](https://github.com/dennisbsj/LabDuck/actions/runs/41630412217) |
+| CytoDuck (`goflo`) | `dad05d5b9e8ac0cf3372c4526d9c4d941960742c` | [Chromium against real broker](https://github.com/dennisbsj/CytoDuck/actions/runs/41639968678), [build](https://github.com/dennisbsj/CytoDuck/actions/runs/41639968640) |
+| DuckNote (`eel`) | `73413e6378a0650c3525184a1311cf828be593ce` | [React + Node + PostgreSQL + real broker Chromium](https://github.com/dennisbsj/DuckNote/actions/runs/41640370147), [full CI](https://github.com/dennisbsj/DuckNote/actions/runs/41640370364) |
+| DuckPipe (`methpipe`) | `7061981b0b3b1fdab23fffe2eddb5f3730901cea` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckPipe/actions/runs/41639842792) |
+| DuckTrain (`mantrain`) | `fff8d5fdba9bfaf5b6f9ab658b7d8cd214290346` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckTrain/actions/runs/41639939459) |
+| DuckMan (`duckman`) | `a42f27148e9cbe51aec80e9f78bd905e6dfc9221` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckMan/actions/runs/41639884085), [full verify](https://github.com/dennisbsj/DuckMan/actions/runs/41639884187) |
+| LabDuck (`limsman`) | `3aff9ec7138000d4aa1120014d606db2585f45c6` | [Native + real broker Chromium](https://github.com/dennisbsj/LabDuck/actions/runs/41640060636) |
 
 The CI workflows for the six app commits above checkout the **same fixed Workspace
 SHA**, rather than each using a different historical broker version. Each existing
