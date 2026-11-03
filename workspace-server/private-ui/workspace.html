@@ -48,6 +48,7 @@
       <button type="button" class="active" data-tab="users" aria-selected="true">User administration</button>
       <button type="button" data-tab="subscriptions" aria-selected="false">Subscriptions</button>
       <button type="button" data-tab="matrix" aria-selected="false">Permission matrix</button>
+      <button type="button" data-tab="roles" aria-selected="false">Roles &amp; permissions</button>
     </nav>
     <div id="tab-users">
     <section class="panel toolbar">
@@ -128,6 +129,24 @@
       <p id="buy-summary" role="status"></p>
       <div class="actions"><button type="button" id="review-buy">Review selection</button><button type="button" id="save-draft" class="primary">Save subscription draft</button><button type="button" id="cancel-buy">Close</button></div>
     </section>
+    </div>
+    <div id="tab-roles" hidden>
+      <section class="panel">
+        <h2>Roles &amp; permissions</h2>
+        <p>Customize a standard role or create your own role for an individual app. Changes affect all users assigned that role within this organization.</p>
+        <p><strong>Native app enforcement is not yet connected:</strong> these policies are stored securely in Workspace, but cannot grant permissions in an app until its backend supports Workspace role policy synchronization.</p>
+        <form id="role-policy-form">
+          <div class="fields">
+            <label>Application<select id="roles-app" required></select></label>
+            <label>Role<select id="roles-role" required></select></label>
+            <label id="new-role-field" hidden>New role name<input id="roles-new-name" maxlength="48" pattern="[A-Za-z][A-Za-z0-9 _-]{0,47}" placeholder="Senior Analyst"></label>
+          </div>
+          <h3>Allowed permissions for this role</h3>
+          <div id="roles-permissions" class="roles" aria-label="Role permissions"></div>
+          <p id="roles-status" role="status" aria-live="polite"></p>
+          <div class="actions"><button type="submit" class="primary">Save role</button><button type="button" id="roles-delete" hidden>Delete custom role</button></div>
+        </form>
+      </section>
     </div>
     <div id="tab-matrix" hidden>
       <section class="panel">
