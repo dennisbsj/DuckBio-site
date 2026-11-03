@@ -131,7 +131,9 @@ test('existing six-app organizations gain only an unpaid DataDuck seat row on mi
  // Reopening twice never resets any of the prior six purchased seats.
  const reopened=createOrganizationStore({databasePath});
  t.after(()=>reopened.close());
- assert.equal(current.prepare('SELECT COUNT(*) AS n FROM seats WHERE org=? AND app=?').get('legacy','dataduck').n,1);
+ const check=new DatabaseSync(databasePath);
+ assert.equal(check.prepare('SELECT COUNT(*) AS n FROM seats WHERE org=? AND app=?').get('legacy','dataduck').n,1);
+ check.close();
 });
 
 test('historical six-app paid Bundle renewals can be planned, but NEW six-app Bundle purchases cannot',()=>{
