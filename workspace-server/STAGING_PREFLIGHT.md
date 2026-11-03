@@ -230,7 +230,14 @@ Use the [offline local source gate](staging-seven-source-gate.mjs) to compare
 SEVEN **pristine, reviewed local Git checkout directories** with the
 immutable QA lock, before attempting any first-install planning. This is
 for the operator's trusted source checkout machine, not for GitHub Pages or
-production:
+production. **Run the command from a separate, reviewed operator-tooling
+checkout containing this refreshed QA lock** (the repository revision that
+documents the six new CI results). The Workspace source within the seven
+staging checkouts must instead remain pinned to the exact tested
+`233ca6d376efa2fbddca042cea5106aae92679c0` candidate; its older
+on-commit copy of the QA lock does not contain the later verification
+results. Keep tooling and staging source checkouts separate and do not
+copy a newer lock into the older staging candidate's Git tree:
 
 ```bash
 # The private source root must already exist, with owner-only 0700 permissions.
