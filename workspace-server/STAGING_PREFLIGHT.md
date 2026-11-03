@@ -373,7 +373,7 @@ it never contacts the network. Output never overwrites existing plans.
 | App | Proposed port | Backend private storage | Mandatory operator prerequisites |
 | --- | ---: | --- | --- |
 | CytoDuck (`goflo`) | 3308 | Dedicated SQLite | `SCIENCE_DATABASE_PATH`, `APP_BASE_URL`, separate setup/admin and native Workspace credentials |
-| DuckNote (`eel`) | 3309 | Dedicated PostgreSQL | DB URL or PG variables, independent 32-byte vault key, exact native org binding, `FRONTEND_ORIGIN` / `CANONICAL_ORIGIN` / broker values, backup/restore |
+| DuckNote (`eel`) | 3309 | Dedicated PostgreSQL and external private 0700 runtime | DB URL or PG variables, independent 32-byte vault key, exact native org binding, `FRONTEND_ORIGIN` / `CANONICAL_ORIGIN` / broker values, backup/restore; separate `<native-data-root>/eel/runtime` |
 | DuckPipe (`methpipe`) | 3310 | Dedicated SQLite | `SCIENCE_DATABASE_PATH`, `APP_BASE_URL`, native credentials and app-local permissions |
 | DuckTrain (`mantrain`) | 3311 | Dedicated SQLite | `SCIENCE_DATABASE_PATH`, `APP_BASE_URL`, native identities and training permissions |
 | DuckMan (`duckman`) | 3312 | Dedicated SQLite and document storage | `DUCKMAN_DATABASE_PATH`, `APP_BASE_URL`, existing private files and permissions |
@@ -391,15 +391,30 @@ and independently verify every app's remaining settings, local native
 accounts, consent/MFA and organization/seat grants. The central broker
 `SUITE_CLIENTS` configuration must never be installed in a native app.
 
-**Important DuckNote runtime blocker:** Its existing Node runtime also
-references a `tmp/` directory under its source checkout. The proposed
-native units make the checked-out Git tree read-only to preserve integrity.
-Before installing the DuckNote unit, an operator must review and adapt
-its ephemeral write paths to a separate authorized private runtime
-directory **without** mutating the audited source checkout, and rerun
-the real native PostgreSQL/Workspace tests. Do not weaken
-`ProtectSystem=strict` or point the database at production merely to
-make startup succeed.
+**DuckNote immutable-source runtime requirement:** The source-level
+DuckNote runtime fix (review [DuckNote PR #143](https://github.com/dennisbsj/DuckNote/pull/143))
+introduces an optional `DUCKNOTE_RUNTIME_DIR` outside the checkout.
+The six-native uninstalled unit template now forces the exact path
+`<native-data-root>/eel/runtime` after loading `native.env`, alongside
+its enforced loopback HOST/PORT. No other app receives this override.
+The native environment audit refuses manual `DUCKNOTE_RUNTIME_DIR`
+overrides in an app's env file, requires the exact `eel/runtime`
+directory to exist as a non-symlink, owner-only 0700 path, and rejects
+destructive `reset-eel-database.once` markers. This new precondition
+is also enforced by the complete seven-service offline prestart gate.
+The operator must separately create this directory under the dedicated
+`duckbio-stg-eel` user, confirm its parent access permissions, and
+verify real write access as that account before any service installation.
+
+**Version-lock stop condition:** Never pair these unit templates with
+the historically locked DuckNote source SHA that lacks the runtime
+override. Update the immutable six-app source QA lock ONLY after
+DuckNote's new PR is merged and both the merged-main full CI and native
+real PostgreSQL/Workspace HTTPS browser QA pass. The central source
+prestart audit must then verify that new exact native commit and
+workflow pin before the seven-unit plan can be used. No fallback to
+making the source checkout writable is allowed.
+
 
 Likewise, verify that CytoDuck's `dist/` frontend build was created from
 the exact tested source, that LabDuck's session/SQLite configuration is
