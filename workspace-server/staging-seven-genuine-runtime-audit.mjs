@@ -8,8 +8,9 @@ import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readPrivateConfiguration,validateWorkspaceStagingConfig}
  from './staging-preflight.mjs';
-import {validateCurrentCompatLock,EXPECTED_NATIVE}
- from './six-native-current-compat-audit.mjs';
+import {EXPECTED_NATIVE} from './six-native-current-compat-audit.mjs';
+import {validateSixNativeStagingSnapshot}
+ from './staging-six-native-snapshot.mjs';
 import {auditSevenLocalSources} from './staging-seven-source-gate.mjs';
 import {runWorkspaceStagingReadOnlySmoke}
  from './staging-readonly-smoke.mjs';
@@ -111,7 +112,7 @@ export async function auditSevenGenuineStaging({
 }={}){
  const checks=[];
  if(!config||!lock||!validateWorkspaceStagingConfig(config).ok||
-    !validateCurrentCompatLock(lock).ok||
+    validateSixNativeStagingSnapshot(lock).kind!=='current'||
     config.SUITE_BUILD_SHA!==lock.central.sha)
   return stop(checks,'configuration','invalid_source_locked_staging');
  if(process.platform!=='linux')

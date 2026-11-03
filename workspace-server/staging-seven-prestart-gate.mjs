@@ -7,7 +7,8 @@ import {fileURLToPath} from 'node:url';
 import {approvedPrivateRoot} from './staging-generate-config.mjs';
 import {validateWorkspaceStagingConfig,readPrivateConfiguration}
  from './staging-preflight.mjs';
-import {validateQaLock} from './six-app-source-qa-audit.mjs';
+import {validateSixNativeStagingSnapshot,stagingSnapshotFile}
+ from './staging-six-native-snapshot.mjs';
 import {auditSevenLocalSources} from './staging-seven-source-gate.mjs';
 import {auditSixNativeEnvironmentFiles} from './staging-six-native-env-audit.mjs';
 import {buildSevenOriginProxyPlan} from './staging-seven-proxy-plan.mjs';
@@ -49,7 +50,8 @@ export function auditSevenServicePrestart({
  nodeBinary=process.execPath,runGit
 }={}){
  const checks=[];
- if(!validateWorkspaceStagingConfig(config).ok||!validateQaLock(lock).ok||
+ if(!validateWorkspaceStagingConfig(config).ok||
+    !validateSixNativeStagingSnapshot(lock).ok||
     config.SUITE_BUILD_SHA!==lock.central.sha)
   return fail('reviewed-source-configuration',checks);
  let source,data,proxy,native,central;
@@ -111,13 +113,16 @@ if(invoked){
  const args=process.argv.slice(2);
  const expected=['--config','--sources-root','--private-data-root',
   '--proxy-plan-root','--native-plan-root'];
- if(args.length!==11||!expected.every((key,i)=>args[2*i]===key)||
-    args[10]!=='--confirm-offline-prestart-only'){
-  console.error('Usage: node staging-seven-prestart-gate.mjs --config PRIVATE_JSON --sources-root PRIVATE_GIT_ROOT --private-data-root PRIVATE_NATIVE_ROOT --proxy-plan-root PRIVATE_PROXY_ROOT --native-plan-root PRIVATE_UNIT_ROOT --confirm-offline-prestart-only');
+ const historical=args.length===11&&args[10]==='--confirm-offline-prestart-only';
+ const current=args.length===13&&args[10]==='--snapshot'&&
+  args[11]==='current'&&args[12]==='--confirm-offline-prestart-only';
+ if((!historical&&!current)||!expected.every((key,i)=>args[2*i]===key)){
+  console.error('Usage: node staging-seven-prestart-gate.mjs --config PRIVATE_JSON --sources-root PRIVATE_GIT_ROOT --private-data-root PRIVATE_NATIVE_ROOT --proxy-plan-root PRIVATE_PROXY_ROOT --native-plan-root PRIVATE_UNIT_ROOT [--snapshot current] --confirm-offline-prestart-only');
   process.exitCode=2;
  }else try{
+  const filename=stagingSnapshotFile(current?'current':'historical');
   const lock=JSON.parse(readFileSync(new URL(
-   './six-app-source-qa-lock.json',import.meta.url),'utf8'));
+   './'+filename,import.meta.url),'utf8'));
   const result=auditSevenServicePrestart({
    config:readPrivateConfiguration(args[1]),lock,sourcesRoot:args[3],
    dataRoot:args[5],proxyOutputRoot:args[7],nativeOutputRoot:args[9]

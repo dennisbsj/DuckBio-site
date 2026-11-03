@@ -9,7 +9,8 @@ import {fileURLToPath} from 'node:url';
 import {approvedPrivateRoot} from './staging-generate-config.mjs';
 import {readPrivateConfiguration,validateWorkspaceStagingConfig}
  from './staging-preflight.mjs';
-import {validateQaLock} from './six-app-source-qa-audit.mjs';
+import {validateSixNativeStagingSnapshot,stagingSnapshotFile}
+ from './staging-six-native-snapshot.mjs';
 
 export const STAGING_PROXY_PORTS=Object.freeze({
  workspace:3307,goflo:3308,eel:3309,methpipe:3310,
@@ -31,7 +32,8 @@ export function validateStagingProxyPorts(ports){
 export function buildSevenOriginProxyPlan(config,lock,ports=STAGING_PROXY_PORTS){
  if(!validateWorkspaceStagingConfig(config).ok)
   throw Error('invalid_synthetic_staging_config');
- if(!validateQaLock(lock).ok)throw Error('invalid_source_qa_lock');
+ if(!validateSixNativeStagingSnapshot(lock).ok)
+  throw Error('invalid_source_qa_lock');
  if(config.SUITE_BUILD_SHA!==lock.central.sha)
   throw Error('staging_workspace_sha_not_jointly_verified');
  if(!validateStagingProxyPorts(ports))throw Error('invalid_or_duplicate_proxy_ports');
@@ -118,15 +120,19 @@ export function writeSevenOriginProxyPlan({
 const invoked=process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url);
 if(invoked){
  const args=process.argv.slice(2);
- if(args.length!==5||args[0]!=='--config'||
-    args[2]!=='--private-output-root'||args[4]!=='--confirm-uninstalled-only'){
-  console.error('Usage: node staging-seven-proxy-plan.mjs --config /absolute/private/staging.json --private-output-root /absolute/private/path --confirm-uninstalled-only');
+ const historical=args.length===5&&args[4]==='--confirm-uninstalled-only';
+ const current=args.length===7&&args[4]==='--snapshot'&&
+    args[5]==='current'&&args[6]==='--confirm-uninstalled-only';
+ if((!historical&&!current)||args[0]!=='--config'||
+    args[2]!=='--private-output-root'){
+  console.error('Usage: node staging-seven-proxy-plan.mjs --config PRIVATE_JSON --private-output-root PRIVATE_ROOT [--snapshot current] --confirm-uninstalled-only');
   process.exitCode=2;
  }else{
   try{
    const config=readPrivateConfiguration(args[1]);
+   const filename=stagingSnapshotFile(current?'current':'historical');
    const lock=JSON.parse(readFileSync(
-    new URL('./six-app-source-qa-lock.json',import.meta.url),'utf8'));
+    new URL('./'+filename,import.meta.url),'utf8'));
    writeSevenOriginProxyPlan({config,lock,outputRoot:args[3]});
    console.log('PASS seven distinct synthetic HTTPS proxy templates, uninstalled only');
   }catch{

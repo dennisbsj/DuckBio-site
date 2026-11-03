@@ -8,7 +8,8 @@ import {fileURLToPath} from 'node:url';
 import {approvedPrivateRoot} from './staging-generate-config.mjs';
 import {readPrivateConfiguration,validateWorkspaceStagingConfig}
  from './staging-preflight.mjs';
-import {validateQaLock} from './six-app-source-qa-audit.mjs';
+import {validateSixNativeStagingSnapshot,stagingSnapshotFile}
+ from './staging-six-native-snapshot.mjs';
 import {auditSevenLocalSources} from './staging-seven-source-gate.mjs';
 import {buildSevenOriginProxyPlan,STAGING_PROXY_PORTS}
  from './staging-seven-proxy-plan.mjs';
@@ -58,7 +59,8 @@ export function prepareSixNativeServicePlan({
 }={}){
  if(!validateWorkspaceStagingConfig(config).ok)
   throw Error('invalid_synthetic_staging_config');
- if(!validateQaLock(lock).ok)throw Error('invalid_source_qa_lock');
+ if(!validateSixNativeStagingSnapshot(lock).ok)
+  throw Error('invalid_source_qa_lock');
  const source=approvedPath(sourcesRoot),data=approvedPath(dataRoot);
  const centralData=approvedPath(resolve(config.SUITE_AUTH_DB_PATH,'..'));
  if([source,data].some(v=>overlaps(v,centralData))||overlaps(source,data))
@@ -194,16 +196,20 @@ export function writeSixNativeServicePlan({
 const invoked=process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url);
 if(invoked){
  const args=process.argv.slice(2);
- if(args.length!==9||args[0]!=='--config'||args[2]!=='--sources-root'||
-    args[4]!=='--private-data-root'||args[6]!=='--private-output-root'||
-    args[8]!=='--confirm-uninstalled-only'){
-  console.error('Usage: node staging-six-native-services.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_GIT_CHECKOUTS --private-data-root PRIVATE_NATIVE_DATA_ROOT --private-output-root PRIVATE_PLAN_ROOT --confirm-uninstalled-only');
+ const historical=args.length===9&&args[8]==='--confirm-uninstalled-only';
+ const current=args.length===11&&args[8]==='--snapshot'&&
+  args[9]==='current'&&args[10]==='--confirm-uninstalled-only';
+ if((!historical&&!current)||args[0]!=='--config'||
+    args[2]!=='--sources-root'||args[4]!=='--private-data-root'||
+    args[6]!=='--private-output-root'){
+  console.error('Usage: node staging-six-native-services.mjs --config PRIVATE_JSON --sources-root PRIVATE_CHECKOUTS --private-data-root PRIVATE_ROOT --private-output-root PRIVATE_PLAN_ROOT [--snapshot current] --confirm-uninstalled-only');
   process.exitCode=2;
  }else{
   try{
    const config=readPrivateConfiguration(args[1]);
+   const filename=stagingSnapshotFile(current?'current':'historical');
    const lock=JSON.parse(readFileSync(
-    new URL('./six-app-source-qa-lock.json',import.meta.url),'utf8'));
+    new URL('./'+filename,import.meta.url),'utf8'));
    writeSixNativeServicePlan({
     config,lock,sourcesRoot:args[3],
     dataRoot:args[5],outputRoot:args[7]
