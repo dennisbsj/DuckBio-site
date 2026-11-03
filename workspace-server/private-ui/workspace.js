@@ -47,6 +47,15 @@ function renderSeats(){
   root.append(card);
   const copy=card.cloneNode(true);subscriptions.append(copy);
  }
+ // Distinguish the seventh candidate from purchasable, role-assignable apps.
+ // No dropdown/seat grant is shown until DataDuck's native SSO + licensing pass.
+ for(const app of state.overview.upcomingApps||[]){
+  const card=el('div',undefined,'seat-card');
+  card.append(el('div',app.name),
+   el('strong','Integration in progress'),
+   el('small','Coming soon · no licenses or user access available yet'));
+  root.append(card);
+ }
 }
 function renderMembers(){
  const root=$('members');root.replaceChildren();

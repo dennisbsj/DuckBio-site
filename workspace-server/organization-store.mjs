@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {buildShadowEntitlementPlan} from './subscription-entitlement-planner.mjs';
 import {createStripeLiveEventLedger} from './stripe-live-event-ledger.mjs';
 import {planVerifiedSubscriptionTransition} from './verified-subscription-transition.mjs';
+import {DATADUCK_APP} from './dataduck-integration-candidate.mjs';
 
 const policy=JSON.parse(readFileSync(fileURLToPath(new URL('../suite-permissions.json',import.meta.url)),'utf8'));
 export const APPLICATIONS=Object.freeze([['limsman','LabDuck','LIMSMan'],['goflo','CytoDuck','GoFlo'],['methpipe','DuckPipe','MethPipe'],['eel','DuckNote','EEL'],['duckman','DuckMan','DuckMan'],['mantrain','DuckTrain','ManTrain']].map(([id,name,key])=>Object.freeze({id,name,roles:Object.freeze(Object.keys(policy.apps[key].roles)),rolePermissions:Object.freeze(policy.apps[key].roles),permissions:Object.freeze([...new Set(Object.values(policy.apps[key].roles).flat().filter(p=>p!=='*'))].sort())})));
@@ -337,6 +338,11 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     overview(org,actor){
       requireAdmin(org,actor);
       return {organization:db.prepare('SELECT id,name FROM organizations WHERE id=?').get(org),
+        // Upcoming DataDuck is visible for planning only: no purchases, assignments,
+        // native session, pricing or permissions are enabled by this catalog entry.
+        upcomingApps:[{id:DATADUCK_APP.id,name:DATADUCK_APP.name,
+          status:DATADUCK_APP.lifecycle,licensingAvailable:false,
+          nativeRoles:[...DATADUCK_APP.nativeRoles]}],
         apps:APPLICATIONS.map(app=>({...app,purchased:db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?').get(org,app.id)?.purchased??0,assigned:db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?').get(org,app.id).n,reserved:pendingSeats(org,app.id)})),
         users:db.prepare('SELECT * FROM members WHERE org=? ORDER BY name,account').all(org).map(row=>view(org,row))};
     },
