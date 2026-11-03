@@ -228,4 +228,28 @@ test('six separate first-party native clients exchange only their own PKCE codes
  assert.equal(parent.status,200);
  assert.equal((await parent.json()).authenticated,true,
   'native child-only disconnect must preserve independent Workspace parent login');
+
+ // Global Workspace parent logout invalidates every existing native child
+ // proof, even for clients whose local role was not individually revoked.
+ const logout=await fetch(f.origin+'/api/suite/account/logout',{
+  method:'POST',headers:f.browserHeaders,body:'{}'});
+ assert.equal(logout.status,200,'central logout succeeds with authenticated CSRF');
+ assert.equal((await logout.json()).loggedOut,true);
+ for(const app of apps){
+  const client=f.clients.find(x=>x.id===app.id);
+  const proof=proofs.get(app.id);
+  const introspection=await f.native(client,'/api/suite/auth/introspect',{
+   clientId:app.id,sessionToken:proof});
+  assert.equal(introspection.status,200,app.id+' introspection is opaque');
+  assert.deepEqual(await introspection.json(),{active:false},
+   app.id+' child cannot survive global parent logout');
+  assert.equal((await f.native(client,'/api/suite/native/communications/unread',
+   {sessionToken:proof})).status,401,
+   app.id+' stale proof cannot access communications after central logout');
+ }
+ const signedOut=await fetch(f.origin+'/api/suite/auth/session',{
+  headers:f.browserHeaders});
+ assert.equal(signedOut.status,200);
+ assert.equal((await signedOut.json()).authenticated,false,
+  'replaying a stale central browser cookie must not reinstate Workspace login');
 });
