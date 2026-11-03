@@ -1,0 +1,60 @@
+name: Current six-native seven-service uninstalled plan validation
+
+on:
+  pull_request:
+    paths:
+      - 'workspace-server/staging-six-native-snapshot.mjs'
+      - 'workspace-server/staging-seven-source-gate.mjs'
+      - 'workspace-server/staging-seven-proxy-plan.mjs'
+      - 'workspace-server/staging-six-native-services.mjs'
+      - 'workspace-server/staging-seven-prestart-gate.mjs'
+      - 'workspace-server/tests/staging-current-six-native-plan.test.mjs'
+      - 'workspace-server/CURRENT_SIX_NATIVE_STAGING_PLAN.md'
+      - '.github/workflows/workspace-current-six-native-prestart.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-server/staging-six-native-snapshot.mjs'
+      - 'workspace-server/staging-seven-source-gate.mjs'
+      - 'workspace-server/staging-seven-proxy-plan.mjs'
+      - 'workspace-server/staging-six-native-services.mjs'
+      - 'workspace-server/staging-seven-prestart-gate.mjs'
+      - 'workspace-server/tests/staging-current-six-native-plan.test.mjs'
+      - 'workspace-server/CURRENT_SIX_NATIVE_STAGING_PLAN.md'
+      - '.github/workflows/workspace-current-six-native-prestart.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  original-six-offline-plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Check read-only plan sources and CLI syntax
+        working-directory: workspace-server
+        run: |
+          node --check staging-six-native-snapshot.mjs
+          node --check staging-seven-source-gate.mjs
+          node --check staging-seven-proxy-plan.mjs
+          node --check staging-six-native-services.mjs
+          node --check staging-seven-prestart-gate.mjs
+      - name: Run reviewed newer lock offline and reject source/plan drift
+        working-directory: workspace-server
+        run: |
+          node six-native-current-compat-audit.mjs --offline
+          node --test tests/staging-current-six-native-plan.test.mjs
+      - name: Preserve original historical six-native offline plan regressions
+        working-directory: workspace-server
+        run: |
+          node --test tests/staging-seven-source-gate.test.mjs tests/staging-seven-proxy-plan.test.mjs tests/staging-six-native-services.test.mjs tests/staging-seven-prestart-gate.test.mjs
