@@ -21,6 +21,8 @@ export const WORKSPACE_NATIVE_APPS=Object.freeze([
 const CURRENT=new Set(WORKSPACE_NATIVE_APPS.filter(x=>x!=='dataduck'));
 const safe=value=>typeof value==='string'&&
  /^[A-Za-z0-9_.:-]{1,128}$/.test(value);
+const safeRole=value=>typeof value==='string'&&
+ /^[A-Za-z][A-Za-z0-9 _-]{0,47}$/.test(value)&&value===value.trim();
 const deny=reason=>Object.freeze({candidateReady:false,accessGranted:false,
  licensesGranted:false,loginEnabled:false,reason});
 
@@ -59,7 +61,7 @@ export function createWorkspaceNativeAccessInspector({
      policy.accessGranted!==false||policy.nativeEnforcementRequired!==true||
      policy.appId!==appId||policy.accountId!==parent.subject||
      policy.organizationId!==organizationId||policy.permission!==permission||
-     !safe(policy.role)||!Number.isSafeInteger(policy.verifiedPaidThroughMs)||
+     !safeRole(policy.role)||!Number.isSafeInteger(policy.verifiedPaidThroughMs)||
      policy.verifiedPaidThroughMs<=clock())return null;
   const grant=identityStore.getAccess(parent.subject,appId)?.localIdentity;
   // A unique native organization ID is essential even for the six originals:
