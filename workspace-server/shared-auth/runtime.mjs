@@ -18,6 +18,7 @@ import { createStripeTestReconciler } from '../stripe-test-reconcile.mjs';
 import { createStripeTestWebhookVerifier } from '../stripe-test-webhook.mjs';
 import { createStripeTestWebhookHandler } from '../stripe-test-webhook-handler.mjs';
 import { createSharedAuthGateway, createProtectedStaticHandler } from './gateway.mjs';
+import {validateWorkspaceStagingConfig} from '../staging-preflight.mjs';
 
 function privatePath(value, label) {
   if (typeof value !== 'string' || !isAbsolute(value) || value.split('/').includes('public_html') || (existsSync(value) && realpathSync(value).split('/').includes('public_html'))) throw new Error(`Private ${label} path required`);
@@ -57,6 +58,13 @@ export function createSuiteRuntime({ env = process.env, fetchImpl = globalThis.f
     const config = JSON.parse(readFileSync(privatePath(env.SUITE_ENV_FILE, 'configuration'), 'utf8'));
     if (!config || typeof config !== 'object' || Array.isArray(config) || Object.entries(config).some(([key, value]) => !/^SUITE_[A-Z0-9_]+$/.test(key) || typeof value !== 'string')) throw new Error('Invalid private suite configuration');
     actual = { ...env, ...config };
+  }
+  // Only the explicit synthetic staging profile is gated here. Fail closed
+  // BEFORE opening or creating any SQLite DB, sockets, mail or billing clients.
+  // Ordinary broker/static runtimes with no staging marker are unchanged.
+  if(Object.hasOwn(actual,'SUITE_STAGING_ACK')){
+    const report=validateWorkspaceStagingConfig(actual);
+    if(!report.ok)throw new Error('Unsafe synthetic staging configuration: '+report.errors.join(', '));
   }
   if (actual.SUITE_MODE === 'broker' && actual.NODE_ENV === 'production' && !actual.SUITE_ORGANIZATION_DB_PATH) throw new Error('A private organization database is required for production Workspace login');
   const buildVersion = String(actual.SUITE_BUILD_SHA || 'development');
