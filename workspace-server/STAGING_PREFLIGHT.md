@@ -124,3 +124,24 @@ npm run staging:prepare-ui -- --config /srv/duckbio-private/staging/workspace-st
 The asset installer refuses any invalid synthetic configuration, unreviewed or dirty Git checkout, non-private root, symlinked root, public Pages directory or preexisting `SUITE_ASSET_ROOT`. It copies the 14 explicitly reviewed private HTML/CSS/JS files and six existing source app SVGs, with 0700 directory and 0600 file permissions. It checks local script/style dependencies, writes a private SHA-256 integrity manifest and never touches SQLite, credentials, DNS, email, payment or the network. The operation creates **a new UI directory only** and never updates an installed one; if source copying fails, only the newly created incomplete directory is removed.
 
 This is not a deployment script or a live release/rollback mechanism. It does not prove that the private backend is running or that HTTPS/TLS is configured. Before any staging launch, verify installed app packages, the tested broker/native SHA baseline, local service binding, server logs without secrets, reliable **backup/restore of live WAL-mode databases**, and the separate operator-controlled HTTPS proxy. UI rollouts and credential rotation require a future atomic release-directory switch and rollback review; do **not** delete a running asset directory to make this first-install command accept it.
+
+## Prepare a loopback-only Workspace service and HTTPS reverse-proxy plan (uninstalled)
+
+After creating the private synthetic configuration and source-verified 20-file UI bundle, generate two **uninstalled** operator-review templates:
+
+```bash
+cd workspace-server
+npm run staging:service-plan -- \
+  --config /srv/duckbio-private/staging/workspace-staging.json \
+  --service-user duckbio-staging \
+  --listen-port 3307 \
+  --confirm-plan-only
+```
+
+This command **does not** install or launch systemd/Caddy, access the network, request TLS certificates, provision DNS or create SQLite databases. It requires the same strict synthetic-only staging config, its owner-readable private JSON file, the exact clean reviewed Git SHA and 20 installed UI assets verified against the original source and manifest. It refuses prior plans and symlinked/replaced private files.
+
+The private output directory `staging-service-plan` contains a proposed `duckbio-workspace-staging.service` systemd unit, one-host `Caddyfile.workspace-staging` snippet, and a SHA-256 manifest. The systemd unit runs the existing broker as a dedicated non-root account with `NODE_ENV=production`, `SUITE_ENV_FILE` and restrictive filesystem writes. The existing runtime binds to **127.0.0.1** on the chosen port, not a public interface. The Caddy snippet routes only the exact Workspace staging hostname to that loopback port. The six native apps require their own independently reviewed deployments.
+
+Before manually installing any files, the operator must verify DNS ownership, an isolated staging server, its Node executable, dedicated account/group ownership and 0600 file access, the installation path outside any public webroot, TLS policy and service hardening. Review the generated unit against the actual Linux distribution, run `caddy validate` on the chosen host, and independently approve any public listener or ACME certificate request. **Starting Caddy may create external certificate requests and expose a public service; generating the templates does not.**
+
+Before any real staging logins, perform a proper private backup/restore procedure for live SQLite WAL and all native app databases, remove the one-use synthetic bootstrap token after first use, install all six apps with separate credentials, and run both anonymous seven-origin and authenticated PKCE/role/entitlement staging tests. The offline plan alone is **not** an installed service or production approval.
