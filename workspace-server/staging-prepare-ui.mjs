@@ -84,7 +84,7 @@ export function preparePrivateStagingUi(config,{runGit=execFileSync}={}){
   const entries={};
   for(const [name,bytes] of files){
    const path=join(target,name);
-   if(name.includes('/'))mkdirSync(dirname(path),{mode:0o700});
+   if(name.includes('/'))mkdirSync(dirname(path),{mode:0o700,recursive:true});
    copyFileSync(name.startsWith('assets/')?
     join(ICON_ROOT,ICON_FILES[name.slice(7,-4)]):
     join(UI_ROOT,name),path,constants.COPYFILE_EXCL);
