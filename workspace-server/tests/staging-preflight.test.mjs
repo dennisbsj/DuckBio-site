@@ -78,7 +78,7 @@ test('client secrets are present, private, unambiguous and not echoed into failu
  fails(bad,'unique_private_client_secrets_required');
  fails(withClients(base,list=>list[0].secret=list[1].secret),
   'unique_private_client_secrets_required');
- fails(withClients(base,list=>list[0].secret+='\\ninvalid'),
+ fails(withClients(base,list=>list[0].secret+='\ninvalid'),
   'unique_private_client_secrets_required');
  assert.equal(JSON.stringify(report(bad)).includes('short'),false);
 });
