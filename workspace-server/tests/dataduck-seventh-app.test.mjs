@@ -121,14 +121,13 @@ test('existing six-app organizations gain only an unpaid DataDuck seat row on mi
  for(const [index,app] of SIX.entries())old.prepare('INSERT INTO seats VALUES(?,?,?)').run('legacy',app,index+1);
  old.close();
  const store=createOrganizationStore({databasePath});
- t.after(()=>store.close());
  const current=new DatabaseSync(databasePath);
- t.after(()=>current.close());
+
  const seats=current.prepare('SELECT app,purchased FROM seats WHERE org=? ORDER BY app').all('legacy');
  assert.equal(seats.length,7);
  assert.equal(seats.find(x=>x.app==='dataduck').purchased,0);
  for(const [i,app] of SIX.entries())assert.equal(seats.find(x=>x.app===app).purchased,i+1);
- store.close();
+ current.close();store.close();
  // Reopening twice never resets any of the prior six purchased seats.
  const reopened=createOrganizationStore({databasePath});
  t.after(()=>reopened.close());
@@ -184,12 +183,9 @@ test('central identity store accepts a DataDuck native mapping but does not gran
   password:'Synthetic only passphrase 12345',
  });
  const id=randomUUID(),org=randomUUID();
- const grant=identity.grantAppAccess({userId:user.id,appId:'dataduck',
+ identity.grantAppAccess({userId:user.id,appId:'dataduck',
   localUserId:id,organizationId:org});
- assert.equal(grant.appId,'dataduck');
- assert.equal(grant.localUserId,id);
- const look=identity.getAppAccess(user.id,'dataduck');
- assert.equal(look.localUserId,id);
- assert.equal(look.organizationId,org);
- assert.equal(identity.getAppAccess(user.id,'goflo'),null);
+ const look=identity.getAccess(user.id,'dataduck');
+ assert.deepEqual(look,{localIdentity:{userId:id,organizationId:org}});
+ assert.equal(identity.getAccess(user.id,'goflo'),null);
 });
