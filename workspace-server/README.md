@@ -11,3 +11,7 @@ This directory is **server-side source**, not a GitHub Pages app or an activated
 - `npm test` runs synthetic account, CSRF, PKCE, native-user mapping, session-revocation, SQLite and portability tests. Production deployment, email delivery, checkout, Google login and web-based admin are separate milestones.
 
 See [the Workspace issue](https://github.com/dennisbsj/DuckBio-site/issues/26) for the remaining work. Do not claim user login is functional or published merely because the backend source tests pass.
+
+## Synthetic staging configuration gate
+
+Before configuring a private staging host, run the [read-only six-app staging preflight](STAGING_PREFLIGHT.md) on an owner-readable private configuration file. This checks exact native app callbacks, isolated HTTPS origins, paths and outbound-integration opt-outs without connecting to any service or opening databases. A PASS is **not** evidence that staging is installed, that real roles and payments work, or that production is authorized.
