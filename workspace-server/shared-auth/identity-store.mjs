@@ -350,7 +350,7 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
     // Explicit VERIFIED opt-in organization mapping, fully separate from the
     // six-app global grant and broker API. No automatic migration.
     bindVerifiedOrganizationNativeLink(input){return verifiedNativeLink(input);},
-    migrateVerifiedLegacyNativeLink({actorId,userId,appId,workspaceOrganizationId,nativeOrganizationId}={}){
+    async migrateVerifiedLegacyNativeLink({actorId,userId,appId,workspaceOrganizationId,nativeOrganizationId}={}){
       if(!orgLinksEnabled)fail('org_native_links_disabled');
       if(!uuidPattern.test(userId)||!APP_IDS.has(appId)||!textId(workspaceOrganizationId)||
          !textId(nativeOrganizationId))fail('invalid_org_native_link');
