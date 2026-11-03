@@ -215,3 +215,56 @@ It creates a new, non-overwriting, owner-only `post-bootstrap/` directory contai
 **Manual release step:** Review file access for the dedicated non-root service account, the systemd override and the SHA-256 manifest; install the drop-in only with separate operator approval, reload systemd, restart the **synthetic staging** service, and confirm fresh login plus no reinitialization. Only after independently verifying the new runtime configuration, your backup/restore and successful restart should the original bootstrap-bearing JSON be retired according to the organization's approved secret-handling policy. Do not delete or rotate an unreviewed live configuration or treat generating the drop-in as completing the switch.
 
 The procedure is not used for existing real accounts or production and does not alter any native-app server configuration. The original private file is deliberately preserved to prevent accidental loss of other client credentials; therefore a PASS does not by itself mean the old token has disappeared from the host.
+
+## Verify seven local Git source checkouts (offline release-candidate gate)
+
+The [coordinated source QA lock](six-app-source-qa-lock.json) is a
+**historical** six-app compatibility snapshot, not a guarantee about a later
+Workspace `main` commit. Each native app's HTTPS integration CI tested a
+specific Workspace version. Additional central staging features were
+subsequently developed **after** that tested version. A staging service
+configuration must **not silently assume** those later changes remain
+compatible with all six native apps.
+
+Use the [offline local source gate](staging-seven-source-gate.mjs) to compare
+SEVEN **pristine, reviewed local Git checkout directories** with the
+immutable QA lock, before attempting any first-install planning. This is
+for the operator's trusted source checkout machine, not for GitHub Pages or
+production:
+
+```bash
+# The private source root must already exist, with owner-only 0700 permissions.
+# It contains exactly: DuckBio-site, CytoDuck, DuckNote, DuckPipe,
+# DuckTrain, DuckMan and LabDuck (each a genuine Git repository).
+cd workspace-server
+npm run staging:sources -- \
+  --config /srv/duckbio-private/staging/workspace-staging.json \
+  --sources-root /srv/duckbio-private/seven-reviewed-sources \
+  --confirm-offline-sources
+```
+
+The check performs **local, read-only Git commands only**: exact Git remote
+ownership, clean worktree, full immutable `HEAD` commit, and the identical
+reviewed Workspace pin inside each native app's tracked CI workflow.
+It rejects missing, extra, symlinked, dirty or mismatched source trees
+and rejects a `SUITE_BUILD_SHA` that differs from the six-app-tested
+Workspace SHA. No credentials, GitHub API access, DNS, TLS, network
+requests, checkout, installation, service start, database write, customer
+data or native app modification is performed. Failures print only fixed
+codes and app IDs, never source paths or configuration secrets.
+
+**Expected current blocker:** The existing QA lock's central Workspace
+commit is `5e0924e9844d36de75ca8e10c08048b3db373359`, while newer
+central commits include staging preparation helpers not covered by all
+six apps' pinned browser CI. A staging source set using those later
+central revisions therefore **must fail** this gate until a new central
+candidate has been independently re-tested with every native app and
+a replacement immutable QA lock is reviewed. Do not work around the
+gate by changing the configured SHA or falsely marking earlier CI as
+evidence for a newer build.
+
+This is a conservative **source compatibility** gate only. Even a PASS
+does not demonstrate a running seven-origin environment, correct native
+service provisioning, private TLS, real authentication, live licensed seats,
+backups or production readiness. Any staging deployment still requires
+separately approved trusted hosting and the remaining release gates.
