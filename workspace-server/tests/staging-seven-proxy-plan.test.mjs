@@ -52,8 +52,8 @@ test('creates seven distinct native/Workspace HTTPS host routes to unique loopba
   assert.equal(caddy.split(item.hostname+' {').length,2);
  }
  assert.equal(caddy.match(/^  reverse_proxy 127\.0\.0\.1:\d+ \{$/gm)?.length,7);
- assert.equal(caddy.match(/^  header_up Host \{host\}$/gm)?.length,7);
- assert.equal(caddy.match(/^  header_up -X-Forwarded-For$/gm)?.length,7);
+ assert.equal(caddy.match(/^    header_up Host \{host\}$/gm)?.length,7);
+ assert.equal(caddy.match(/^    header_up -X-Forwarded-For$/gm)?.length,7);
  assert.equal(new Set(manifest.routes.map(r=>r.loopbackPort)).size,7);
  assert(!/0\.0\.0\.0|tls internal|reverse_proxy \*:|https?:\/\/|:443\b/.test(
   caddy.split('\n').filter(x=>!x.startsWith('#')).join('\n')));
