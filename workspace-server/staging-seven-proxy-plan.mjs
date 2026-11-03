@@ -69,6 +69,7 @@ export function buildSevenOriginProxyPlan(config,lock,ports=STAGING_PROXY_PORTS)
    '    ?Referrer-Policy "no-referrer"',
    '  }',
    '  reverse_proxy 127.0.0.1:'+item.port+' {',
+   '    header_up Host {http.request.host}',
    '    header_up -Forwarded',
    '    header_up -X-Forwarded-For',
    '    header_up -X-Forwarded-Host',
