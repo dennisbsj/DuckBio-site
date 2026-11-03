@@ -7,6 +7,7 @@ on:
       - 'workspace-server/tests/staging-service-plan.test.mjs'
       - 'workspace-server/tests/staging-proxy-https-live.mjs'
       - 'workspace-server/tests/staging-seven-proxy-plan.test.mjs'
+      - 'workspace-server/tests/staging-six-native-services.test.mjs'
       - 'workspace-server/six-app-source-qa-lock.json'
       - 'workspace-server/private-ui/**'
       - 'workspace-server/package.json'
@@ -18,6 +19,7 @@ on:
       - 'workspace-server/tests/staging-service-plan.test.mjs'
       - 'workspace-server/tests/staging-proxy-https-live.mjs'
       - 'workspace-server/tests/staging-seven-proxy-plan.test.mjs'
+      - 'workspace-server/tests/staging-six-native-services.test.mjs'
       - 'workspace-server/six-app-source-qa-lock.json'
       - 'workspace-server/private-ui/**'
       - 'workspace-server/package.json'
@@ -218,6 +220,19 @@ jobs:
             DUCKBIO_PROXY_TEST_PORT=18443 \
             node --test tests/staging-proxy-https-live.mjs
           echo 'PASS real Caddy TLS and Workspace Node synthetic loopback integration (CI only)'
+      - name: Verify all six native systemd templates with real Ubuntu systemd parser (not installed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Six throwaway local service identities, only on the ephemeral runner.
+          for id in goflo eel methpipe mantrain duckman limsman; do
+            user="duckbio-stg-$id"
+            sudo groupadd --system "$user"
+            sudo useradd --system --no-create-home --gid "$user" "$user"
+          done
+          cd workspace-server
+          DUCKBIO_VERIFY_NATIVE_SYSTEMD=1 \
+            node --test tests/staging-six-native-services.test.mjs
       - name: Remove all synthetic plan files
         if: always()
         shell: bash
