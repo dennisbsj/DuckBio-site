@@ -5,6 +5,7 @@ on:
     paths:
       - 'workspace-server/staging-*.mjs'
       - 'workspace-server/tests/staging-service-plan.test.mjs'
+      - 'workspace-server/tests/staging-proxy-https-live.mjs'
       - 'workspace-server/tests/staging-seven-proxy-plan.test.mjs'
       - 'workspace-server/six-app-source-qa-lock.json'
       - 'workspace-server/private-ui/**'
@@ -15,6 +16,7 @@ on:
     paths:
       - 'workspace-server/staging-*.mjs'
       - 'workspace-server/tests/staging-service-plan.test.mjs'
+      - 'workspace-server/tests/staging-proxy-https-live.mjs'
       - 'workspace-server/tests/staging-seven-proxy-plan.test.mjs'
       - 'workspace-server/six-app-source-qa-lock.json'
       - 'workspace-server/private-ui/**'
@@ -142,6 +144,80 @@ jobs:
           assert.ok(!serialized.includes('0.0.0.0:'),
             'Caddy must not proxy a public native backend');
           NODE
+      - name: Exercise actual Workspace behind Caddy via loopback TLS (synthetic only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          qa="$(mktemp -d)"
+          chmod 700 "$qa"
+          container="duckbio-qa-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          pid=""
+          cleanup() {
+            rc="$?"
+            if [[ "$rc" -ne 0 ]]; then
+              echo 'Diagnostic: ephemeral loopback listeners'
+              ss -lntp | grep -E ':(3307|18443|443)\\b' || true
+              echo 'Diagnostic: synthetic Caddy startup'
+              docker logs "$container" 2>&1 | tail -30 || true
+              echo 'Diagnostic: synthetic Workspace process'
+              tail -25 "$RUNNER_TEMP/duckbio-staging-node.log" 2>/dev/null || true
+            fi
+            docker rm -f "$container" >/dev/null 2>&1 || true
+            if [[ -n "$pid" ]]; then
+              kill "$pid" >/dev/null 2>&1 || true
+              wait "$pid" >/dev/null 2>&1 || true
+            fi
+            rm -rf -- "$qa"
+            rm -f "$RUNNER_TEMP/duckbio-staging-node.log"
+          }
+          trap cleanup EXIT
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -sha256 \
+            -keyout "$qa/key.pem" -out "$qa/cert.pem" \
+            -subj '/CN=staging-workspace.duckbio.net' \
+            -addext 'subjectAltName=DNS:staging-workspace.duckbio.net' \
+            >/dev/null 2>&1
+          chmod 600 "$qa/key.pem" "$qa/cert.pem"
+          node --input-type=module - \
+            "$STAGING_QA_TMP/staging-service-plan/Caddyfile.workspace-staging" \
+            "$qa/Caddyfile.qa" <<'NODE'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const template=readFileSync(process.argv[2],'utf8');
+          const opening='staging-workspace.duckbio.net {\n';
+          assert.equal(template.split(opening).length,2,
+            'must test the actual reviewed, single Workspace site block');
+          const site=template.replace(opening,opening+
+            '  bind 127.0.0.1\n  tls /qa/cert.pem /qa/key.pem\n');
+          const globalOptions=[
+            '{','  admin off','  auto_https off','  https_port 18443','}',''
+          ].join('\n');
+          writeFileSync(process.argv[3],globalOptions+'\n'+site,{flag:'wx',mode:0o600});
+          NODE
+          # Certificate and listener are synthetic; no ACME, DNS or public ports.
+          docker run --rm --network none --read-only \
+            --tmpfs /tmp --tmpfs /data --tmpfs /config \
+            -v "$qa:/qa:ro" \
+            caddy:2.10.2 caddy validate \
+            --config /qa/Caddyfile.qa --adapter caddyfile
+          cd workspace-server
+          NODE_ENV=production PORT=3307 \
+            SUITE_ENV_FILE="$STAGING_QA_TMP/workspace-staging.json" \
+            node shared-auth/runtime.mjs \
+            > "$RUNNER_TEMP/duckbio-staging-node.log" 2>&1 &
+          pid="$!"
+          docker run --detach --name "$container" --network host \
+            --user "$(id -u):$(id -g)" \
+            --cap-drop ALL --cap-add NET_BIND_SERVICE \
+            --security-opt no-new-privileges --read-only \
+            --tmpfs /tmp --tmpfs /data --tmpfs /config \
+            -v "$qa:/qa:ro" \
+            caddy:2.10.2 caddy run \
+            --config /qa/Caddyfile.qa --adapter caddyfile >/dev/null
+          DUCKBIO_PROXY_TEST_CONFIG="$STAGING_QA_TMP/workspace-staging.json" \
+            DUCKBIO_PROXY_TEST_CA="$qa/cert.pem" \
+            DUCKBIO_PROXY_TEST_PORT=18443 \
+            node --test tests/staging-proxy-https-live.mjs
+          echo 'PASS real Caddy TLS and Workspace Node synthetic loopback integration (CI only)'
       - name: Remove all synthetic plan files
         if: always()
         shell: bash
