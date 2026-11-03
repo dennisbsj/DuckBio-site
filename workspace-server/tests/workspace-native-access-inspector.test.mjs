@@ -30,14 +30,16 @@ function fixture(t,{live=true}={}){
  const identity={
   getParentSession:id=>id==='session-alpha'?{id,subject:'alice',expiresAt:2200000000000}:null,
   getUser:id=>id==='alice'?{id,state:centralActive?'active':'disabled'}:null,
-  getAccess:(id,appId)=>id==='alice'&&appId==='goflo'
-   ?{localIdentity:{userId:nativeUserId,organizationId:'native-org-one'}}:null
  };
+ const scopedNativeLinks={get:({workspaceAccountId,workspaceOrganizationId,appId})=>
+  workspaceAccountId==='alice'&&workspaceOrganizationId==='alpha'&&appId==='goflo'
+   ?{workspaceAccountId,workspaceOrganizationId,appId,nativeUserId,
+      nativeOrganizationId:'native-org-one',revision:1}:null};
  let verifyNativeMapping=async x=>nativeVerified&&x.appId==='goflo'&&
    x.workspaceAccountId==='alice'&&x.workspaceOrganizationId==='alpha'&&
    x.nativeUserId===nativeUserId&&x.nativeOrganizationId==='native-org-one';
  const create=(verifier=verifyNativeMapping)=>createInspector({
-  identityStore:identity,organizationStore:store,
+  identityStore:identity,organizationStore:store,scopedNativeLinks,
   verifyNativeMapping:verifier,clock:()=>now
  });
  const input={sessionId:'session-alpha',organizationId:'alpha',
@@ -155,7 +157,8 @@ test('permission revocation or identity remapping DURING native verification inv
 });
 test('missing private trust adapters cannot accidentally yield usable access',async()=>{
  assert.throws(()=>createInspector(),/private_access_stores_required/);
- assert.throws(()=>createInspector({identityStore:{getParentSession(){},getUser(){},getAccess(){}},
-  organizationStore:{currentSessionOrganization(){},verifiedNativePermissionCandidate(){}}}),
+ assert.throws(()=>createInspector({identityStore:{getParentSession(){},getUser(){}},
+  organizationStore:{currentSessionOrganization(){},verifiedNativePermissionCandidate(){}},
+  scopedNativeLinks:{get(){}}}),
  /trusted_native_mapping_verifier_required/);
 });
