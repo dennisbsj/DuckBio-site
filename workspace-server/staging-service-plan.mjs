@@ -1,7 +1,8 @@
 // Source-verified, UNINSTALLED synthetic Workspace service + HTTPS proxy templates.
 // No systemd, Caddy, DNS, network, account or database changes.
 import {createHash} from 'node:crypto';
-import {existsSync,lstatSync,mkdirSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {existsSync,lstatSync,mkdirSync,readFileSync,rmSync,statSync,writeFileSync} from 'node:fs';
 import {dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {approvedPrivateRoot} from './staging-generate-config.mjs';
@@ -15,6 +16,22 @@ function safePath(s){
     s.includes('//')||s.split('/').includes('..'))
   throw Error('unsafe_service_path');
  return s;
+}
+export function verifyNodeStagingExecutable(binary,{runNode=execFileSync}={}){
+ if(!safePath(binary).endsWith('/node'))
+  throw Error('node_executable_required');
+ try{
+  const stat=statSync(binary);
+  if(!stat.isFile()||(stat.mode&0o111)===0)
+   throw Error('node_executable_not_runnable');
+  const version=runNode(binary,['--version'],{
+   encoding:'utf8',timeout:3000,stdio:['ignore','pipe','ignore']
+  }).trim();
+  const m=/^v(\d+)\.(\d+)\.(\d+)$/.exec(version);
+  if(!m||Number(m[1])<22||(Number(m[1])===22&&Number(m[2])<13))
+   throw Error('unsupported_node_version');
+  return version;
+ }catch{throw Error('node_executable_unverified')}
 }
 function verifyAssets(config,root){
  const target=join(root,'private-ui');
@@ -50,7 +67,7 @@ function verifyAssets(config,root){
  return names.length;
 }
 export function prepareStagingServicePlan(config,{
- serviceUser='duckbio-staging',listenPort=3307,nodeBinary='/usr/bin/node',runGit
+ serviceUser='duckbio-staging',listenPort=3307,nodeBinary=process.execPath,runGit
 }={}){
  if(!validateWorkspaceStagingConfig(config).ok)
   throw Error('invalid_synthetic_staging_config');
@@ -62,8 +79,7 @@ export function prepareStagingServicePlan(config,{
     serviceUser==='root')throw Error('dedicated_service_user_required');
  if(!Number.isInteger(listenPort)||listenPort<1024||listenPort>65535)
   throw Error('private_port_required');
- if(!safePath(nodeBinary).endsWith('/node'))
-  throw Error('node_executable_required');
+ const nodeVersion=verifyNodeStagingExecutable(nodeBinary);
  const configPath=join(root,'workspace-staging.json');
  if(!existsSync(configPath)||
     JSON.stringify(readPrivateConfiguration(configPath))!==JSON.stringify(config))
@@ -138,6 +154,7 @@ export function prepareStagingServicePlan(config,{
   writeFileSync(join(dir,'plan-manifest.json'),
    JSON.stringify({format:'duckbio-staging-service-plan-v1',
     reviewedGitSha:config.SUITE_BUILD_SHA,assetCount,port:listenPort,
+    nodeVersion,
     unitSha256:hash(Buffer.from(unit)),caddySha256:hash(Buffer.from(caddy)),
     scope:'templates-only-no-deployment'},null,2)+'\n',
    {flag:'wx',mode:0o600});
@@ -147,14 +164,17 @@ export function prepareStagingServicePlan(config,{
 const invoked=process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url);
 if(invoked){
  const args=process.argv.slice(2);
- if(args.length!==7||args[0]!=='--config'||
-    args[2]!=='--service-user'||args[4]!=='--listen-port'||
-    args[6]!=='--confirm-plan-only'){
-  console.error('Usage: node staging-service-plan.mjs --config PRIVATE_JSON --service-user duckbio-staging --listen-port 3307 --confirm-plan-only');
+ const hasBinary=args.length===9&&args[6]==='--node-binary'&&
+    args[8]==='--confirm-plan-only';
+ const standard=args.length===7&&args[6]==='--confirm-plan-only';
+ if((!hasBinary&&!standard)||args[0]!=='--config'||
+    args[2]!=='--service-user'||args[4]!=='--listen-port'){
+  console.error('Usage: node staging-service-plan.mjs --config PRIVATE_JSON --service-user duckbio-staging --listen-port 3307 [--node-binary /absolute/path/to/node] --confirm-plan-only');
   process.exitCode=2;
  }else try{
   prepareStagingServicePlan(readPrivateConfiguration(args[1]),
-   {serviceUser:args[3],listenPort:Number(args[5])});
+   {serviceUser:args[3],listenPort:Number(args[5]),
+    nodeBinary:hasBinary?args[7]:process.execPath});
   console.log('PASS private Workspace service and HTTPS proxy templates (not installed)');
  }catch{
   console.error('FAIL staging service plan (source, private UI and config verification required)');

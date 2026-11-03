@@ -10,7 +10,8 @@ import {fileURLToPath} from 'node:url';
 import {writeSyntheticStagingConfig} from '../staging-generate-config.mjs';
 import {preparePrivateStagingUi} from '../staging-prepare-ui.mjs';
 import {readPrivateConfiguration} from '../staging-preflight.mjs';
-import {prepareStagingServicePlan} from '../staging-service-plan.mjs';
+import {prepareStagingServicePlan,verifyNodeStagingExecutable}
+ from '../staging-service-plan.mjs';
 
 const repo=fileURLToPath(new URL('../../',import.meta.url));
 const sha=()=>execFileSync('git',['rev-parse','HEAD'],
@@ -51,6 +52,7 @@ test('creates only two reviewed, uninstalled service/proxy templates, never star
  const manifest=JSON.parse(readFileSync(join(dir,'plan-manifest.json'),'utf8'));
  assert.equal(manifest.reviewedGitSha,sha());
  assert.equal(manifest.assetCount,20);
+ assert.equal(manifest.nodeVersion,process.version);
  assert.equal(manifest.unitSha256,hash(unit));
  assert.equal(manifest.caddySha256,hash(caddy));
  assert.equal(manifest.scope,'templates-only-no-deployment');
@@ -59,7 +61,9 @@ test('creates only two reviewed, uninstalled service/proxy templates, never star
  assert.match(unit,/^Environment=NODE_ENV=production$/m);
  assert.match(unit,/^Environment=PORT=3307$/m);
  assert.match(unit,/^Environment=SUITE_ENV_FILE=\/.*\/workspace-staging.json$/m);
- assert.match(unit,/^ExecStart=\/usr\/bin\/node \/.*\/shared-auth\/runtime.mjs$/m);
+ assert.ok(unit.split('\n').some(line=>line.startsWith('ExecStart='+process.execPath+' ')&&
+  line.endsWith('/shared-auth/runtime.mjs')),
+  'service unit must use the Node executable actually verified on this host');
  assert.match(unit,/^UMask=0077$/m);
  assert.match(unit,/^NoNewPrivileges=true$/m);
  assert.match(unit,/^ProtectSystem=strict$/m);
@@ -99,6 +103,20 @@ test('rejects missing private UI manifest, mismatched source SHA and config mism
  assert.throws(()=>prepareStagingServicePlan(incorrect),/private_config_file_mismatch/);
  assert.equal(existsSync(join(root,'staging-service-plan')),false);
 });
+test('only an existing executable Node 22.13+ binary is permitted for staging',()=>{
+ assert.equal(verifyNodeStagingExecutable(process.execPath),process.version);
+ for(const version of ['v18.20.0','v20.19.5','v22.12.9','vnot-a-node','v22.12.0']){
+  assert.throws(()=>verifyNodeStagingExecutable(process.execPath,{
+   runNode:()=>version
+  }),/node_executable_unverified/);
+ }
+ for(const version of ['v22.13.0','v24.0.0','v26.1.0'])
+  assert.equal(verifyNodeStagingExecutable(process.execPath,{
+   runNode:()=>version
+  }),version);
+ assert.throws(()=>verifyNodeStagingExecutable('/missing/server/node'),
+  /node_executable_unverified/);
+});
 test('validates privileged service identity, loopback port and safely escaped Node binary path',t=>{
  const {root,cfg}=setup(t);
  for(const bad of [
@@ -129,7 +147,8 @@ test('CLI requires deliberate plan-only flag and never prints credentials',t=>{
  const denied=spawnSync(process.execPath,argv,{encoding:'utf8',timeout:10000});
  assert.equal(denied.status,2);
  assert.equal(existsSync(join(root,'staging-service-plan')),false);
- const started=spawnSync(process.execPath,[...argv,'--confirm-plan-only'],
+ const started=spawnSync(process.execPath,[...argv,'--node-binary',
+  process.execPath,'--confirm-plan-only'],
   {encoding:'utf8',timeout:10000});
  assert.equal(started.status,0,started.stderr);
  assert.match(started.stdout,/not installed/);
