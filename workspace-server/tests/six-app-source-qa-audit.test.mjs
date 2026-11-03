@@ -82,7 +82,7 @@ test('snapshot rejects schema drift, foreign origins, duplicate runs and invente
 });
 test('documentation must contain each exact immutable SHA and real evidence run ID',()=>{
  assert.deepEqual(validateDocumentation(frozen,docs),{ok:true,errors:[]});
- assert.equal(validateDocumentation(frozen,docs.replace(frozen.apps[1].sha,'' )).ok,false);
+ assert.equal(validateDocumentation(frozen,docs.replaceAll(frozen.apps[1].sha,'' )).ok,false);
  assert.equal(validateDocumentation(frozen,docs.replace(
   '/actions/runs/'+frozen.central.runId,'/actions/runs/0')).ok,false);
 });
