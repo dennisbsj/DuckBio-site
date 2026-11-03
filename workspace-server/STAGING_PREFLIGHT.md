@@ -196,3 +196,22 @@ The private output directory `staging-service-plan` contains a proposed `duckbio
 Before manually installing any files, the operator must verify DNS ownership, an isolated staging server, its Node executable, dedicated account/group ownership and 0600 file access, the installation path outside any public webroot, TLS policy and service hardening. Review the generated unit against the actual Linux distribution, run `caddy validate` on the chosen host, and independently approve any public listener or ACME certificate request. **Starting Caddy may create external certificate requests and expose a public service; generating the templates does not.**
 
 Before any real staging logins, perform a proper private backup/restore procedure for live SQLite WAL and all native app databases, remove the one-use synthetic bootstrap token after first use, install all six apps with separate credentials, and run both anonymous seven-origin and authenticated PKCE/role/entitlement staging tests. The offline plan alone is **not** an installed service or production approval.
+
+## Retire the one-time synthetic administrator setup token after first activation
+
+The generated initial `workspace-staging.json` intentionally contains a one-time `SUITE_SETUP_TOKEN`. Once the **synthetic** administrator has been created successfully, the service must not continue to read a configuration file containing that bootstrap token. Prepare a second private runtime configuration without the token. **Stop the Workspace broker first**, verify that all four SQLite stores have checkpointed/closed, and use the source-only command:
+
+```bash
+cd workspace-server
+npm run staging:retire-bootstrap -- \
+  --config /srv/duckbio-private/staging/workspace-staging.json \
+  --confirm-broker-stopped-and-synthetic
+```
+
+This command accepts only the existing owner-readable, synthetic-only private configuration, in the same private root as the four SQLite files. It opens each SQLite database **read-only**, checks `PRAGMA quick_check`, refuses remaining `-wal`/`-shm` files, and verifies that the exact setup token's stored SHA-256 hash is marked **consumed** and that there is at least one active administrator with a stored password credential. It is deliberately NOT a substitute for verifying that the service is stopped and safely backed up.
+
+It creates a new, non-overwriting, owner-only `post-bootstrap/` directory containing a `workspace-staging-runtime.json` with the setup token removed, a `runtime-without-setup-token.conf` systemd drop-in **template** pointing `SUITE_ENV_FILE` at that new runtime JSON, and a SHA-256 manifest. The six independent native client secrets, reviewed SHA, all app origins and private DB paths remain identical. The command never edits the initial file, the databases, the running systemd service or proxy, and never logs private values.
+
+**Manual release step:** Review file access for the dedicated non-root service account, the systemd override and the SHA-256 manifest; install the drop-in only with separate operator approval, reload systemd, restart the **synthetic staging** service, and confirm fresh login plus no reinitialization. Only after independently verifying the new runtime configuration, your backup/restore and successful restart should the original bootstrap-bearing JSON be retired according to the organization's approved secret-handling policy. Do not delete or rotate an unreviewed live configuration or treat generating the drop-in as completing the switch.
+
+The procedure is not used for existing real accounts or production and does not alter any native-app server configuration. The original private file is deliberately preserved to prevent accidental loss of other client credentials; therefore a PASS does not by itself mean the old token has disappeared from the host.
