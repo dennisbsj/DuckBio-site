@@ -17,6 +17,24 @@ test('canonical list has exactly six apps and per-app role catalogs',()=>{
  assert.deepEqual(APPLICATIONS.map(x=>x.name),['LabDuck','CytoDuck','DuckPipe','DuckNote','DuckMan','DuckTrain']);
  assert(APPLICATIONS.find(x=>x.id==='eel').roles.includes('scientist'));assert(APPLICATIONS.find(x=>x.id==='limsman').roles.includes('QC'));
 });
+test('DataDuck seventh app is visible as an unlicensed candidate, never a paid seat or role',t=>{
+ const {store}=fixture(t);
+ const view=store.overview('one','admin1');
+ assert.equal(view.apps.length,6,'legacy six app licenses are unchanged');
+ assert.deepEqual(view.upcomingApps,[{
+  id:'dataduck',name:'DataDuck',status:'unreleased-integration-candidate',
+  licensingAvailable:false,nativeRoles:['Admin','Analyst','Reviewer','ReadOnly']
+ }]);
+ assert.equal(view.apps.some(x=>x.id==='dataduck'),false);
+ assert.throws(()=>buy(store,'evt-data','Single',['dataduck']),/invalid_purchase/);
+ assert.throws(()=>store.createSubscriptionDraft({
+  organizationId:'one',actorId:'admin1',plan:'Single',apps:['dataduck'],seats:1
+ }),/invalid_subscription/);
+ assert.throws(()=>store.saveMember({
+  organizationId:'one',actorId:'admin1',member:member('scientist',{dataduck:'Analyst'})
+ }),/invalid_roles/);
+ assert.equal(store.accessFor({organizationId:'one',accountId:'admin1',appId:'dataduck'}),null);
+});
 test('verified Single Mixed Bundle seat events are idempotent',t=>{
  const {store}=fixture(t);
  assert.deepEqual(store.overview('one','admin1').apps.map(x=>x.purchased),[0,0,0,0,0,0]);
