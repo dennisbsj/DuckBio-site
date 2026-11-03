@@ -44,7 +44,9 @@ All returned link metadata has `accessGranted:false`, `licensesGranted:false`, `
 
 ## Tests, isolation, and missing gates
 
-The 14 isolated real-SQLite tests cover: legacy session/grant retention, no implicit migration, two native users for one account in two orgs, independently verified legacy migration, missing native-org denial, native-user collisions, cross-tenant conflicts, use of another central identity's legacy actor, revoke/rebind/audit, external provider outages, authorization loss mid-verification, disabled users, portable-export completeness, DataDuck denial and legacy grant changes during migration.
+The 14 migration tests and three additional cross-store real-SQLite tests cover: legacy session/grant retention, no implicit migration, two native users for one account in two orgs, independently verified legacy migration, missing native-org denial, native-user collisions, cross-tenant conflicts, use of another central identity's legacy actor, revoke/rebind/audit, external provider outages, authorization loss mid-verification, disabled users, portable-export completeness, DataDuck denial and legacy grant changes during migration.
+
+Cross-store tests inject actual Workspace organization admin and app-assignment/permission checks and verify native mapping revocation after member deactivation; they deliberately use **synthetic test seats** and **do not prove any real paid entitlement**. The native preflight draft PR #136 remains the independent verified-LIVE-seat boundary.
 
 Run `npm test` and `npm run check` in `workspace-server/`. GitHub Actions executes Node 22 and 24. The actual private adapters are **not provided**, no HTTP endpoint is added and the existing Workspace server does not opt in. Do not merge, deploy or activate without end-to-end native and HTTPS staging validation and backup/restore design review.
 
