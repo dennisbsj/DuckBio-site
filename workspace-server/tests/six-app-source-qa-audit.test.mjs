@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {APPS,validateQaLock,validateDocumentation,
  validateRun,validatePinnedWorkflow,auditQaLock}
  from '../six-app-source-qa-audit.mjs';
@@ -132,4 +134,32 @@ test('fail closed on inaccessible GitHub evidence without leaking remote content
  assert.equal(result.ok,false);
  assert(result.errors.includes('unverified_duckman_workflow'));
  assert.equal(result.verifiedApps,5);
+});
+
+test('remote CLI refuses to inspect private repositories without explicit read permission',()=>{
+ const script=fileURLToPath(new URL('../six-app-source-qa-audit.mjs',import.meta.url));
+ const env={...process.env};
+ delete env.DUCKBIO_QA_READ_TOKEN;
+ const result=spawnSync(process.execPath,[script,'--remote'],{
+  encoding:'utf8',env,timeout:10000
+ });
+ assert.equal(result.status,1);
+ assert.match(result.stderr,/private_read_token_required/);
+ assert(!result.stderr.includes('https://api.github.com'));
+});
+test('authenticated verification confines private token to approved GitHub REST GETs',async()=>{
+ const plain=fakeGithub(frozen);
+ const seen=[];
+ const auth=(url,init)=>{
+  assert.equal(init.headers.Authorization,'Bearer isolated-read-only-test-credential');
+  seen.push(url);
+  return plain.fetchImpl(url,{...init,headers:{...init.headers,Authorization:undefined}});
+ };
+ const result=await auditQaLock(frozen,{
+  fetchImpl:auth,readToken:'isolated-read-only-test-credential'
+ });
+ assert.equal(result.ok,true);
+ assert.equal(seen.length,14);
+ const invalid=await auditQaLock(frozen,{fetchImpl:auth,readToken:'a\nb'});
+ assert.deepEqual(invalid.errors,['invalid_read_only_token']);
 });
