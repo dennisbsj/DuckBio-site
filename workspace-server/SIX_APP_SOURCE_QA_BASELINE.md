@@ -21,9 +21,9 @@ This is **not necessarily the latest Workspace `main`**; any later central chang
 
 | App | Immutable native commit | Coordinated central-version HTTPS evidence |
 | --- | --- | --- |
-| CytoDuck (`goflo`) | `b9877a723347cc5343157fe6342014deaedb2922` | [Chromium against real broker](https://github.com/dennisbsj/CytoDuck/actions/runs/41657607526), [build](https://github.com/dennisbsj/CytoDuck/actions/runs/41657607587) |
+| CytoDuck (`goflo`) | `47ee5236281f76ff82709eef47362a1b3ed7afc9` | [Actual native React/Node + real Workspace broker HTTPS Chromium](https://github.com/dennisbsj/CytoDuck/actions/runs/41680201936), [seven-origin HTTPS routing with five fake native stubs](https://github.com/dennisbsj/CytoDuck/actions/runs/41680202081), [build](https://github.com/dennisbsj/CytoDuck/actions/runs/41680202096) |
 | DuckNote (`eel`) | `cef89cb8b3b21c7100d9035b03df161de75c4d11` | [React + Node + PostgreSQL + real broker Chromium](https://github.com/dennisbsj/DuckNote/actions/runs/41669072382), [full merged-main CI incl. real PostgreSQL/MFA/PKCE/HTTPS](https://github.com/dennisbsj/DuckNote/actions/runs/41669072517) |
-| DuckPipe (`methpipe`) | `7061981b0b3b1fdab23fffe2eddb5f3730901cea` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckPipe/actions/runs/41639842792) |
+| DuckPipe (`methpipe`) | `4c8479a3973137234bd63e650bd8178d0a1e9bd9` | [Actual native + real Workspace broker HTTPS Chromium](https://github.com/dennisbsj/DuckPipe/actions/runs/41680217552), [seven-origin HTTPS routing with five fake native stubs](https://github.com/dennisbsj/DuckPipe/actions/runs/41680217082) |
 | DuckTrain (`mantrain`) | `fff8d5fdba9bfaf5b6f9ab658b7d8cd214290346` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckTrain/actions/runs/41639939459) |
 | DuckMan (`duckman`) | `a42f27148e9cbe51aec80e9f78bd905e6dfc9221` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckMan/actions/runs/41639884085), [full verify](https://github.com/dennisbsj/DuckMan/actions/runs/41639884187) |
 | LabDuck (`limsman`) | `3aff9ec7138000d4aa1120014d606db2585f45c6` | [Native + real broker Chromium](https://github.com/dennisbsj/LabDuck/actions/runs/41640060636) |
@@ -57,14 +57,35 @@ central source or commercial license is changed in this historical lock.
 uninstalled seven-service staging update is tracked independently in
 [PR #124](https://github.com/dennisbsj/DuckBio-site/pull/124).
 
-**CytoDuck seven-origin route regression:** Native PR #216 updated the
-CytoDuck main source and CI workflow to test its real backend behind the
-seven-host HTTPS Caddy routing configuration, with the actual pinned
-Workspace broker and **five explicitly synthetic routing stubs** for the
-other native addresses. It did NOT launch five other real native backends,
-nor does this claim genuine simultaneous seven-service integration.
-The common Workspace SHA remains unchanged. The above CytoDuck CI links
-refer to the updated exact merged-main commit.
+**Independent CytoDuck and DuckPipe evidence correction:** The historical
+source lock must refer to the **two-real-server native application + Workspace
+SSO Chromium workflow** for each app, NOT reuse a seven-origin routing
+workflow as if it verified login, PKCE, native sessions and authorizations
+against the locked broker. The former CytoDuck lock improperly paired
+seven-origin run 41657607526 with the unrelated native SSO workflow ID
+405597927; that remotely verifiable mismatch has now been corrected.
+[CytoDuck PR #217](https://github.com/dennisbsj/CytoDuck/pull/217)
+and [DuckPipe PR #45](https://github.com/dennisbsj/DuckPipe/pull/45)
+assert exact, pinned Workspace checkout commits before both test types and
+reran both suites on the *same respective merged-main native SHAs*.
+CytoDuck native HTTPS SSO [41680201936](https://github.com/dennisbsj/CytoDuck/actions/runs/41680201936)
+and DuckPipe native HTTPS SSO [41680217552](https://github.com/dennisbsj/DuckPipe/actions/runs/41680217552)
+each checkout historical Workspace broker
+`233ca6d376efa2fbddca042cea5106aae92679c0`. These real two-origin
+CI runs, **not** the Caddy routing runs, are recorded in the source lock.
+
+The independent genuine-native Caddy seven-host checks also succeeded on
+these precise native main SHAs: CytoDuck
+[41680202081](https://github.com/dennisbsj/CytoDuck/actions/runs/41680202081)
+(Workspace router `156afdcbddbe56832dcdd881db76f01140cad7ee`)
+and DuckPipe
+[41680217082](https://github.com/dennisbsj/DuckPipe/actions/runs/41680217082)
+(Workspace router `5bcb15f8baeedd549ee518d55244f17df3ccee69`).
+They verify each **one genuine native app + real Workspace** with
+**five explicitly synthetic native routing stubs**; they are not proof of
+six genuinely running apps together. Routing CI uses newer reviewed
+Workspace router versions, independent of the older immutable SSO broker
+lock. All other locked app revisions and the locked broker SHA are unchanged.
 
 The CI workflows for the six app commits above checkout the **same fixed Workspace
 SHA**, rather than each using a different historical broker version. Each existing
