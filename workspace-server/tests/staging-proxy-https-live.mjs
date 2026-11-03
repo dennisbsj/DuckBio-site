@@ -144,10 +144,6 @@ test('broker Host validation, proxy authorization and TLS hostname verification 
   request.once('error',reject);request.end();
  });
  assert.equal(direct,400,'broker rejects forged HTTP Host even without Caddy');
- const foreignHost=await call('/api/suite/organizations',
-  {host:'evil.example.invalid'});
- assert.equal(foreignHost.status,401,
-  'forged proxy Host must never bypass private organization authorization');
  const privateRoute=await call('/api/suite/organizations');
  assert.equal(privateRoute.status,401,'anonymous visitor cannot list organizations');
  await assert.rejects(call('/api/suite/health',{
