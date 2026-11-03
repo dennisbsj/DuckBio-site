@@ -25,11 +25,6 @@ function privatePath(file){
   while(!existsSync(ancestor)&&path.dirname(ancestor)!==ancestor)ancestor=path.dirname(ancestor);
   if(invalid(realpathSync(ancestor)))fail('private_path_required');
 }
-function validRoles(value){
-  if(!value||typeof value!=='object'||Array.isArray(value))fail('invalid_roles');
-  for(const [app,role] of Object.entries(value))if(!byId.get(app)?.roles.includes(role))fail('invalid_roles');
-  return value;
-}
 export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveSubscriptionEvidence=null,ownerAlertsOptIn=false}){
   if(typeof ownerAlertsOptIn!=='boolean')fail('invalid_owner_alerts_config');
   // Production must inject a PRIVATE verifier of live billing evidence.
@@ -48,6 +43,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     'CREATE TABLE IF NOT EXISTS receipts(reference TEXT PRIMARY KEY,org TEXT NOT NULL,digest TEXT NOT NULL,recorded_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS session_organizations(session_id TEXT PRIMARY KEY,account TEXT NOT NULL,org TEXT NOT NULL,selected_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS permission_overrides(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,permission TEXT NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),PRIMARY KEY(org,account,app,permission),FOREIGN KEY(org,account,app) REFERENCES assignments(org,account,app) ON DELETE CASCADE)',
+    'CREATE TABLE IF NOT EXISTS organization_roles(org TEXT NOT NULL REFERENCES organizations(id),app TEXT NOT NULL,role TEXT NOT NULL,custom INTEGER NOT NULL CHECK(custom IN (0,1)),permissions TEXT NOT NULL CHECK(json_valid(permissions)),updated_at INTEGER NOT NULL,PRIMARY KEY(org,app,role))',
     'CREATE TABLE IF NOT EXISTS organization_invites(token_hash TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),issued_by TEXT NOT NULL,email TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),expires_at INTEGER NOT NULL,UNIQUE(org,email))',
     'CREATE TABLE IF NOT EXISTS organization_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,org TEXT NOT NULL REFERENCES organizations(id),actor TEXT NOT NULL,action TEXT NOT NULL,subject TEXT NOT NULL,details TEXT NOT NULL CHECK(json_valid(details)),recorded_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS subscription_drafts(id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),status TEXT NOT NULL CHECK(status IN (\'draft\',\'canceled\')),created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)',
@@ -72,6 +68,50 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
   for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))chmodSync(databasePath+suffix,0o600);
   const tx=work=>{db.exec('BEGIN IMMEDIATE');try{const result=work();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
   const liveEventLedger=createStripeLiveEventLedger({db,clock});
+
+  // Organization-scoped app role policies. Built-in role edits are stored as
+  // overrides, never mutate the shared canonical baseline or other tenants.
+  // Native app security decisions must independently enforce the resulting
+  // policy; this Workspace-only catalog is not an entitlement or authorization
+  // proof for a downstream native backend.
+  const roleNameValid=value=>typeof value==='string'&&
+    /^[A-Za-z][A-Za-z0-9 _-]{0,47}$/.test(value)&&value===value.trim();
+  function roleRow(org,app,role){
+    return db.prepare('SELECT custom,permissions FROM organization_roles WHERE org=? AND app=? AND role=?')
+      .get(org,app,role);
+  }
+  function existingRole(org,app,role){
+    const base=byId.get(app);
+    if(!base||!roleNameValid(role))return false;
+    return base.roles.includes(role)||
+      Boolean(db.prepare('SELECT 1 FROM organization_roles WHERE org=? AND app=? AND role=? AND custom=1')
+        .get(org,app,role));
+  }
+  function rolePermissions(org,app,role){
+    const base=byId.get(app);
+    if(!base)return [];
+    const row=roleRow(org,app,role);
+    if(row)return JSON.parse(row.permissions);
+    return base.rolePermissions[role]||[];
+  }
+  function catalog(org){
+    return APPLICATIONS.map(app=>{
+      const policies={...app.rolePermissions};
+      const custom=[];
+      for(const row of db.prepare('SELECT role,custom,permissions FROM organization_roles WHERE org=? AND app=? ORDER BY role').all(org,app.id)){
+        policies[row.role]=JSON.parse(row.permissions);
+        if(row.custom)custom.push(row.role);
+      }
+      return {...app,roles:[...app.roles,...custom],rolePermissions:policies,
+        customRoles:custom,rolePolicyEnforcedByNative:false};
+    });
+  }
+  function validRoles(value,org){
+    if(!value||typeof value!=='object'||Array.isArray(value))fail('invalid_roles');
+    for(const [app,role] of Object.entries(value))
+      if(!existingRole(org,app,role))fail('invalid_roles');
+    return value;
+  }
   function requireAdmin(org,actor){
     if(!safeId(org)||!safeId(actor)||!db.prepare('SELECT 1 FROM members WHERE org=? AND account=? AND admin=1 AND active=1').get(org,actor))fail('access_denied');
   }
@@ -337,7 +377,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     overview(org,actor){
       requireAdmin(org,actor);
       return {organization:db.prepare('SELECT id,name FROM organizations WHERE id=?').get(org),
-        apps:APPLICATIONS.map(app=>({...app,purchased:db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?').get(org,app.id)?.purchased??0,assigned:db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?').get(org,app.id).n,reserved:pendingSeats(org,app.id)})),
+        apps:catalog(org).map(app=>({...app,purchased:db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?').get(org,app.id)?.purchased??0,assigned:db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?').get(org,app.id).n,reserved:pendingSeats(org,app.id)})),
         users:db.prepare('SELECT * FROM members WHERE org=? ORDER BY name,account').all(org).map(row=>view(org,row))};
     },
     // Only call from a separate VERIFIED billing adapter. No browser purchase endpoint exists.
@@ -444,9 +484,10 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     },
     saveMember({organizationId,actorId,member}){
       if(!member||!safeId(member.accountId)||!safeText(member.name)||!safeText(member.nickname)||!safeEmail(member.email)||typeof member.admin!=='boolean')fail('invalid_member');
-      const requested=validRoles(member.roles),email=member.email.trim().toLowerCase();
+      const email=member.email.trim().toLowerCase();
       return tx(()=>{
         requireAdmin(organizationId,actorId);
+        const requested=validRoles(member.roles,organizationId);
         const prior=db.prepare('SELECT * FROM members WHERE org=? AND account=?').get(organizationId,member.accountId);
         const previousRoles=prior?roles(organizationId,member.accountId):{};
         if(prior?.admin&&prior.active&&!member.admin&&db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1 AND active=1').get(organizationId).n===1)fail('last_organization_admin');
@@ -870,9 +911,10 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     },
     issueInvitation({organizationId,actorId,email,name,nickname,admin=false,roles={}}){
       if(!safeEmail(email)||!safeText(name)||!safeText(nickname)||typeof admin!=='boolean')fail('invalid_invitation');
-      const normalized=email.trim().toLowerCase(),requested=validRoles(roles);
+      const normalized=email.trim().toLowerCase();
       return tx(()=>{
         requireAdmin(organizationId,actorId);
+        const requested=validRoles(roles,organizationId);
         if(db.prepare('SELECT 1 FROM members WHERE org=? AND email=?').get(organizationId,normalized))fail('member_exists');
         db.prepare('DELETE FROM organization_invites WHERE expires_at<=?').run(clock());
         if(db.prepare('SELECT 1 FROM organization_invites WHERE org=? AND email=?').get(organizationId,normalized))fail('invitation_exists');
@@ -916,12 +958,74 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         if(db.prepare('SELECT 1 FROM members WHERE org=? AND email=?').get(invitation.organizationId,invitation.email))fail('member_exists');
         const removed=db.prepare('DELETE FROM organization_invites WHERE token_hash=? AND expires_at>? RETURNING token_hash').get(inviteHash(token),clock());
         if(!removed)fail('invalid_invitation');
-        const assignedRoles=validRoles(invitation.roles);
+        const assignedRoles=validRoles(invitation.roles,invitation.organizationId);
         db.prepare('INSERT INTO members(org,account,name,nickname,email,admin) VALUES(?,?,?,?,?,?)').run(invitation.organizationId,accountId,invitation.name,invitation.nickname,invitation.email,invitation.admin?1:0);
         for(const [app,role] of Object.entries(assignedRoles))
           db.prepare('INSERT INTO assignments(org,account,app,role) VALUES(?,?,?,?)').run(invitation.organizationId,accountId,app,role);
         audit(invitation.organizationId,accountId,'invitation.accepted',accountId,{roles:assignedRoles,admin:invitation.admin});
         return {organizationId:invitation.organizationId,accountId,admin:invitation.admin,roles:assignedRoles};
+      });
+    },
+
+    // Organization administrators can edit baseline app roles or create their
+    // own named roles from the exact audited permission catalog.
+    listRoles({organizationId,actorId,appId}){
+      requireAdmin(organizationId,actorId);
+      if(!byId.has(appId))fail('invalid_role');
+      const app=catalog(organizationId).find(x=>x.id===appId);
+      return {appId,roles:app.roles.map(name=>({
+        name,custom:app.customRoles.includes(name),
+        permissions:app.rolePermissions[name].includes('*')
+          ?[...app.permissions]:[...app.rolePermissions[name]]
+      })),availablePermissions:[...app.permissions],
+       nativeEnforcementPending:true};
+    },
+    saveRole({organizationId,actorId,appId,role,permissions}){
+      const app=byId.get(appId);
+      if(!app||!roleNameValid(role)||!Array.isArray(permissions)||
+        permissions.length>app.permissions.length||
+        permissions.some(x=>typeof x!=='string'||!app.permissions.includes(x))||
+        new Set(permissions).size!==permissions.length)fail('invalid_role');
+      const chosen=[...permissions].sort();
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        const existing=roleRow(organizationId,appId,role);
+        const baseline=app.roles.includes(role);
+        // Case-insensitive duplicate role names are not allowed for custom
+        // roles, even though SQLite's table key itself is case-sensitive.
+        if(!baseline&&!existing){
+          if(db.prepare('SELECT 1 FROM organization_roles WHERE org=? AND app=? AND lower(role)=lower(?)')
+            .get(organizationId,appId,role)||
+            app.roles.some(x=>x.toLowerCase()===role.toLowerCase()))
+            fail('role_exists');
+          const count=db.prepare('SELECT count(*) AS n FROM organization_roles WHERE org=? AND app=? AND custom=1')
+            .get(organizationId,appId).n;
+          if(count>=32)fail('role_limit_reached');
+        }
+        if(existing&&Boolean(existing.custom)===baseline)fail('role_conflict');
+        db.prepare('INSERT INTO organization_roles(org,app,role,custom,permissions,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(org,app,role) DO UPDATE SET permissions=excluded.permissions,updated_at=excluded.updated_at')
+          .run(organizationId,appId,role,baseline?0:1,JSON.stringify(chosen),clock());
+        audit(organizationId,actorId,baseline?'role.defaults.updated':
+          existing?'role.custom.updated':'role.custom.created',
+          appId+':'+role,{appId,role,permissionCount:chosen.length});
+        return {appId,role,custom:!baseline,permissions:chosen,nativeEnforcementPending:true};
+      });
+    },
+    deleteRole({organizationId,actorId,appId,role}){
+      if(!byId.has(appId)||!roleNameValid(role))fail('invalid_role');
+      return tx(()=>{
+        requireAdmin(organizationId,actorId);
+        const saved=roleRow(organizationId,appId,role);
+        if(!saved||!saved.custom)fail('builtin_role_protected');
+        if(db.prepare('SELECT 1 FROM assignments WHERE org=? AND app=? AND role=? LIMIT 1')
+          .get(organizationId,appId,role))fail('role_in_use');
+        for(const invitation of db.prepare('SELECT roles FROM organization_invites WHERE org=? AND expires_at>?')
+          .all(organizationId,clock()))
+          if(JSON.parse(invitation.roles)[appId]===role)fail('role_in_use');
+        db.prepare('DELETE FROM organization_roles WHERE org=? AND app=? AND role=? AND custom=1')
+          .run(organizationId,appId,role);
+        audit(organizationId,actorId,'role.custom.deleted',appId+':'+role,{appId,role});
+        return {appId,role,deleted:true};
       });
     },
     matrix(organizationId,actorId){
@@ -940,7 +1044,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         requireAdmin(organizationId,actorId);
         const assigned=db.prepare('SELECT role FROM assignments WHERE org=? AND account=? AND app=?').get(organizationId,accountId,appId);
         if(!assigned)fail('app_access_required');
-        const allowed=byId.get(appId).rolePermissions[assigned.role]||[];
+        const allowed=rolePermissions(organizationId,appId,assigned.role);
         const baseline=allowed.includes('*')||allowed.includes(permission);
         if(enabled===baseline)db.prepare('DELETE FROM permission_overrides WHERE org=? AND account=? AND app=? AND permission=?').run(organizationId,accountId,appId,permission);
         else db.prepare('INSERT INTO permission_overrides(org,account,app,permission,enabled) VALUES(?,?,?,?,?) ON CONFLICT(org,account,app,permission) DO UPDATE SET enabled=excluded.enabled').run(organizationId,accountId,appId,permission,enabled?1:0);
@@ -952,7 +1056,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       if(!safeId(organizationId)||!safeId(accountId)||!byId.has(appId))return [];
       const assigned=db.prepare('SELECT a.role FROM assignments a JOIN members m ON m.org=a.org AND m.account=a.account WHERE a.org=? AND a.account=? AND a.app=? AND m.active=1').get(organizationId,accountId,appId);
       if(!assigned)return [];
-      const app=byId.get(appId),base=app.rolePermissions[assigned.role]||[];
+      const app=byId.get(appId),base=rolePermissions(organizationId,appId,assigned.role);
       const allowed=new Set(base.includes('*')?app.permissions:base);
       for(const row of db.prepare('SELECT permission,enabled FROM permission_overrides WHERE org=? AND account=? AND app=?').all(organizationId,accountId,appId)) {
         if(row.enabled)allowed.add(row.permission);else allowed.delete(row.permission);
