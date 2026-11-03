@@ -153,6 +153,15 @@ jobs:
           container="duckbio-qa-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           pid=""
           cleanup() {
+            rc="$?"
+            if [[ "$rc" -ne 0 ]]; then
+              echo 'Diagnostic: ephemeral loopback listeners'
+              ss -lntp | grep -E ':(3307|18443|443)\\b' || true
+              echo 'Diagnostic: synthetic Caddy startup'
+              docker logs "$container" 2>&1 | tail -30 || true
+              echo 'Diagnostic: synthetic Workspace process'
+              tail -25 "$RUNNER_TEMP/duckbio-staging-node.log" 2>/dev/null || true
+            fi
             docker rm -f "$container" >/dev/null 2>&1 || true
             if [[ -n "$pid" ]]; then
               kill "$pid" >/dev/null 2>&1 || true
