@@ -8,8 +8,9 @@ import {fileURLToPath} from 'node:url';
 import {approvedPrivateRoot} from './staging-generate-config.mjs';
 import {readPrivateConfiguration,validateWorkspaceStagingConfig}
  from './staging-preflight.mjs';
-import {validateQaLock,validatePinnedWorkflow} from './six-app-source-qa-audit.mjs';
-import {validateCurrentCompatLock} from './six-native-current-compat-audit.mjs';
+import {validatePinnedWorkflow} from './six-app-source-qa-audit.mjs';
+import {validateSixNativeStagingSnapshot,stagingSnapshotFile}
+ from './staging-six-native-snapshot.mjs';
 
 const nameOf=row=>row.repo.split('/')[1];
 const validRemote=(value,repo)=>{
@@ -38,9 +39,7 @@ export function auditSevenLocalSources({sourcesRoot,workspaceBuildSha,lock,
  // Preserve the historical lock unchanged while also permitting the new
  // independently reviewed, exactly six-native current-Workspace QA snapshot.
  // Both schemas are allowlisted, fixed-source and deny extra app IDs.
- const historical=validateQaLock(lock);
- const current=validateCurrentCompatLock(lock);
- if(!historical.ok&&!current.ok)
+ if(!validateSixNativeStagingSnapshot(lock).ok)
   return {ok:false,verified:0,errors:['invalid_source_qa_lock']};
  if(typeof workspaceBuildSha!=='string'||
     workspaceBuildSha!==lock.central.sha)
@@ -95,16 +94,20 @@ export function auditSevenLocalSources({sourcesRoot,workspaceBuildSha,lock,
 const invoked=process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url);
 if(invoked){
  const args=process.argv.slice(2);
- if(args.length!==5||args[0]!=='--config'||
-    args[2]!=='--sources-root'||args[4]!=='--confirm-offline-sources'){
-  console.error('Usage: node staging-seven-source-gate.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS --confirm-offline-sources');
+ const historical=args.length===5&&args[4]==='--confirm-offline-sources';
+ const current=args.length===7&&args[4]==='--snapshot'&&
+  args[5]==='current'&&args[6]==='--confirm-offline-sources';
+ if((!historical&&!current)||args[0]!=='--config'||
+    args[2]!=='--sources-root'){
+  console.error('Usage: node staging-seven-source-gate.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS [--snapshot current] --confirm-offline-sources');
   process.exitCode=2;
  }else{
   try{
    const config=readPrivateConfiguration(args[1]);
    if(!validateWorkspaceStagingConfig(config).ok)throw Error('invalid_config');
+   const filename=stagingSnapshotFile(current?'current':'historical');
    const lock=JSON.parse(await import('node:fs').then(
-    fs=>fs.readFileSync(new URL('./six-app-source-qa-lock.json',import.meta.url),'utf8')));
+    fs=>fs.readFileSync(new URL('./'+filename,import.meta.url),'utf8')));
    const report=auditSevenLocalSources({sourcesRoot:args[3],
     workspaceBuildSha:config.SUITE_BUILD_SHA,lock});
    if(!report.ok){
