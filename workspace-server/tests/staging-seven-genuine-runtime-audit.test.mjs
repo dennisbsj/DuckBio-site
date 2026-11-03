@@ -63,7 +63,7 @@ function fixture({edit,changeAfter=0,smokeResult}={}){
  return {calls,sourceAudit,inspectUnit,inspectProcess,smoke,records};
 }
 const run=(f,overrides={})=>auditSevenGenuineStaging({
- config:config(),lock,sourcesRoot,sourceAudit:f.sourceAudit,
+ config:config(),lock,sourcesRoot:sourceRoot,sourceAudit:f.sourceAudit,
  inspectUnit:f.inspectUnit,inspectProcess:f.inspectProcess,smoke:f.smoke,
  ...overrides
 });
