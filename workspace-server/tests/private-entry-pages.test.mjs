@@ -40,7 +40,7 @@ test('all private Workspace entry routes resolve to reviewed pages and real same
  });
  const htmlRoutes=[
   '/','/login','/login/','/setup','/invite','/account','/workspace',
-  '/owner','/messages','/connect'
+  '/owner','/messages'
  ];
  for(const route of htmlRoutes){
   const response=await fetch(origin+route,{redirect:'manual'});
@@ -68,6 +68,18 @@ test('all private Workspace entry routes resolve to reviewed pages and real same
     'private script/styles must not receive an HTML fallback');
   }
  }
+ // /connect is NOT an ordinary public page. Its exact registered native
+ // PKCE handoff must be checked before the central login UI can render.
+ assert.equal((await fetch(origin+'/connect',{redirect:'manual'})).status,400);
+ const handoff=new URLSearchParams({
+  appId:'goflo',
+  redirectUri:'https://staging-goflo.duckbio.net/auth/callback',
+  state:'s'.repeat(43),
+  codeChallenge:'c'.repeat(43)
+ });
+ const permitted=await fetch(origin+'/connect?'+handoff.toString(),{redirect:'manual'});
+ assert.equal(permitted.status,200);
+ assert.match(await permitted.text(),/Connect an app/);
  const workspace=await (await fetch(origin+'/workspace')).text();
  assert.match(workspace,/id="login-form"/);
  assert.match(workspace,/id="organizations"/);
