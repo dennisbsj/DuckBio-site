@@ -72,7 +72,10 @@ test('creates only two reviewed, uninstalled service/proxy templates, never star
  assert.doesNotMatch(unit,/0\.0\.0\.0|ExecStartPre|sudo|curl|wget|chown|chmod|npm install/);
  assert.match(caddy,/^staging-workspace\.duckbio\.net \{$/m);
  assert.match(caddy,/reverse_proxy 127\.0\.0\.1:3307/);
- assert.match(caddy,/header_up Host \{host\}/);
+ assert.doesNotMatch(caddy,/header_up Host/,
+  'proxy must preserve original HTTP Host for backend origin validation');
+ assert.match(caddy,/\?X-Content-Type-Options/,
+  'proxy must not duplicate backend security headers');
  assert.match(caddy,/header_up -X-Forwarded-Host/);
  assert.doesNotMatch(caddy,/staging-(?:goflo|eel|methpipe|mantrain|duckman|limsman)\.duckbio\.net/);
  assert.doesNotMatch(caddy,/tls internal|reverse_proxy 0\.0\.0\.0|\*:443/);
