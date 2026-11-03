@@ -57,8 +57,20 @@ test('verified consumed synthetic first-admin token produces a private runtime w
  const f=setup(t);
  await activate(f);
  f.close();
+ const before=Object.fromEntries([
+  'SUITE_AUTH_DB_PATH','SUITE_IDENTITY_DB_PATH',
+  'SUITE_ORGANIZATION_DB_PATH','SUITE_COMMUNICATIONS_DB_PATH'
+ ].map(key=>[key,SHA(readFileSync(f.config[key]))]));
  const prior=readFileSync(f.filename);
  const result=preparePostBootstrapStagingConfig(f.config);
+ for(const [key,checksum] of Object.entries(before)){
+  assert.equal(SHA(readFileSync(f.config[key])),checksum,
+   'offline identity audit must not change bytes in '+key);
+  assert.equal(existsSync(f.config[key]+'-wal'),false,
+   'read-only audit must not create a WAL sidecar');
+  assert.equal(existsSync(f.config[key]+'-shm'),false,
+   'read-only audit must not create an SHM sidecar');
+ }
  assert.deepEqual(result,{ok:true,files:3,storesChecked:4});
  const target=join(f.root,'post-bootstrap');
  assert.equal(statSync(target).mode&0o777,0o700);
@@ -100,6 +112,11 @@ test('unconsumed setup token blocks all runtime config creation',
  assert.throws(()=>preparePostBootstrapStagingConfig(f.config),
   /synthetic_first_administrator_not_activated/);
  assert.equal(existsSync(join(f.root,'post-bootstrap')),false);
+ for(const key of ['SUITE_AUTH_DB_PATH','SUITE_IDENTITY_DB_PATH',
+  'SUITE_ORGANIZATION_DB_PATH','SUITE_COMMUNICATIONS_DB_PATH']){
+  assert.equal(existsSync(f.config[key]+'-wal'),false);
+  assert.equal(existsSync(f.config[key]+'-shm'),false);
+ }
 });
 
 test('mismatched config/setup token and missing identity store never create output',
