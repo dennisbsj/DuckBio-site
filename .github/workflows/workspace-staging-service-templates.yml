@@ -6,6 +6,8 @@ on:
       - 'workspace-server/staging-*.mjs'
       - 'workspace-server/tests/staging-service-plan.test.mjs'
       - 'workspace-server/tests/staging-proxy-https-live.mjs'
+      - 'workspace-server/tests/staging-seven-proxy-plan.test.mjs'
+      - 'workspace-server/six-app-source-qa-lock.json'
       - 'workspace-server/private-ui/**'
       - 'workspace-server/package.json'
       - '.github/workflows/workspace-staging-service-templates.yml'
@@ -15,6 +17,8 @@ on:
       - 'workspace-server/staging-*.mjs'
       - 'workspace-server/tests/staging-service-plan.test.mjs'
       - 'workspace-server/tests/staging-proxy-https-live.mjs'
+      - 'workspace-server/tests/staging-seven-proxy-plan.test.mjs'
+      - 'workspace-server/six-app-source-qa-lock.json'
       - 'workspace-server/private-ui/**'
       - 'workspace-server/package.json'
       - '.github/workflows/workspace-staging-service-templates.yml'
@@ -91,6 +95,55 @@ jobs:
             assert.ok(!serialized.includes('staging-'+id+'.duckbio.net'),
               'central proxy cannot accidentally include native app origins');
           NODE
+      - name: Generate seven-origin candidate routing with only disposable private source data
+        shell: bash
+        run: |
+          set -euo pipefail
+          config_root="$STAGING_QA_TMP/seven-source-config"
+          output_root="$STAGING_QA_TMP/seven-proxy-output"
+          install -d -m 700 "$config_root" "$output_root"
+          candidate="$(node -e 'console.log(JSON.parse(require("node:fs").readFileSync("workspace-server/six-app-source-qa-lock.json","utf8")).central.sha)')"
+          cd workspace-server
+          node staging-generate-config.mjs \
+            --base-domain duckbio.net \
+            --private-root "$config_root" \
+            --build-sha "$candidate" \
+            --confirm-synthetic-only
+          node staging-seven-proxy-plan.mjs \
+            --config "$config_root/workspace-staging.json" \
+            --private-output-root "$output_root" \
+            --confirm-uninstalled-only
+      - name: Parse and validate all seven Caddy host routes without network or installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="$STAGING_QA_TMP/seven-proxy-output/seven-origin-proxy-plan/Caddyfile.seven-origin-staging"
+          docker run --rm --network none --read-only \
+            --tmpfs /tmp --tmpfs /data --tmpfs /config \
+            -v "$file:/etc/caddy/Caddyfile:ro" \
+            caddy:2.10.2 caddy adapt \
+            --config /etc/caddy/Caddyfile --adapter caddyfile --pretty \
+            > "$RUNNER_TEMP/duckbio-seven-caddy-adapted.json"
+          docker run --rm --network none --read-only \
+            --tmpfs /tmp --tmpfs /data --tmpfs /config \
+            -v "$file:/etc/caddy/Caddyfile:ro" \
+            caddy:2.10.2 caddy validate \
+            --config /etc/caddy/Caddyfile --adapter caddyfile
+          node --input-type=module - "$RUNNER_TEMP/duckbio-seven-caddy-adapted.json" <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const parsed=JSON.parse(readFileSync(process.argv[2],'utf8'));
+          const serialized=JSON.stringify(parsed);
+          const names=['workspace','goflo','eel','methpipe','mantrain','duckman','limsman'];
+          for(let i=0;i<names.length;i++){
+            assert.ok(serialized.includes('staging-'+names[i]+'.duckbio.net'),
+              'expected staging host missing in Caddy config');
+            assert.ok(serialized.includes('127.0.0.1:'+(3307+i)),
+              'expected distinct loopback route missing');
+          }
+          assert.ok(!serialized.includes('0.0.0.0:'),
+            'Caddy must not proxy a public native backend');
+          NODE
       - name: Exercise actual Workspace behind Caddy via loopback TLS (synthetic only)
         shell: bash
         run: |
@@ -162,3 +215,4 @@ jobs:
             rm -rf -- "$STAGING_QA_TMP"
           fi
           rm -f "$RUNNER_TEMP/duckbio-staging-caddy-adapted.json"
+          rm -f "$RUNNER_TEMP/duckbio-seven-caddy-adapted.json"
