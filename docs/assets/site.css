@@ -2571,30 +2571,51 @@ html:not([data-theme="dark"]) body:not(.homepage-exact) .pr-hero.pr-plans-first{
 }
 
 
-/* DuckBio desktop banner size limit — preserves the complete artwork without cropping it. */
+/* DuckBio full-bleed desktop banners: full viewport width with shorter fixed height. */
 @media (min-width: 1100px) {
-  /* Keep the three existing banner compositions at their designed 51%-width
-     ratio, but stop them scaling indefinitely on wide desktop monitors.
-     This preserves raster headings, the duck artwork and the Home CTA hotspot. */
-  body.homepage-exact main { background: #071f37; }
+  /* Match the height of the former 1100px-wide version, but return full bleed. */
   body.homepage-exact .home-mockup-exact {
-    max-width: 1100px;
-    margin-inline: auto;
+    display:block;
+    width:100%;
+    max-width:none;
+    height:561px;
+    margin:0;
+    overflow:hidden;
+  }
+  body.homepage-exact .home-mockup-image {
+    display:block;
+    width:100%;
+    height:auto;
+    max-width:none;
+    margin-top:-5.263158%;
   }
 
-  /* Pricing's banner has a 1400 × 790 image with a small intentional crop. */
-  main:has(> .pr-banner) { background: #051e33; }
   body:not(.homepage-exact) main > .pr-banner {
-    max-width: 1100px;
-    height: 561px;
-    margin-inline: auto;
+    width:100%;
+    max-width:none;
+    height:561px;
+    margin:0;
+    overflow:hidden;
+  }
+  body:not(.homepage-exact) main > .pr-banner > img {
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    object-position:center 22%;
   }
 
-  body.support-faq-page main { background: #071d32; }
   html body.support-faq-page main > .page-hero.support-hero {
-    width: 100%;
-    max-width: 1100px;
-    height: 561px;
-    margin-inline: auto;
+    display:flex;
+    width:100%;
+    max-width:none;
+    height:561px;
+    margin:0;
+    overflow:hidden;
+  }
+  body.support-faq-page .support-hero-art {
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    object-position:center 45%;
   }
 }
