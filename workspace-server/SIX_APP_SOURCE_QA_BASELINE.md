@@ -21,7 +21,7 @@ This is **not necessarily the latest Workspace `main`**; any later central chang
 
 | App | Immutable native commit | Coordinated central-version HTTPS evidence |
 | --- | --- | --- |
-| CytoDuck (`goflo`) | `dad05d5b9e8ac0cf3372c4526d9c4d941960742c` | [Chromium against real broker](https://github.com/dennisbsj/CytoDuck/actions/runs/41639968678), [build](https://github.com/dennisbsj/CytoDuck/actions/runs/41639968640) |
+| CytoDuck (`goflo`) | `b9877a723347cc5343157fe6342014deaedb2922` | [Chromium against real broker](https://github.com/dennisbsj/CytoDuck/actions/runs/41657607526), [build](https://github.com/dennisbsj/CytoDuck/actions/runs/41657607587) |
 | DuckNote (`eel`) | `ba691bef4f98e63083e5646c00efff1fc3f19a83` | [React + Node + PostgreSQL + real broker Chromium](https://github.com/dennisbsj/DuckNote/actions/runs/41646354024), [full CI](https://github.com/dennisbsj/DuckNote/actions/runs/41646354106) |
 | DuckPipe (`methpipe`) | `7061981b0b3b1fdab23fffe2eddb5f3730901cea` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckPipe/actions/runs/41639842792) |
 | DuckTrain (`mantrain`) | `fff8d5fdba9bfaf5b6f9ab658b7d8cd214290346` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckTrain/actions/runs/41639939459) |
@@ -37,6 +37,15 @@ that binding and the revised DuckNote `main` commit; the other five
 app revisions and common Workspace source are unchanged. An omitted
 `HOST` deliberately retains historical behavior outside staging, so
 operators must not treat unspecified binding as safe for private staging.
+
+**CytoDuck seven-origin route regression:** Native PR #216 updated the
+CytoDuck main source and CI workflow to test its real backend behind the
+seven-host HTTPS Caddy routing configuration, with the actual pinned
+Workspace broker and **five explicitly synthetic routing stubs** for the
+other native addresses. It did NOT launch five other real native backends,
+nor does this claim genuine simultaneous seven-service integration.
+The common Workspace SHA remains unchanged. The above CytoDuck CI links
+refer to the updated exact merged-main commit.
 
 The CI workflows for the six app commits above checkout the **same fixed Workspace
 SHA**, rather than each using a different historical broker version. Each existing
