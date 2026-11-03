@@ -36,7 +36,7 @@ export function stagingHttpsOrigin(value){
  const publicSites=['github.io','pages.dev','workers.dev'];
  const examples=['example.com','example.net','example.org'];
  const badSuffix=suffix=>host===suffix||host.endsWith('.'+suffix);
- if(port||host.endsWith('.')||isIP(host.replace(/^\\[|\\]$/g,''))||
+ if(port||host.endsWith('.')||isIP(host.replaceAll('[','').replaceAll(']',''))||
     labels.length<3||labels.some(x=>!x)||reserved.includes(labels.at(-1))||
     retired.some(badSuffix)||publicSites.some(badSuffix)||
     examples.some(badSuffix)||labels.includes('prod')||
