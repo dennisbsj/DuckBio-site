@@ -37,11 +37,11 @@ function fixture(t){
    const executable=join(dir,kind.entrypoint);
    mkdirSync(dirname(executable),{recursive:true});
    writeFileSync(executable,name==='DuckNote'?
-    '// Inert fixture: verifyDuckNoteRuntimeDir(appRoot,process.env.DUCKNOTE_RUNTIME_DIR)\\n':
+    '// Inert fixture: verifyDuckNoteRuntimeDir(appRoot,process.env.DUCKNOTE_RUNTIME_DIR)\n':
     '// inert fixture, never executed\\n');
    if(name==='DuckNote')
     writeFileSync(join(dir,'server','runtime-directory.js'),
-     '// Synthetic DUCKNOTE_RUNTIME_DIR fixture; never imported\\n');
+     '// Synthetic DUCKNOTE_RUNTIME_DIR fixture; never imported\n');
    const workflow=join(dir,app.workflow);
    mkdirSync(dirname(workflow),{recursive:true});
    writeFileSync(workflow,'jobs:\n  test:\n    steps:\n'+
