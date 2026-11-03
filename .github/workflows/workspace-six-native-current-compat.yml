@@ -1,0 +1,46 @@
+name: Six native apps against reviewed current Workspace - offline evidence QA
+
+on:
+  pull_request:
+    paths:
+      - 'workspace-server/six-native-current-compat-audit.mjs'
+      - 'workspace-server/six-native-current-compat-lock.json'
+      - 'workspace-server/SIX_NATIVE_CURRENT_WORKSPACE_QA.md'
+      - 'workspace-server/tests/six-native-current-compat-audit.test.mjs'
+      - '.github/workflows/workspace-six-native-current-compat.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-server/six-native-current-compat-audit.mjs'
+      - 'workspace-server/six-native-current-compat-lock.json'
+      - 'workspace-server/SIX_NATIVE_CURRENT_WORKSPACE_QA.md'
+      - 'workspace-server/tests/six-native-current-compat-audit.test.mjs'
+      - '.github/workflows/workspace-six-native-current-compat.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  exact-six-native-offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Validate new read-only evidence gate syntax
+        working-directory: workspace-server
+        run: node --check six-native-current-compat-audit.mjs
+      - name: Reject mismatched central SHA, fake main CI and mutated native workflows
+        working-directory: workspace-server
+        run: node --test tests/six-native-current-compat-audit.test.mjs
+      - name: Check six exact immutable source evidence rows against documentation
+        working-directory: workspace-server
+        run: node six-native-current-compat-audit.mjs --offline
