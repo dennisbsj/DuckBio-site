@@ -1,8 +1,8 @@
 // Generates private, synthetic-only Workspace staging configuration OFFLINE.
 // No DNS changes, server provisioning, account creation, payment or network calls.
-// Never prints/returns client secrets, and refuses existing configuration.
+// Never prints client secrets and refuses existing configuration.
 import {randomBytes} from 'node:crypto';
-import {closeSync,existsSync,fsyncSync,linkSync,lstatSync,openSync,
+import {closeSync,existsSync,fsyncSync,linkSync,openSync,
  realpathSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
 import {dirname,isAbsolute,join,resolve,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
