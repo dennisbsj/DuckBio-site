@@ -77,13 +77,13 @@ async function nativeGet(url,cookie,{fetchImpl,timeoutMs}){
   });
   if(!response||!Number.isSafeInteger(response.status)||
      response.redirected||(response.url&&response.url!==url)||
-     response.status<200||response.status>=400||
-     !response.body)return null;
+     ![200,401,403].includes(response.status))return null;
   if(response.status!==200){
    // Only a true HTTP authorization denial is acceptable for a foreign
    // cookie. No redirects, upstream faults or successful 204 shortcuts.
    return {status:response.status};
   }
+  if(!response.body)return null;
   if(!/^application\/json(?:\s*;|$)/i.test(
    response.headers?.get('content-type')||''))return null;
   const chunks=[];let length=0;
