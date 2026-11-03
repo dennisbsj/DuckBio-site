@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import https from 'node:https';
+import http from 'node:http';
 import {readFileSync} from 'node:fs';
 import {NATIVE_APP_IDS,readPrivateConfiguration,
  validateWorkspaceStagingConfig} from '../staging-preflight.mjs';
@@ -131,9 +132,22 @@ test('real reverse-proxy retains same-origin CSRF and Secure HttpOnly cookies',a
  assert.equal(health.json?.configured,true);
 });
 
-test('actual TLS and Host guards reject wrong site and anonymous organization access',async()=>{
- const wrong=await call('/api/suite/health',{host:'evil.example.invalid'});
- assert.equal(wrong.status,421,'TLS SNI alone must not allow forged HTTP Host');
+test('broker Host validation, proxy authorization and TLS hostname verification are independent',async()=>{
+ // The broker must reject a forged Host on its *actual loopback socket*.
+ // Caddy can normalize Host during routing; do not assume it preserves a
+ // forged header across all versions and transports.
+ const direct=await new Promise((resolve,reject)=>{
+  const request=http.request({hostname:'127.0.0.1',port:3307,
+   path:'/api/suite/health',headers:{Host:'evil.example.invalid'}},res=>{
+    res.resume();res.on('end',()=>resolve(res.statusCode));
+   });
+  request.once('error',reject);request.end();
+ });
+ assert.equal(direct,400,'broker rejects forged HTTP Host even without Caddy');
+ const foreignHost=await call('/api/suite/organizations',
+  {host:'evil.example.invalid'});
+ assert.equal(foreignHost.status,401,
+  'forged proxy Host must never bypass private organization authorization');
  const privateRoute=await call('/api/suite/organizations');
  assert.equal(privateRoute.status,401,'anonymous visitor cannot list organizations');
  await assert.rejects(call('/api/suite/health',{
