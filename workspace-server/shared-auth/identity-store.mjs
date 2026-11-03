@@ -6,7 +6,7 @@ import path from 'node:path';
 
 const derive = promisify(scrypt);
 const PASSWORD_COST = Object.freeze({ N: 32768, r: 8, p: 1, keyLength: 64 });
-const APP_IDS = new Set(['goflo', 'eel', 'methpipe', 'mantrain', 'duckman', 'limsman']);
+const APP_IDS = new Set(['goflo', 'eel', 'methpipe', 'mantrain', 'duckman', 'limsman', 'dataduck']);
 const opaque = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
