@@ -511,3 +511,65 @@ A CI-only copy of that Caddy template is bound to `127.0.0.1:18443` with externa
 The automated assertions check that the real central Workspace responds to its hostname and declines anonymous organization reads, that each of six other HTTPS hostnames reaches **only its uniquely identified test upstream**, that the six fake upstreams reject native communications configuration as unauthorized rather than pretending to be genuine apps, and that the upstream ports reject incorrect direct Host headers. The test uses the current checked-out Workspace runtime SHA and a **separate historical six-app-tested source SHA** for the proxy source-plan generator. Because they differ, this must not be interpreted as native client compatibility verification.
 
 **IMPORTANT: These six upstream servers are ROUTING STUBS, not CytoDuck, DuckNote, DuckPipe, DuckTrain, DuckMan or LabDuck.** The resulting PASS means that Caddy's seven host routes, certificate matching and network/port isolation function together in a disposable environment. It does **not** prove native login, browser PKCE, per-app licensing, role enforcement, database operation, shared session revocation, or production readiness. The six real native servers must still be started concurrently from pinned commits with their own private databases and tested with the Workspace broker before approving a staging rollout.
+
+
+## Combined seven-service prestart gate (OFFLINE ONLY — NOT DEPLOYED)
+
+Use this combined read-only audit **after** the isolated synthetic staging
+configuration, seven pristine source checkouts, six separate native
+environment files, the uninstalled seven-origin Caddy plan and the
+uninstalled six-native systemd plan have already been prepared privately.
+This audit checks them together rather than trusting independent old PASS
+results. Run it on the trusted operator machine from a **separate, current
+operator tooling checkout** with the refreshed reviewed six-app source
+lock; the seven staging source checkouts themselves MUST remain at their
+jointly tested immutable SHAs.
+
+~~~bash
+cd workspace-server
+npm run staging:seven-prestart -- \
+  --config /srv/duckbio-private/staging/workspace-staging.json \
+  --sources-root /srv/duckbio-private/seven-reviewed-sources \
+  --private-data-root /srv/duckbio-native-private \
+  --proxy-plan-root /srv/duckbio-private/proxy-plan-output \
+  --native-plan-root /srv/duckbio-private/native-unit-plan-output \
+  --confirm-offline-prestart-only
+~~~
+
+The two plan-root arguments refer to the parent directories of
+"seven-origin-proxy-plan" and "six-native-service-plan", respectively.
+Do not supply the actual installed systemd or Caddy paths. Central
+private data, source checkout roots, native data, proxy planning and
+native unit planning must all be distinct, nonoverlapping private roots.
+
+The final offline gate verifies, in order:
+
+1. A validated synthetic staging config and one jointly tested
+   Workspace/source lock, plus owner-only, isolated source/data roots.
+2. Exactly seven pristine Git source checkouts, approved remotes,
+   immutable full SHAs and six native workflow pins to the same Workspace.
+3. Six private, app-scoped native environment files: registered own
+   credentials, explicit native organization mapping, isolated app
+   database configuration and app-specific vault/proof keys.
+4. A byte-for-byte identical seven-host Caddy plan and routing manifest:
+   exact seven approved hostnames and loopback routes, no tampering,
+   unexpected extra files, symlinks or unsafe permissions.
+5. All six byte-for-byte identical systemd unit templates and their
+   manifest, including entrypoints, isolated data paths, exact
+   source SHAs, current supported Node executable and the routing hash.
+
+This command does NOT write or install any file, run services,
+contact GitHub, inspect database contents, make network requests, create
+certificates, alter DNS, touch Stripe or email providers, or authorize
+any real users. Its output is limited to fixed gate names and PASS/BLOCKED;
+it never prints private paths, credential values, native organization IDs,
+hostnames, database passwords or full environment files.
+
+**A PASS is still only an offline prestart consistency result.** It does
+not demonstrate a live Caddy listener, trusted DNS/TLS, actual app
+readiness, authenticated integration among seven real services,
+per-app entitlements, native MFA, real restore/recovery, or production
+readiness. A failed gate is a stop condition. Independent operator
+staging-host approval and the live release checks remain mandatory.
+The six synthetic route stubs used in a separate CI suite must never be
+represented as six running real native apps.
