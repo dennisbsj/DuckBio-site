@@ -86,6 +86,20 @@ export function prepareSixNativeServicePlan({
   const stat=lstatSync(entry);
   if(!stat.isFile()||stat.isSymbolicLink())
    throw Error('missing_or_symlinked_native_entrypoint');
+  if(app.id==='eel'){
+   // The older jointly-tested DuckNote source silently ignores the
+   // private-runtime override. Never generate a misleading unit for it.
+   const helper=join(checkout,'server','runtime-directory.js');
+   let supported=false;
+   try{
+    const stat=lstatSync(helper);
+    supported=stat.isFile()&&!stat.isSymbolicLink()&&
+     readFileSync(entry,'utf8').includes(
+      'verifyDuckNoteRuntimeDir(appRoot,process.env.DUCKNOTE_RUNTIME_DIR)')&&
+     readFileSync(helper,'utf8').includes('DUCKNOTE_RUNTIME_DIR');
+   }catch{}
+   if(!supported)throw Error('ducknote_private_runtime_source_not_verified');
+  }
   const privateDir=join(data,app.id);
   // A writable DuckNote runtime must never be located in its read-only
   // source checkout. The fixed ExecStart assignment overrides native.env.
