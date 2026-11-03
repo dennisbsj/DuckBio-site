@@ -12,7 +12,8 @@
  *  - Exact session-locked central organization from organizationStore
  *  - Current app assignment, edited roles + effective permissions and
  *    independently verified LIVE paid seat from organizationStore
- *  - Explicit existing native user+organization mapping, confirmed by
+ *  - Explicit organization-scoped native user+tenant mapping (no legacy
+ *    (user,app) fallback), confirmed by
  *    an authoritative native-app verifier (no email joins).
  */
 export const WORKSPACE_NATIVE_APPS=Object.freeze([
@@ -33,10 +34,11 @@ const deny=reason=>Object.freeze({candidateReady:false,accessGranted:false,
  * This library never trusts browser-supplied roles, email or claimed seats.
  */
 export function createWorkspaceNativeAccessInspector({
- identityStore,organizationStore,verifyNativeMapping,clock=Date.now
+ identityStore,organizationStore,scopedNativeLinks,verifyNativeMapping,clock=Date.now
 }={}){
  for(const [store,methods] of [
-  [identityStore,['getParentSession','getUser','getAccess']],
+  [identityStore,['getParentSession','getUser']],
+  [scopedNativeLinks,['get']],
   [organizationStore,['currentSessionOrganization','verifiedNativePermissionCandidate']]
  ])if(!store||methods.some(method=>typeof store[method]!=='function'))
    throw Error('private_access_stores_required');
@@ -63,12 +65,16 @@ export function createWorkspaceNativeAccessInspector({
      policy.organizationId!==organizationId||policy.permission!==permission||
      !safeRole(policy.role)||!Number.isSafeInteger(policy.verifiedPaidThroughMs)||
      policy.verifiedPaidThroughMs<=clock())return null;
-  const grant=identityStore.getAccess(parent.subject,appId)?.localIdentity;
-  // A unique native organization ID is essential even for the six originals:
-  // no assumption that central and native tenant IDs are the same.
-  if(!grant||!safe(grant.userId)||!safe(grant.organizationId))return null;
-  return {parent,policy,nativeUserId:grant.userId,
-   nativeOrganizationId:grant.organizationId};
+  // Never fall back to legacy (user,app) grants across organizations.
+  // Missing explicit (user,session-locked org,app) binding always denies.
+  const grant=scopedNativeLinks.get({workspaceAccountId:parent.subject,
+   workspaceOrganizationId:organizationId,appId});
+  if(!grant||grant.workspaceAccountId!==parent.subject||
+     grant.workspaceOrganizationId!==organizationId||grant.appId!==appId||
+     !safe(grant.nativeUserId)||!safe(grant.nativeOrganizationId)||
+     !Number.isSafeInteger(grant.revision)||grant.revision<=0)return null;
+  return {parent,policy,nativeUserId:grant.nativeUserId,
+   nativeOrganizationId:grant.nativeOrganizationId,linkRevision:grant.revision};
  }
  return Object.freeze({
   async inspect({sessionId,organizationId,appId,permission}={}){
@@ -98,6 +104,7 @@ export function createWorkspaceNativeAccessInspector({
    if(!second||first.parent.subject!==second.parent.subject||
       first.nativeUserId!==second.nativeUserId||
       first.nativeOrganizationId!==second.nativeOrganizationId||
+      first.linkRevision!==second.linkRevision||
       first.policy.role!==second.policy.role)
      return deny('access_changed_during_verification');
    return Object.freeze({candidateReady:true,accessGranted:false,
