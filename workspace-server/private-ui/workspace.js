@@ -1,6 +1,6 @@
 // Private same-origin Workspace UI. Server owns roles, license counts and identity.
 const $=id=>document.getElementById(id);
-const state={csrf:'',orgs:[],selected:null,overview:null,matrix:null,busy:false,inviteToken:null,inviteDetails:null};
+const state={csrf:'',orgs:[],selected:null,overview:null,matrix:null,rolePolicies:null,busy:false,inviteToken:null,inviteDetails:null};
 const errorMessage=(status)=>status===401?'Sign in again.':status===403?'Your role does not allow this action.':status===409?'There are not enough app licences, or the data changed. Reload the organization.':status===400?'Check the account, email and app roles.':'The private Workspace service is unavailable.';
 function status(message){$('status').textContent=message;}
 function el(tag,text,cls){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
@@ -158,7 +158,7 @@ async function overview(orgId){
  const view=await request('/api/suite/organization/overview',{organizationId:orgId});
  state.overview=view;$('organization-name').textContent=view.organization.name;
  renderSeats();renderMembers();await refreshInvitations();await refreshAudit();$('edit-panel').hidden=true;$('buy-panel').hidden=true;$('invite-panel').hidden=true;
- state.matrix=null;
+ state.matrix=null;state.rolePolicies=null;
  status('Workspace data loaded from the private server.');
 }
 async function chooseOrganization(orgId){
@@ -479,7 +479,8 @@ function showTab(tab){
   button.classList.toggle('active',active);
   button.setAttribute('aria-selected',String(active));
  }
- for(const name of ['users','subscriptions','matrix'])$('tab-'+name).hidden=name!==tab;
+ for(const name of ['users','subscriptions','matrix','roles'])$('tab-'+name).hidden=name!==tab;
+ if(tab==='roles')loadRolePolicies().catch(e=>{$('roles-status').textContent=e.message;});
  if(tab==='matrix')loadMatrix().catch(e=>{$('matrix-info').textContent=e.message;});
  if(tab==='subscriptions')refreshSubscriptions().catch(e=>status(e.message));
 }
@@ -536,6 +537,86 @@ function renderMatrix(){
  }
  $('matrix-info').textContent=entries.length+' user/app rows shown. Changes are stored in Workspace; native app enforcement is not connected.';
 }
+
+async function loadRolePolicies(preferredRole){
+ if(!state.selected||!state.overview)return;
+ const select=$('roles-app'),previous=select.value;
+ select.replaceChildren();
+ for(const app of state.overview.apps){
+  const opt=el('option',app.name);opt.value=app.id;select.append(opt);
+ }
+ if(state.overview.apps.some(app=>app.id===previous))select.value=previous;
+ const appId=select.value,org=state.selected;
+ if(!appId)return;
+ const response=await request('/api/suite/organization/roles/list',{organizationId:org,appId});
+ if(org!==state.selected||appId!==select.value)return;
+ state.rolePolicies=response;
+ const roles=$('roles-role'),prior=preferredRole??roles.value;
+ roles.replaceChildren();
+ for(const row of response.roles){
+  const opt=el('option',row.name+(row.custom?' (custom)':' (standard)'));
+  opt.value=row.name;roles.append(opt);
+ }
+ const create=el('option','+ New custom role');create.value='__new__';roles.append(create);
+ if(response.roles.some(row=>row.name===prior)||prior==='__new__')roles.value=prior;
+ renderRolePolicy();
+}
+function renderRolePolicy(){
+ if(!state.rolePolicies)return;
+ const name=$('roles-role').value,newRole=name==='__new__';
+ const record=state.rolePolicies.roles.find(row=>row.name===name);
+ $('new-role-field').hidden=!newRole;
+ $('roles-new-name').required=newRole;
+ $('roles-delete').hidden=!record?.custom;
+ const enabled=new Set(record?.permissions||[]);
+ const container=$('roles-permissions');container.replaceChildren();
+ for(const permission of state.rolePolicies.availablePermissions){
+  const label=el('label',undefined,'role-card');
+  const check=el('input');check.type='checkbox';check.value=permission;
+  check.checked=enabled.has(permission);
+  label.append(check,document.createTextNode(' '+permission));
+  container.append(label);
+ }
+ $('roles-status').textContent=newRole
+  ?'New roles start without any permissions.'
+  :'Changes apply to all members assigned this role in this organization.';
+}
+$('roles-app').addEventListener('change',()=>{
+ state.rolePolicies=null;
+ loadRolePolicies().catch(e=>{$('roles-status').textContent=e.message;});
+});
+$('roles-role').addEventListener('change',renderRolePolicy);
+$('role-policy-form').addEventListener('submit',async event=>{
+ event.preventDefault();
+ if(!state.selected||!state.rolePolicies)return;
+ const appId=$('roles-app').value;
+ const role=$('roles-role').value==='__new__'
+  ?$('roles-new-name').value.trim():$('roles-role').value;
+ const permissions=[...$('roles-permissions').querySelectorAll('input:checked')].map(x=>x.value);
+ try{
+  const saved=await request('/api/suite/organization/role/save',{
+   organizationId:state.selected,appId,role,permissions
+  });
+  state.overview=await request('/api/suite/organization/overview',{organizationId:state.selected});
+  renderSeats();renderMembers();await loadRolePolicies(saved.role.role);
+  await refreshAudit();
+  $('roles-status').textContent='Saved '+saved.role.role+
+   '. Native backend permission enforcement is not connected yet.';
+ }catch(e){$('roles-status').textContent=e.message;}
+});
+$('roles-delete').addEventListener('click',async()=>{
+ if(!state.selected||!state.rolePolicies)return;
+ const role=$('roles-role').value,appId=$('roles-app').value;
+ if(!state.rolePolicies.roles.some(r=>r.name===role&&r.custom))return;
+ if(!window.confirm('Delete '+role+'? Reassign users and pending invitations first.'))return;
+ try{
+  await request('/api/suite/organization/role/delete',{organizationId:state.selected,appId,role});
+  state.overview=await request('/api/suite/organization/overview',{organizationId:state.selected});
+  renderSeats();renderMembers();await loadRolePolicies();await refreshAudit();
+  $('roles-status').textContent='Custom role deleted.';
+ }catch(e){$('roles-status').textContent=e.message;}
+});
+
 document.querySelectorAll('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>showTab(btn.dataset.tab)));
 $('matrix-search').addEventListener('input',renderMatrix);
 $('matrix-app').addEventListener('change',renderMatrix);
