@@ -11,6 +11,8 @@ cd workspace-server
 npm run staging:preflight -- --config /srv/duckbio-private/workspace-staging.json
 ```
 
+**Runtime startup guard:** When the private Workspace server is started with `SUITE_STAGING_ACK` present (including a value loaded through `SUITE_ENV_FILE`), it validates the complete synthetic staging profile **before creating SQLite databases or initializing the broker**. An invalid, empty or misspelled acknowledgement now fails closed. This is an additional guard for deliberately marked staging environments, **not** a production-mode restriction and **not** a substitute for independently running this CLI preflight, verifying file permissions, ownership, DNS, TLS and staging isolation. Runtimes without that staging marker remain unchanged; do not treat omitting the marker as permission to bypass staging review.
+
 The command exits **0 only if every local gate passes**; otherwise it exits nonzero, printing **only fixed error codes**, never client secrets, user IDs, database content, or config values. No outward connections are attempted.
 
 The private JSON file must use string values for the runtime's settings:
