@@ -1,0 +1,43 @@
+name: Audit six-app immutable source CI evidence (read-only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-server/six-app-source-qa-lock.json'
+      - 'workspace-server/six-app-source-qa-audit.mjs'
+      - 'workspace-server/tests/six-app-source-qa-audit.test.mjs'
+      - 'workspace-server/SIX_APP_SOURCE_QA_BASELINE.md'
+      - 'workspace-server/package.json'
+      - '.github/workflows/workspace-six-app-source-audit.yml'
+  pull_request:
+    paths:
+      - 'workspace-server/six-app-source-qa-lock.json'
+      - 'workspace-server/six-app-source-qa-audit.mjs'
+      - 'workspace-server/tests/six-app-source-qa-audit.test.mjs'
+      - 'workspace-server/SIX_APP_SOURCE_QA_BASELINE.md'
+      - 'workspace-server/package.json'
+      - '.github/workflows/workspace-six-app-source-audit.yml'
+permissions:
+  contents: read
+jobs:
+  historical-public-source-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Checkout source snapshot without persistent credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate exact offline lock, documentation and audit source
+        working-directory: workspace-server
+        run: |
+          node --check six-app-source-qa-audit.mjs
+          node --test tests/six-app-source-qa-audit.test.mjs
+          npm run staging:source-audit
+      - name: Recheck public historical GitHub evidence (GET-only)
+        working-directory: workspace-server
+        run: npm run staging:source-audit:remote
