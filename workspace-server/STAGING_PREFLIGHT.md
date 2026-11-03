@@ -44,3 +44,22 @@ The private JSON file must use string values for the runtime's settings:
 7. Request a separate explicit go/no-go approval before any production routing, real accounts, DNS change, hosting cutover, payment activation or migration. The offline PASS message is never a substitute for that approval.
 
 Current repository status: source-only, with no claim of staging or production deployment.
+
+## Anonymous HTTPS staging smoke (only AFTER staging servers exist)
+
+The offline gate above validates configuration **without any network traffic**. Once the operator has explicitly provisioned private, isolated staging domains for Workspace and **all six** native apps, run the next optional check from a trusted operator machine:
+
+```bash
+cd workspace-server
+npm run staging:smoke -- --config /srv/duckbio-private/workspace-staging.json --confirm-read-only-staging
+```
+
+The smoke command requires the same owner-readable, private, synthetic-only configuration (including reviewed commit SHA) and the explicit confirmation flag. It uses **only anonymous GET requests** with no cookies, credentials, request bodies, or redirect following. It does not create users, make purchases, launch browsers, or write to databases. Its stable PASS/FAIL output includes app IDs and fixed diagnostic codes only, not URLs, identities, tokens, response bodies or secrets.
+
+It checks:
+
+1. The central Workspace `/api/suite/health` responds over the exactly configured HTTPS origin with `status: ok`, `mode: local`, `configured: true`, no-store headers, and a build version matching `SUITE_BUILD_SHA`. If this fails, **no native app is contacted**.
+2. Each of the six registered native HTTPS origins denies unsigned access to its private Workspace communications configuration with JSON HTTP **401 or 403**. This catches wrong-domain static HTML fallbacks, unexpectedly public config endpoints and missing native authorization routes. LabDuck uses its Node-specific `/api.php?action=workspace_communications_config` route.
+3. DuckNote's public `/health` reports `ok: true` and `database: true`; LabDuck's `/api.php?action=health` identifies its **Node** runtime and schema version 1.
+
+A failed probe is not automatically retried. Network access must be enabled and valid DNS/TLS already configured; otherwise the check fails safely. A PASS demonstrates **only these limited anonymous HTTPS contracts**, not end-to-end authenticated SSO, native user mapping, real paid entitlements, backups, restore or production readiness. Complete the additional manual release gates above separately. Do not use the command against live production/customer origins.

@@ -133,7 +133,7 @@ export function validateWorkspaceStagingConfig(config){
  return {ok:errors.length===0,errors};
 }
 
-function readPrivateConfiguration(filename){
+export function readPrivateConfiguration(filename){
  const path=privateAbsolutePath(filename);
  if(!path||!existsSync(path))throw Error('invalid_config_file');
  // On the Linux staging host, no group/other access to secret-bearing JSON.
