@@ -2569,3 +2569,32 @@ html:not([data-theme="dark"]) body.support-faq-page .support-faq-heading,
 html:not([data-theme="dark"]) body:not(.homepage-exact) .pr-hero.pr-plans-first{
   border-top-color:#9edbe8;
 }
+
+
+/* DuckBio desktop banner size limit — preserves the complete artwork without cropping it. */
+@media (min-width: 1100px) {
+  /* Keep the three existing banner compositions at their designed 51%-width
+     ratio, but stop them scaling indefinitely on wide desktop monitors.
+     This preserves raster headings, the duck artwork and the Home CTA hotspot. */
+  body.homepage-exact main { background: #071f37; }
+  body.homepage-exact .home-mockup-exact {
+    max-width: 1100px;
+    margin-inline: auto;
+  }
+
+  /* Pricing's banner has a 1400 × 790 image with a small intentional crop. */
+  main:has(> .pr-banner) { background: #051e33; }
+  body:not(.homepage-exact) main > .pr-banner {
+    max-width: 1100px;
+    height: 561px;
+    margin-inline: auto;
+  }
+
+  body.support-faq-page main { background: #071d32; }
+  html body.support-faq-page main > .page-hero.support-hero {
+    width: 100%;
+    max-width: 1100px;
+    height: 561px;
+    margin-inline: auto;
+  }
+}
