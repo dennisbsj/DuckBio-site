@@ -2,6 +2,7 @@
 // It never starts a server, opens a database or makes an external request.
 // Passing this gate is NOT evidence that HTTPS staging is deployed or operational.
 import {existsSync,readFileSync,realpathSync,statSync} from 'node:fs';
+import {isIP} from 'node:net';
 import {dirname,isAbsolute,resolve,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {resolve as resolvePath} from 'node:path';
@@ -17,6 +18,33 @@ function canonicalHttps(value){
   return u.protocol==='https:'&&u.origin===value&&u.pathname==='/'&&
    !u.username&&!u.password&&!u.search&&!u.hash?u.origin:null;
  }catch{return null}
+}
+
+
+// Conservative OFFLINE stage-only guard; DNS and the trusted certificate
+// chain still need independent verification on an approved staging host.
+// A valid URL is not evidence that the domain is controlled by DuckBio.
+export function stagingHttpsOrigin(value){
+ const origin=canonicalHttps(value);
+ if(!origin)return null;
+ const {hostname,port}=new URL(origin);
+ const host=hostname.toLowerCase();
+ const labels=host.split('.');
+ const reserved=['localhost','local','internal','lan','home','test','example',
+  'invalid','arpa','onion'];
+ const retired=['celluloidconsulting.net','celluloidconsulting.com'];
+ const publicSites=['github.io','pages.dev','workers.dev'];
+ const examples=['example.com','example.net','example.org'];
+ const badSuffix=suffix=>host===suffix||host.endsWith('.'+suffix);
+ if(port||host.endsWith('.')||isIP(host.replaceAll('[','').replaceAll(']',''))||
+    labels.length<3||labels.some(x=>!x)||reserved.includes(labels.at(-1))||
+    retired.some(badSuffix)||publicSites.some(badSuffix)||
+    examples.some(badSuffix)||labels.includes('prod')||
+    labels.includes('production')||labels.includes('live')||
+    labels.includes('www'))return null;
+ const stagingLabel=/^(?:staging|stage|qa)(?:-[a-z0-9-]+)?$|^[a-z0-9-]+-(?:staging|stage|qa)$/;
+ if(!labels.slice(0,-2).some(label=>stagingLabel.test(label)))return null;
+ return origin;
 }
 
 function privateAbsolutePath(value){
@@ -43,7 +71,7 @@ export function validateWorkspaceStagingConfig(config){
  if(config.SUITE_MODE!=='broker')reject('broker_mode_required');
  if(!/^[a-f0-9]{40}$/i.test(config.SUITE_BUILD_SHA||''))
   reject('reviewed_git_sha_required');
- const origin=canonicalHttps(config.SUITE_ORIGIN);
+ const origin=stagingHttpsOrigin(config.SUITE_ORIGIN);
  if(!origin)reject('workspace_https_origin_required');
  if(!origin||canonicalHttps(config.SUITE_ISSUER||config.SUITE_ORIGIN)!==origin)
   reject('workspace_issuer_must_match_origin');
@@ -63,7 +91,7 @@ export function validateWorkspaceStagingConfig(config){
     reject('invalid_native_client_registration');continue;
    }
    ids.add(client.id);
-   const native=canonicalHttps(client.nativeOrigin);
+   const native=stagingHttpsOrigin(client.nativeOrigin);
    if(!native||native===origin||hosts.has(native)){
     reject('distinct_native_https_origins_required');
    }else hosts.add(native);
