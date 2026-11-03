@@ -9,7 +9,7 @@ import {NATIVE_APP_IDS} from '../staging-preflight.mjs';
 function syntheticStaging(root){
  const workspace='https://staging-workspace.duckbio.net';
  const clients=NATIVE_APP_IDS.map(id=>({
-  id,appId:id,secret:'synthetic-client-only-'+id+'-'.repeat(5),
+  id,appId:id,secret:'synthetic-client-only-'+id+'-'.repeat(40),
   nativeOrigin:'https://staging-'+id+'.duckbio.net',
   redirectUris:['https://staging-'+id+'.duckbio.net/auth/callback']
  }));
