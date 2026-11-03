@@ -58,3 +58,7 @@ jobs:
         working-directory: workspace-server
         run: |
           node --test tests/staging-seven-source-gate.test.mjs tests/staging-seven-proxy-plan.test.mjs tests/staging-six-native-services.test.mjs tests/staging-seven-prestart-gate.test.mjs
+      - name: Verify standalone pinned Workspace UI and seventh systemd unit planning still works
+        working-directory: workspace-server
+        run: |
+          node --test tests/staging-prepare-ui.test.mjs tests/staging-service-plan.test.mjs
