@@ -77,7 +77,7 @@ and workflow IDs; central CI must have passed Node 22 and 24; each native
 workflow must check out the same immutable central source commit. No
 credentials, repository write permissions, customer data or production
 systems are needed. Run
-[the separately configured GitHub Actions audit](../../.github/workflows/workspace-six-app-source-audit.yml)
+[the separately configured GitHub Actions audit](../.github/workflows/workspace-six-app-source-audit.yml)
 for repeatable independent evidence checks.
 
 A green **historical evidence audit** proves only that these immutable
