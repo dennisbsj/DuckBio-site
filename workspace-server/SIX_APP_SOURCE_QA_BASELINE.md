@@ -22,7 +22,7 @@ This is **not necessarily the latest Workspace `main`**; any later central chang
 | App | Immutable native commit | Coordinated central-version HTTPS evidence |
 | --- | --- | --- |
 | CytoDuck (`goflo`) | `b9877a723347cc5343157fe6342014deaedb2922` | [Chromium against real broker](https://github.com/dennisbsj/CytoDuck/actions/runs/41657607526), [build](https://github.com/dennisbsj/CytoDuck/actions/runs/41657607587) |
-| DuckNote (`eel`) | `ba691bef4f98e63083e5646c00efff1fc3f19a83` | [React + Node + PostgreSQL + real broker Chromium](https://github.com/dennisbsj/DuckNote/actions/runs/41646354024), [full CI](https://github.com/dennisbsj/DuckNote/actions/runs/41646354106) |
+| DuckNote (`eel`) | `cef89cb8b3b21c7100d9035b03df161de75c4d11` | [React + Node + PostgreSQL + real broker Chromium](https://github.com/dennisbsj/DuckNote/actions/runs/41669072382), [full merged-main CI incl. real PostgreSQL/MFA/PKCE/HTTPS](https://github.com/dennisbsj/DuckNote/actions/runs/41669072517) |
 | DuckPipe (`methpipe`) | `7061981b0b3b1fdab23fffe2eddb5f3730901cea` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckPipe/actions/runs/41639842792) |
 | DuckTrain (`mantrain`) | `fff8d5fdba9bfaf5b6f9ab658b7d8cd214290346` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckTrain/actions/runs/41639939459) |
 | DuckMan (`duckman`) | `a42f27148e9cbe51aec80e9f78bd905e6dfc9221` | [Native + real broker Chromium](https://github.com/dennisbsj/DuckMan/actions/runs/41639884085), [full verify](https://github.com/dennisbsj/DuckMan/actions/runs/41639884187) |
@@ -37,6 +37,25 @@ that binding and the revised DuckNote `main` commit; the other five
 app revisions and common Workspace source are unchanged. An omitted
 `HOST` deliberately retains historical behavior outside staging, so
 operators must not treat unspecified binding as safe for private staging.
+
+**DuckNote private staging runtime update:** Native PR #143 was merged into
+DuckNote `main` at `cef89cb8b3b21c7100d9035b03df161de75c4d11`.
+It adds an explicitly configured `DUCKNOTE_RUNTIME_DIR` outside the
+immutable source tree for private staging, preserving legacy `tmp` behavior
+when unset, rejecting unsafe/symlinked paths and destructive database reset
+markers before server startup. This source-lock refresh is backed by the
+**merged-main push** real React/Node/PostgreSQL + Workspace HTTPS Chromium
+workflow [41669072382](https://github.com/dennisbsj/DuckNote/actions/runs/41669072382)
+(workflow ID `405611188`), and the complete PostgreSQL, security and
+native integration [CI run 41669072517](https://github.com/dennisbsj/DuckNote/actions/runs/41669072517).
+Both succeeded for the exact source SHA and are not PR-only evidence.
+The native HTTPS workflow still checks out the same pinned Workspace
+`233ca6d376efa2fbddca042cea5106aae92679c0`; no other native source,
+central source or commercial license is changed in this historical lock.
+**The native staging systemd plan must supply a separate private 0700
+`eel/runtime` and fail closed on old/unverified DuckNote code.** The
+uninstalled seven-service staging update is tracked independently in
+[PR #124](https://github.com/dennisbsj/DuckBio-site/pull/124).
 
 **CytoDuck seven-origin route regression:** Native PR #216 updated the
 CytoDuck main source and CI workflow to test its real backend behind the
