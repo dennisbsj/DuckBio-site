@@ -60,8 +60,26 @@ node staging-six-native-services.mjs \
   --private-output-root /srv/duckbio-private/native-plans \
   --snapshot current --confirm-uninstalled-only
 
-# 6. Recheck that every source, env, Caddy template, unit and manifest
-#    matches the reviewed current snapshot. Never deploy from this PASS alone.
+# 6. The SEVENTH systemd unit (central Workspace) is generated SEPARATELY
+#    by the existing pinned Workspace source itself, never from newer tooling.
+#    Its source checker requires the real pinned Git HEAD and pristine checkout.
+cd /srv/duckbio-private/seven-reviewed-sources/DuckBio-site/workspace-server
+node staging-prepare-ui.mjs \
+  --config /srv/duckbio-private/staging/workspace-staging.json \
+  --confirm-first-install
+node staging-service-plan.mjs \
+  --config /srv/duckbio-private/staging/workspace-staging.json \
+  --service-user duckbio-staging --listen-port 3307 --confirm-plan-only
+
+# IMPORTANT: The old Workspace-only Caddyfile produced alongside that
+# seventh unit must NEVER be combined with the new seven-origin Caddyfile.
+# Use ONLY the seven-origin Caddyfile after separate operator approval.
+
+# 7. Return to the trusted newer tooling checkout. Recheck every source,
+#    six-native environment, Caddy template, unit and manifest. This gate
+#    does NOT itself validate or install the separately generated central
+#    Workspace unit; its independent pinned-source generator must pass above.
+cd /path/to/trusted/newer/DuckBio-site/workspace-server
 node staging-seven-prestart-gate.mjs \
   --config /srv/duckbio-private/staging/workspace-staging.json \
   --sources-root /srv/duckbio-private/seven-reviewed-sources \
@@ -72,6 +90,8 @@ node staging-seven-prestart-gate.mjs \
 ```
 
 The proxy generator writes into `seven-origin-proxy-plan` and the native generator into `six-native-service-plan`, with **exclusive creation** and owner-only artifacts. They reject existing destinations and do not overwrite earlier plans. Use separate, private output roots; never combine historical and current artifacts. The prestart auditor compares actual files to independently reconstructed canonical templates, so edited or extra files fail.
+
+The central Workspace unit is **the seventh service** and must be generated using the immutable pinned Workspace source checkout, NOT the newer operator-tooling checkout. Its existing `staging-prepare-ui.mjs` and `staging-service-plan.mjs` verify the real Git HEAD, clean source, asset hashes and exact private configuration before creating a dedicated `duckbio-workspace-staging.service` on loopback port 3307. The central generator also outputs a **Workspace-only Caddyfile for its historical standalone plan**; do not install or combine that Caddyfile with the separate canonical seven-origin Caddyfile. The six-native prestart gate does **not** audit the central unit contents, and its PASS must never be used as an alternative to the central generator's own successful verification.
 
 The six units use separate `duckbio-stg-APP` Linux accounts, distinct loopback ports and dedicated private native database roots. DuckNote must have its private `eel/runtime` directory with 0700 permissions, outside the read-only source tree, without any `reset-eel-database.once` marker. DuckNote's PostgreSQL connection must be synthetic staging-only and local, and its native vault key separate from the Workspace broker client secret. An old DuckNote source lacking the runtime isolation is rejected by the native plan generator.
 
