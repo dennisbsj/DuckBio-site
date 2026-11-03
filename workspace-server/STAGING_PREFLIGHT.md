@@ -216,6 +216,69 @@ It creates a new, non-overwriting, owner-only `post-bootstrap/` directory contai
 
 The procedure is not used for existing real accounts or production and does not alter any native-app server configuration. The original private file is deliberately preserved to prevent accidental loss of other client credentials; therefore a PASS does not by itself mean the old token has disappeared from the host.
 
+## Plan seven distinct HTTPS reverse-proxy sites (OFFLINE, UNINSTALLED)
+
+Once the operator has reviewed the exact seven source revisions in
+[the current immutable QA lock](six-app-source-qa-lock.json), use
+`staging:seven-proxy-plan` to prepare **one uninstalled Caddyfile** for
+Workspace and the six native applications. This complements the earlier
+Workspace-only systemd/Caddy template; it does **not** replace the
+independent native application services or their private configurations.
+
+On a trusted operator machine, prepare a **fresh, owner-only (0700)**
+private output directory outside Git worktrees and public web content,
+then use a separately validated, synthetic-only private config:
+
+```bash
+install -d -m 700 /srv/duckbio-private/proxy-plan-output
+cd workspace-server
+npm run staging:seven-proxy-plan -- \
+  --config /srv/duckbio-private/staging/workspace-staging.json \
+  --private-output-root /srv/duckbio-private/proxy-plan-output \
+  --confirm-uninstalled-only
+```
+
+The command requires that `SUITE_BUILD_SHA` **exactly matches** the
+central Workspace commit jointly tested with all six native apps.
+It creates a new `seven-origin-proxy-plan/` directory only, containing
+`Caddyfile.seven-origin-staging` and `routing-manifest.json` (0600
+files; 0700 directory) without overwriting any existing output.
+The Caddyfile contains exactly seven distinct staging-labelled hostnames,
+each forwarding only to an independent **127.0.0.1** native port.
+It never embeds the six client secrets, broker setup token, private
+database paths, organization mappings, credentials or payment settings.
+
+For the initial plan, the reserved ports are:
+
+| Origin/application | Expected loopback port |
+| --- | ---: |
+| Workspace | 3307 |
+| CytoDuck (`goflo`) | 3308 |
+| DuckNote (`eel`) | 3309 |
+| DuckPipe (`methpipe`) | 3310 |
+| DuckTrain (`mantrain`) | 3311 |
+| DuckMan (`duckman`) | 3312 |
+| LabDuck (`limsman`) | 3313 |
+
+These port assignments are **uninstalled planning defaults**, not
+evidence that the ports are free or that native servers listen there.
+The planner verifies unique, unprivileged loopback ports and records
+the seven immutable source SHAs, hostnames and routing manifest hash.
+Port changes require a separate operator review and synchronized
+changes to the actual native server and Workspace-only service plans.
+
+**Do not install the seven-host Caddyfile alongside the earlier
+Workspace-only Caddy site block** or silently activate real DNS/TLS.
+Installing the template could trigger external certificate requests and
+network exposure; the operator must first verify domain ownership,
+firewall rules, real listener binds, independent native app databases,
+per-app secrets, exact callback origins, TLS certificates and recovery
+plans. A plan PASS **does not test Caddy's live syntax, reach any host,
+start any service, or prove seven-service integration**. After an
+approved staging installation, separately run the existing anonymous
+HTTPS smoke and full authenticated MFA/permission/entitlement tests.
+No production, billing or customer system is involved in this planning.
+
 ## Verify seven local Git source checkouts (offline release-candidate gate)
 
 The [coordinated source QA lock](six-app-source-qa-lock.json) is a
