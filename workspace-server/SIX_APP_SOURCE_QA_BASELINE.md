@@ -71,14 +71,33 @@ npm run staging:source-audit:remote
 
 The first command requires no network and checks the manifest format, fixed
 allowlisted app IDs/repositories, immutable SHAs and matching documentation.
-The second adds **GET-only public GitHub API** checks: the exact seven CI
+The second adds **GET-only authenticated GitHub API** checks: the exact seven CI
 runs must be completed, successful pushes on `main` with the recorded head
 and workflow IDs; central CI must have passed Node 22 and 24; each native
-workflow must check out the same immutable central source commit. No
-credentials, repository write permissions, customer data or production
-systems are needed. Run
-[the separately configured GitHub Actions audit](../.github/workflows/workspace-six-app-source-audit.yml)
-for repeatable independent evidence checks.
+workflow must check out the same immutable central source commit.
+
+**Private repository boundary:** The Workspace source repository is public,
+but the six native app repositories are **private**. The central repository's
+ordinary GitHub Actions token cannot read their workflows and CI history.
+Consequently, [the automatic GitHub Actions check](../.github/workflows/workspace-six-app-source-audit.yml)
+performs **offline validation and unit tests only**; do **not** interpret its
+green status as independent re-verification of private remote evidence.
+To perform the complete remote read-only audit, an explicitly authorized
+operator must provide a credential with **read-only metadata, Actions and
+Contents access** to the six private app repositories, for example in a
+trusted shell:
+
+```bash
+# Set DUCKBIO_QA_READ_TOKEN privately using an approved secret manager.
+npm run staging:source-audit:remote
+```
+
+The command fails closed without the token, never prints its value, performs
+only fixed allowlisted GitHub REST GETs and makes no repository changes.
+Do not put this token in source, comments, output, artifacts, a public
+workflow, or a shared CI secret without an explicit security review. The
+connected GitHub app can also be used by an authorized reviewer to verify
+the same evidence manually.
 
 A green **historical evidence audit** proves only that these immutable
 source revisions passed their recorded isolated CI workflows. It does
