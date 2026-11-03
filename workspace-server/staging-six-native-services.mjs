@@ -87,6 +87,9 @@ export function prepareSixNativeServicePlan({
   if(!stat.isFile()||stat.isSymbolicLink())
    throw Error('missing_or_symlinked_native_entrypoint');
   const privateDir=join(data,app.id);
+  // A writable DuckNote runtime must never be located in its read-only
+  // source checkout. The fixed ExecStart assignment overrides native.env.
+  const runtimeDir=app.id==='eel'?join(privateDir,'runtime'):null;
   const envFile=join(privateDir,'native.env');
   const serviceUser='duckbio-stg-'+app.id;
   const unitName='duckbio-native-'+app.id+'-staging.service';
@@ -105,7 +108,8 @@ export function prepareSixNativeServicePlan({
    'WorkingDirectory='+checkout,
    'EnvironmentFile='+envFile,
    'ExecStart=/usr/bin/env NODE_ENV=production HOST=127.0.0.1 PORT='+
-     route.loopbackPort+' '+nodeBinary+' '+entry,
+     route.loopbackPort+(runtimeDir?' DUCKNOTE_RUNTIME_DIR='+runtimeDir:'')+
+     ' '+nodeBinary+' '+entry,
    'Restart=on-failure',
    'RestartSec=5s',
    'UMask=0077',
@@ -133,6 +137,7 @@ export function prepareSixNativeServicePlan({
    nativeHostname:route.hostname,storageKind:kind.database,
    requiredPrivateSettings:kind.requiredPrivateSettings,
    environmentFile:envFile,privateDataDirectory:privateDir,
+   ...(runtimeDir?{privateRuntimeDirectory:runtimeDir}:{}),
    unitName,unitSha256:digest(unit)
   });
  }
