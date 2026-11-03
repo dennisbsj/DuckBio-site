@@ -54,6 +54,7 @@ test('creates seven distinct native/Workspace HTTPS host routes to unique loopba
  assert.equal(caddy.match(/^  reverse_proxy 127\.0\.0\.1:\d+ \{$/gm)?.length,7);
  assert.equal(caddy.match(/header_up Host/g)?.length||0,0,
   'all seven backends must inspect the real incoming Host header');
+ assert.equal(caddy.match(/respond @wrongHost 421/g)?.length,7);
  assert.equal(caddy.match(/^    \?X-Content-Type-Options/gm)?.length,7,
   'no duplicate nosniff headers across seven native backends');
  assert.equal(caddy.match(/^    header_up -X-Forwarded-For$/gm)?.length,7);
