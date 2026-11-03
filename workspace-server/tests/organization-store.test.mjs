@@ -13,13 +13,13 @@ function fixture(t){
 }
 const member=(accountId,roles={},extra={})=>({accountId,name:'Scientist',nickname:'Sci',email:accountId+'@example.test',admin:false,roles,...extra});
 const buy=(store,reference,plan,apps,seats=1,organizationId='one')=>store.applyVerifiedSeatPurchase({reference,organizationId,plan,apps,seats});
-test('canonical list has exactly six apps and per-app role catalogs',()=>{
- assert.deepEqual(APPLICATIONS.map(x=>x.name),['LabDuck','CytoDuck','DuckPipe','DuckNote','DuckMan','DuckTrain']);
- assert(APPLICATIONS.find(x=>x.id==='eel').roles.includes('scientist'));assert(APPLICATIONS.find(x=>x.id==='limsman').roles.includes('QC'));
+test('canonical list has seven apps and per-app role catalogs',()=>{
+ assert.deepEqual(APPLICATIONS.map(x=>x.name),['LabDuck','CytoDuck','DuckPipe','DuckNote','DuckMan','DuckTrain','DataDuck']);
+ assert(APPLICATIONS.find(x=>x.id==='eel').roles.includes('scientist'));assert(APPLICATIONS.find(x=>x.id==='limsman').roles.includes('QC'));assert.deepEqual(APPLICATIONS.find(x=>x.id==='dataduck').roles,['Analyst','Reviewer','ReadOnly','Admin']);
 });
 test('verified Single Mixed Bundle seat events are idempotent',t=>{
  const {store}=fixture(t);
- assert.deepEqual(store.overview('one','admin1').apps.map(x=>x.purchased),[0,0,0,0,0,0]);
+ assert.deepEqual(store.overview('one','admin1').apps.map(x=>x.purchased),[0,0,0,0,0,0,0]);
  assert.equal(buy(store,'evt1','Single',['eel'],2).applied,true);
  assert.equal(buy(store,'evt1','Single',['eel'],2).applied,false);
  assert.throws(()=>buy(store,'evt1','Single',['eel'],1),/purchase_reference_conflict/);
@@ -263,6 +263,6 @@ test('subscription drafts are tenant scoped and cannot ever grant seats',t=>{
  assert.throws(()=>store.cancelSubscriptionDraft({organizationId:'two',actorId:'admin2',draftId:draft.id}),/subscription_not_found/);
  assert.equal(store.cancelSubscriptionDraft({organizationId:'one',actorId:'admin1',draftId:draft.id}).status,'canceled');
  assert.equal(store.cancelSubscriptionDraft({organizationId:'one',actorId:'admin1',draftId:draft.id}).status,'canceled');
- assert.deepEqual(store.overview('one','admin1').apps.map(a=>a.purchased),[0,0,0,0,0,0]);
- assert.deepEqual(store.overview('one','admin1').apps.map(a=>a.assigned),[0,0,0,0,0,0]);
+ assert.deepEqual(store.overview('one','admin1').apps.map(a=>a.purchased),[0,0,0,0,0,0,0]);
+ assert.deepEqual(store.overview('one','admin1').apps.map(a=>a.assigned),[0,0,0,0,0,0,0]);
 });
