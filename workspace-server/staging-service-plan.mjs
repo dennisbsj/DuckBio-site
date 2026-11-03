@@ -127,6 +127,8 @@ export function prepareStagingServicePlan(config,{
   '# UNINSTALLED: activating Caddy may request public TLS certificates.',
   '# Workspace only: each native app needs its own separately reviewed server.',
   hostname+' {',
+  '  @wrongHost not host '+hostname,
+  '  respond @wrongHost 421',
   '  header {',
   '    ?X-Content-Type-Options "nosniff"',
   '    ?X-Frame-Options "DENY"',
