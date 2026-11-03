@@ -1,6 +1,6 @@
 // OFFLINE, read-only native environment audit. Does not start services,
 // transfer credentials or attest a deployed staging system. Never reports values.
-import {lstatSync,readFileSync} from 'node:fs';
+import {lstatSync,readFileSync,realpathSync} from 'node:fs';
 import {join,resolve,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {approvedPrivateRoot} from './staging-generate-config.mjs';
@@ -39,7 +39,7 @@ function auditApp(env,client,id,dir,config){
  const errors=[];
  const require=(condition,code)=>{if(!condition)errors.push(code)};
  for(const k of Object.keys(env)){
-  if(k.startsWith('SUITE_')||/^(?:NODE_ENV|HOST|PORT|NODE_OPTIONS|LD_PRELOAD)$/.test(k)||
+  if(k.startsWith('SUITE_')||/^(?:NODE_ENV|HOST|PORT|NODE_OPTIONS|LD_PRELOAD|DUCKNOTE_RUNTIME_DIR)$/.test(k)||
      /^(?:STRIPE_|RESEND_|MAIL_WEBHOOK_)/.test(k))
    errors.push('forbidden_runtime_override');
  }
@@ -54,6 +54,18 @@ function auditApp(env,client,id,dir,config){
  require(nonempty(env[organizationKey])&&env[organizationKey].length<=128,
   'native_organization_mapping_missing');
  if(id==='eel'){
+  // The native service unit injects this fixed location after reading
+  // native.env; the environment file must never choose its own path.
+  const runtime=join(dir,'runtime');
+  let safeRuntime=false;
+  try{
+   const stat=lstatSync(runtime);
+   safeRuntime=stat.isDirectory()&&!stat.isSymbolicLink()&&
+    realpathSync(runtime)===runtime&&
+    (process.platform==='win32'||(stat.mode&0o077)===0)&&
+    !lstatSync(join(runtime,'reset-eel-database.once'),{throwIfNoEntry:false});
+  }catch{}
+  require(safeRuntime,'native_runtime_missing_or_unsafe');
   require(['FRONTEND_ORIGIN','APP_BASE_URL','CANONICAL_ORIGIN',
    'DUCKBIO_WORKSPACE_NATIVE_ORIGIN'].every(k=>same(env[k],client.nativeOrigin)),
    'native_origin_mismatch');
