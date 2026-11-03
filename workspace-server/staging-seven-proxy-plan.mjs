@@ -61,6 +61,8 @@ export function buildSevenOriginProxyPlan(config,lock,ports=STAGING_PROXY_PORTS)
   const host=new URL(item.origin).hostname;
   lines.push(
    host+' {',
+   '  @wrongHost not host '+host,
+   '  respond @wrongHost 421',
    '  header {',
    '    ?X-Content-Type-Options "nosniff"',
    '    ?X-Frame-Options "DENY"',
