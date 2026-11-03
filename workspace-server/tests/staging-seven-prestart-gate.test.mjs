@@ -36,7 +36,12 @@ function fixture(t){
    const kind=NATIVE_SERVICE_KINDS[app.id];
    const executable=join(dir,kind.entrypoint);
    mkdirSync(dirname(executable),{recursive:true});
-   writeFileSync(executable,'// inert fixture, never executed\n');
+   writeFileSync(executable,name==='DuckNote'?
+    '// Inert fixture: verifyDuckNoteRuntimeDir(appRoot,process.env.DUCKNOTE_RUNTIME_DIR)\n':
+    '// inert fixture, never executed\\n');
+   if(name==='DuckNote')
+    writeFileSync(join(dir,'server','runtime-directory.js'),
+     '// Synthetic DUCKNOTE_RUNTIME_DIR fixture; never imported\n');
    const workflow=join(dir,app.workflow);
    mkdirSync(dirname(workflow),{recursive:true});
    writeFileSync(workflow,'jobs:\n  test:\n    steps:\n'+
@@ -75,6 +80,7 @@ function fixture(t){
   env[id==='eel'||id==='duckman'?'DUCKBIO_WORKSPACE_ORGANIZATION_ID':
    'DUCKBIO_WORKSPACE_ORG_ID']='synthetic-staging-'+id;
   if(id==='eel'){
+   mkdirSync(join(dir,'runtime'),{mode:0o700});
    Object.assign(env,{
     DUCKBIO_WORKSPACE_NATIVE_ORIGIN:c.nativeOrigin,
     DUCKBIO_WORKSPACE_NATIVE_LINK_ENABLED:'true',
@@ -164,6 +170,17 @@ test('stale Git source or changed registered Workspace SHA cannot falsely pass',
  rmSync(join(f.source,'DuckPipe','unreviewed.txt'));
  const changed={...f.config,SUITE_BUILD_SHA:'f'.repeat(40)};
  assert(failed(audit(f,{config:changed}),'reviewed-source-configuration'));
+});
+test('missing or altered private DuckNote runtime blocks seven-service prestart',
+ {timeout:120000},t=>{
+ const f=fixture(t),runtime=join(f.data,'eel','runtime');
+ assert.equal(audit(f).ok,true);
+ const marker=join(runtime,'reset-eel-database.once');
+ writeFileSync(marker,'synthetic reset marker',{mode:0o600});
+ assert(failed(audit(f),'six-private-native-env-files'));
+ rmSync(marker);
+ rmSync(runtime,{recursive:true});
+ assert(failed(audit(f),'six-private-native-env-files'));
 });
 test('wrong per-app secret and unsafe native DB location fail before reading plans',
  {timeout:120000},t=>{

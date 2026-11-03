@@ -86,7 +86,24 @@ export function prepareSixNativeServicePlan({
   const stat=lstatSync(entry);
   if(!stat.isFile()||stat.isSymbolicLink())
    throw Error('missing_or_symlinked_native_entrypoint');
+  if(app.id==='eel'){
+   // The older jointly-tested DuckNote source silently ignores the
+   // private-runtime override. Never generate a misleading unit for it.
+   const helper=join(checkout,'server','runtime-directory.js');
+   let supported=false;
+   try{
+    const stat=lstatSync(helper);
+    supported=stat.isFile()&&!stat.isSymbolicLink()&&
+     readFileSync(entry,'utf8').includes(
+      'verifyDuckNoteRuntimeDir(appRoot,process.env.DUCKNOTE_RUNTIME_DIR)')&&
+     readFileSync(helper,'utf8').includes('DUCKNOTE_RUNTIME_DIR');
+   }catch{}
+   if(!supported)throw Error('ducknote_private_runtime_source_not_verified');
+  }
   const privateDir=join(data,app.id);
+  // A writable DuckNote runtime must never be located in its read-only
+  // source checkout. The fixed ExecStart assignment overrides native.env.
+  const runtimeDir=app.id==='eel'?join(privateDir,'runtime'):null;
   const envFile=join(privateDir,'native.env');
   const serviceUser='duckbio-stg-'+app.id;
   const unitName='duckbio-native-'+app.id+'-staging.service';
@@ -105,7 +122,8 @@ export function prepareSixNativeServicePlan({
    'WorkingDirectory='+checkout,
    'EnvironmentFile='+envFile,
    'ExecStart=/usr/bin/env NODE_ENV=production HOST=127.0.0.1 PORT='+
-     route.loopbackPort+' '+nodeBinary+' '+entry,
+     route.loopbackPort+(runtimeDir?' DUCKNOTE_RUNTIME_DIR='+runtimeDir:'')+
+     ' '+nodeBinary+' '+entry,
    'Restart=on-failure',
    'RestartSec=5s',
    'UMask=0077',
@@ -133,6 +151,7 @@ export function prepareSixNativeServicePlan({
    nativeHostname:route.hostname,storageKind:kind.database,
    requiredPrivateSettings:kind.requiredPrivateSettings,
    environmentFile:envFile,privateDataDirectory:privateDir,
+   ...(runtimeDir?{privateRuntimeDirectory:runtimeDir}:{}),
    unitName,unitSha256:digest(unit)
   });
  }

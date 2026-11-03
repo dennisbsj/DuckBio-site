@@ -35,6 +35,7 @@ function fixture(t){
    'DUCKBIO_WORKSPACE_ORGANIZATION_ID':'DUCKBIO_WORKSPACE_ORG_ID';
   env[orgKey]='staging-synthetic-org-'+id;
   if(id==='eel'){
+   mkdirSync(join(dir,'runtime'),{mode:0o700});
    Object.assign(env,{
     FRONTEND_ORIGIN:origin,APP_BASE_URL:origin,CANONICAL_ORIGIN:origin,
     DUCKBIO_WORKSPACE_NATIVE_ORIGIN:origin,
@@ -127,6 +128,28 @@ test('DuckNote requires explicit link, independent vault, and private staging Po
  assert(codes(result,'eel').includes('native_link_not_enabled'));
  assert(codes(result,'eel').includes('independent_vault_key_missing'));
  assert(codes(result,'eel').includes('private_staging_postgres_required'));
+});
+test('DuckNote private runtime must exist, be owner-only and contain no reset marker',t=>{
+ const f=fixture(t),runtime=join(f.dirs.get('eel'),'runtime');
+ assert.equal(inspect(f).ok,true);
+ chmodSync(runtime,0o755);
+ if(process.platform!=='win32')
+  assert(codes(inspect(f),'eel').includes('native_runtime_missing_or_unsafe'));
+ chmodSync(runtime,0o700);
+ const marker=join(runtime,'reset-eel-database.once');
+ writeFileSync(marker,'synthetic reset marker',{mode:0o600});
+ assert(codes(inspect(f),'eel').includes('native_runtime_missing_or_unsafe'));
+ rmSync(marker);
+ assert.equal(inspect(f).ok,true);
+ f.write('eel',{DUCKNOTE_RUNTIME_DIR:'/tmp/unreviewed'});
+ assert(codes(inspect(f),'eel').includes('forbidden_runtime_override'));
+ f.write('eel');
+ rmSync(runtime,{recursive:true});
+ assert(codes(inspect(f),'eel').includes('native_runtime_missing_or_unsafe'));
+ const source=join(f.dirs.get('eel'),'alternative');
+ mkdirSync(source,{mode:0o700});
+ symlinkSync(source,runtime);
+ assert(codes(inspect(f),'eel').includes('native_runtime_missing_or_unsafe'));
 });
 test('malformed, symlinked and world-readable environment files fail without leaked content',t=>{
  const f=fixture(t),path=join(f.dirs.get('goflo'),'native.env');
