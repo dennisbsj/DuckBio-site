@@ -1,0 +1,99 @@
+name: Validate offline Workspace staging systemd and Caddy syntax
+
+on:
+  pull_request:
+    paths:
+      - 'workspace-server/staging-*.mjs'
+      - 'workspace-server/tests/staging-service-plan.test.mjs'
+      - 'workspace-server/private-ui/**'
+      - 'workspace-server/package.json'
+      - '.github/workflows/workspace-staging-service-templates.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-server/staging-*.mjs'
+      - 'workspace-server/tests/staging-service-plan.test.mjs'
+      - 'workspace-server/private-ui/**'
+      - 'workspace-server/package.json'
+      - '.github/workflows/workspace-staging-service-templates.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate only disposable private test configuration and templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(mktemp -d)"
+          chmod 700 "$root"
+          echo "STAGING_QA_TMP=$root" >> "$GITHUB_ENV"
+          cd workspace-server
+          SHA="$(git rev-parse --verify HEAD)"
+          node staging-generate-config.mjs \
+            --base-domain duckbio.net \
+            --private-root "$root" \
+            --build-sha "$SHA" \
+            --confirm-synthetic-only
+          node staging-preflight.mjs --config "$root/workspace-staging.json"
+          node staging-prepare-ui.mjs \
+            --config "$root/workspace-staging.json" --confirm-first-install
+          node staging-service-plan.mjs \
+            --config "$root/workspace-staging.json" \
+            --service-user duckbio-staging \
+            --listen-port 3307 \
+            --node-binary "$(command -v node)" \
+            --confirm-plan-only
+      - name: Validate systemd unit with native Ubuntu tool, without installing it
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo groupadd --system duckbio-staging
+          sudo useradd --system --no-create-home --gid duckbio-staging duckbio-staging
+          systemd-analyze verify \
+            "$STAGING_QA_TMP/staging-service-plan/duckbio-workspace-staging.service"
+      - name: Validate Caddyfile using Caddy 2.10.2 in a network-disabled disposable container
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="$STAGING_QA_TMP/staging-service-plan/Caddyfile.workspace-staging"
+          docker run --rm --network none --read-only \
+            --tmpfs /tmp --tmpfs /data --tmpfs /config \
+            -v "$file:/etc/caddy/Caddyfile:ro" \
+            caddy:2.10.2 caddy adapt \
+            --config /etc/caddy/Caddyfile --adapter caddyfile --pretty \
+            > "$RUNNER_TEMP/duckbio-staging-caddy-adapted.json"
+          docker run --rm --network none --read-only \
+            --tmpfs /tmp --tmpfs /data --tmpfs /config \
+            -v "$file:/etc/caddy/Caddyfile:ro" \
+            caddy:2.10.2 caddy validate \
+            --config /etc/caddy/Caddyfile --adapter caddyfile
+          node --input-type=module - "$RUNNER_TEMP/duckbio-staging-caddy-adapted.json" <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const config=JSON.parse(readFileSync(process.argv[2],'utf8'));
+          const serialized=JSON.stringify(config);
+          assert.ok(serialized.includes('staging-workspace.duckbio.net'));
+          assert.ok(serialized.includes('127.0.0.1:3307'));
+          for(const id of ['goflo','eel','methpipe','mantrain','duckman','limsman'])
+            assert.ok(!serialized.includes('staging-'+id+'.duckbio.net'),
+              'central proxy cannot accidentally include native app origins');
+          NODE
+      - name: Remove all synthetic plan files
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "$STAGING_QA_TMP" && -d "$STAGING_QA_TMP" ]]; then
+            rm -rf -- "$STAGING_QA_TMP"
+          fi
+          rm -f "$RUNNER_TEMP/duckbio-staging-caddy-adapted.json"
