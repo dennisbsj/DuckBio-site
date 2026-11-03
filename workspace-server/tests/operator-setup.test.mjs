@@ -23,7 +23,7 @@ test('offline organization setup binds exact pre-existing active central adminis
  const ok=cmd();assert.equal(ok.status,0,ok.stderr);assert.deepEqual(JSON.parse(ok.stdout),{ok:true,organizationId:'lab-1'});
  const org=createOrganizationStore({databasePath:orgPath});
  const view=org.overview('lab-1',owner.id);
- assert.deepEqual(view.apps.map(a=>a.purchased),[0,0,0,0,0,0]);
+ assert.deepEqual(view.apps.map(a=>a.purchased),[0,0,0,0,0,0,0]);
  assert.equal(view.users[0].email,'admin@example.test');
  assert.deepEqual(view.users[0].roles,{});
  assert.throws(()=>org.overview('lab-1',user.id),/access_denied/);
