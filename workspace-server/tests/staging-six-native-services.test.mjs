@@ -97,9 +97,15 @@ test('six real local Git fixtures produce distinct native service units matched 
   assert.match(unit.content,/^User=duckbio-stg-[a-z]+$/m);
   assert.match(unit.content,/^Group=duckbio-stg-[a-z]+$/m);
   assert.match(unit.content,/^EnvironmentFile=\/[^\n]+\/native\.env$/m);
+  const forcedPrivateRuntime=svc.appId==='eel'?
+   ' DUCKNOTE_RUNTIME_DIR='+join(f.data,'eel','runtime'):'';
   assert(unit.content.includes(
    'ExecStart=/usr/bin/env NODE_ENV=production HOST=127.0.0.1 PORT='+
-   svc.loopbackPort+' '+process.execPath+' '));
+   svc.loopbackPort+forcedPrivateRuntime+' '+process.execPath+' '));
+  if(svc.appId==='eel'){
+   assert.equal(svc.privateRuntimeDirectory,join(f.data,'eel','runtime'));
+   assert(unit.content.includes('ReadWritePaths='+join(f.data,'eel')));
+  }else assert.equal(svc.privateRuntimeDirectory,undefined);
   assert(unit.content.includes('ReadWritePaths='+svc.privateDataDirectory));
   assert(unit.content.includes('ReadOnlyPaths='+join(f.sources,k.repo)));
   assert.match(unit.content,/^ProtectSystem=strict$/m);
