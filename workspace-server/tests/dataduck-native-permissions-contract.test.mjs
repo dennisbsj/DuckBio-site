@@ -78,7 +78,7 @@ test('unknown actions, wildcards, duplicate or tampered permission catalogs fail
  for(const p of [undefined,null,'all',['*'],['workspace.view'],
   ['projects.list','projects.list'],['projects.list','unknown'],[null],
   DATADUCK_WORKSPACE_PERMISSIONS.concat('admin.export')]){
-  assert.equal(examine('Admin','projects.list',p).compatible,false);
+  assert.equal(preview({nativeRole:'Admin',action:'projects.list',workspacePermissions:p}).compatible,false);
  }
  for(const action of ['admin', '/api/v1/admin/users','auth.csrf',
   '__proto__','PROJECTS.LIST','','projects.list?org=other']){
