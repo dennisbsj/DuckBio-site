@@ -94,6 +94,57 @@ The private backend still requires a **separately reviewed copy** of the private
 
 Since regenerating would silently invalidate existing native app secrets, the generator deliberately cannot rotate an existing file. Any later SHA/configuration update or secret rotation requires a separate reviewed, backed-up procedure; do not delete the generated file to bypass that safeguard. The previous manual release gates and verified restore/rollback remain mandatory.
 
+## Export exactly one native staging credential (offline, no deployment)
+
+The synthetic central `workspace-staging.json` deliberately contains **six**
+independent native client secrets. **Never install or share that entire broker
+configuration with one native app.** Once the private central configuration
+has passed preflight, export just one native registration at a time into a
+**fresh, empty, separately owned 0700 destination** on a trusted operator
+machine:
+
+```bash
+# Example for DuckNote (private paths are operator-selected examples).
+install -d -m 700 /srv/duckbio-private/handoff-eel
+cd workspace-server
+npm run staging:native-handoff -- \
+  --config /srv/duckbio-private/staging/workspace-staging.json \
+  --app-id eel \
+  --private-output-root /srv/duckbio-private/handoff-eel \
+  --confirm-one-app-only
+```
+
+The command creates one **0600**, never-overwritten file,
+`workspace-native-eel.json`, containing **only** the selected app's
+`appId`, `clientId`, `clientSecret`, `workspaceOrigin`, `issuer`,
+`nativeOrigin` and the precise registered `redirectUri`. It omits
+the five other credentials, broker's `SUITE_SETUP_TOKEN`, central
+database locations, account details, billing configuration and any
+organization ID. It refuses existing output files, nonempty directories,
+symlinks, unapproved/public paths, and equal or nested central/private
+broker directories. It never connects to DNS, starts a server, enables
+billing, or prints the secret or private paths.
+
+Repeat with **separately created private destinations** for
+`goflo`, `eel`, `methpipe`, `mantrain`, `duckman` and `limsman`.
+Transfer each registration **only** to the corresponding native app
+operator using a separately approved protected transfer or secrets
+manager. Restrict each host's access to its own credential, and
+securely delete the transient handoff file according to the
+organization's reviewed key-handling procedure.
+
+**This is a private registration receipt, not a runnable native environment
+file.** The native application still needs its own isolated database,
+application origin, independently configured **exact organization binding**
+and any application-specific keys (e.g., DuckNote's encrypted vault key or
+DuckMan's proof key). The local/native authorization and MFA checks must
+continue to apply. Do not invent an organization ID or automatically grant
+app seats; no purchase, user registration or runtime integration is performed
+by this export. For any future secret rotation, use a separately approved
+backup/rekey procedure rather than regenerating this output over a deployed
+app. The subsequent seven-origin HTTPS smoke and authenticated staging
+integration remain separate gates.
+
 ## Disposable SQLite recovery drill (no staging server or credentials required)
 
 Before deploying a staging database or creating real DNS records, the private Workspace repository can exercise a **completely temporary synthetic recovery** using the same runtime and SQLite adapters. This is a local test of startup, native app isolation and **offline** backup/restore mechanics, not a copy of any existing installation:
