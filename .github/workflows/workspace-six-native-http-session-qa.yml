@@ -1,0 +1,47 @@
+name: Six native HTTP session boundaries - synthetic-only staging acceptance tests
+
+on:
+  pull_request:
+    paths:
+      - 'workspace-server/staging-six-native-http-sessions-audit.mjs'
+      - 'workspace-server/tests/staging-six-native-http-sessions-audit.test.mjs'
+      - 'workspace-server/SIX_NATIVE_HTTP_SESSION_STAGING_ACCEPTANCE.md'
+      - '.github/workflows/workspace-six-native-http-session-qa.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-server/staging-six-native-http-sessions-audit.mjs'
+      - 'workspace-server/tests/staging-six-native-http-sessions-audit.test.mjs'
+      - 'workspace-server/SIX_NATIVE_HTTP_SESSION_STAGING_ACCEPTANCE.md'
+      - '.github/workflows/workspace-six-native-http-session-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  six-synthetic-native-session-isolation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Validate operator-only read-only native HTTP session auditor
+        working-directory: workspace-server
+        run: node --check staging-six-native-http-sessions-audit.mjs
+      - name: Exercise all six native HTTP session boundaries with synthetic positive and negative responses
+        working-directory: workspace-server
+        run: node --test tests/staging-six-native-http-sessions-audit.test.mjs
+      - name: Preserve six native central broker/session and genuine seven-process guards
+        working-directory: workspace-server
+        run: node --test tests/staging-six-native-auth-proof-audit.test.mjs tests/staging-seven-genuine-runtime-audit.test.mjs
+      - name: Check independent six-native source pins and CI evidence offline
+        working-directory: workspace-server
+        run: node six-native-current-compat-audit.mjs --offline
