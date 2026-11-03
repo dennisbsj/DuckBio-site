@@ -176,6 +176,45 @@ The asset installer refuses any invalid synthetic configuration, unreviewed or d
 
 This is not a deployment script or a live release/rollback mechanism. It does not prove that the private backend is running or that HTTPS/TLS is configured. Before any staging launch, verify installed app packages, the tested broker/native SHA baseline, local service binding, server logs without secrets, reliable **backup/restore of live WAL-mode databases**, and the separate operator-controlled HTTPS proxy. UI rollouts and credential rotation require a future atomic release-directory switch and rollback review; do **not** delete a running asset directory to make this first-install command accept it.
 
+## Offline audit of six private native staging environment files
+
+After an approved operator has created six **separate private environment
+files**, run the native environment checker from a reviewed Workspace tooling
+checkout, before installing any native service:
+
+    cd workspace-server
+    npm run staging:six-native-env-audit -- --config /srv/duckbio-private/staging/workspace-staging.json --private-data-root /srv/duckbio-native-private --confirm-offline-only
+
+The six files must each be named native.env, under the app-ID subdirectory
+(goflo, eel, methpipe, mantrain, duckman, limsman) of the owner-only native
+data root. Directories must be owner-only (0700); regular files must be 0600.
+The checker rejects symlinks, malformed or duplicate settings, and unsafe
+runtime overrides such as HOST, PORT, NODE_ENV or broker-wide SUITE keys.
+
+The checker matches each app's **own** private broker client secret against
+the exact validated central six-client registration, requires exact central
+origin/issuer and an explicitly supplied native organization mapping. It
+rejects a borrowed app secret, mismatched app origin, or missing native
+tenant. DuckNote additionally requires its four matching public HTTPS
+origins, explicit link opt-in, independent 32-byte AES vault key and a
+locally bound staging-named PostgreSQL database. DuckMan requires an
+independent proof key. The other apps' private database/config paths must
+stay under their own private app directory.
+
+Output includes only app IDs and fixed failure codes. It never prints
+secrets, database contents, URLs or file paths, and does not write
+configuration or contact any system. Do not upload native.env files to
+GitHub or include them in CI artifacts.
+
+This is a **limited offline configuration audit, not authorization to
+install or deploy**. A PASS does not prove actual native config file
+semantics, database existence or isolation, user/tenant authorization,
+paid seats, HTTPS/TLS, listener binding, backup/restore or simultaneous
+seven-app integration. The DuckNote PostgreSQL policy deliberately
+requires loopback hosting and a staging-labelled database; a different
+topology requires separate explicit security review rather than bypassing
+these checks.
+
 ## Prepare a loopback-only Workspace service and HTTPS reverse-proxy plan (uninstalled)
 
 After creating the private synthetic configuration and source-verified 20-file UI bundle, generate two **uninstalled** operator-review templates:
