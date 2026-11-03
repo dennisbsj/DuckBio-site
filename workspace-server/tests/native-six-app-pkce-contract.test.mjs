@@ -158,9 +158,13 @@ test('six separate first-party native clients exchange only their own PKCE codes
    clientId:app.id,sessionToken:details.sessionToken});
   assert.equal(own.status,200);
   assert.equal((await own.json()).active,true);
-  assert.equal((await f.native(client,'/api/suite/auth/introspect',{
-   clientId:other.id,sessionToken:details.sessionToken},other)).status,401,
-   'one native app must not introspect another app proof');
+  // RFC-style introspection deliberately returns 200 + active:false
+  // rather than revealing whether another app's token exists.
+  const foreign=await f.native(client,'/api/suite/auth/introspect',{
+   clientId:other.id,sessionToken:details.sessionToken},other);
+  assert.equal(foreign.status,200);
+  assert.deepEqual(await foreign.json(),{active:false},
+   'a foreign app must see no identity, audience, organization or validity');
   const unread=await f.native(client,'/api/suite/native/communications/unread',{
    sessionToken:details.sessionToken});
   assert.equal(unread.status,200);
