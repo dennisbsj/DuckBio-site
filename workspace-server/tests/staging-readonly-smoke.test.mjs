@@ -9,14 +9,14 @@ function config(){
  const clients=NATIVE_APP_IDS.map(id=>({
   id,appId:id,
   secret:'synthetic-only-'+randomBytes(40).toString('base64url'),
-  nativeOrigin:'https://stage-'+id+'.example.test',
-  redirectUris:['https://stage-'+id+'.example.test/auth/callback']
+  nativeOrigin:'https://stage-'+id+'.duckbio.net',
+  redirectUris:['https://stage-'+id+'.duckbio.net/auth/callback']
  }));
  return {
   SUITE_STAGING_ACK:'synthetic-accounts-only',
   SUITE_MODE:'broker',SUITE_BUILD_SHA:'a'.repeat(40),
-  SUITE_ORIGIN:'https://stage-workspace.example.test',
-  SUITE_ISSUER:'https://stage-workspace.example.test',
+  SUITE_ORIGIN:'https://stage-workspace.duckbio.net',
+  SUITE_ISSUER:'https://stage-workspace.duckbio.net',
   SUITE_CLIENTS:JSON.stringify(clients),
   SUITE_AUTH_DB_PATH:root+'/auth.sqlite',
   SUITE_IDENTITY_DB_PATH:root+'/identity.sqlite',
@@ -107,7 +107,7 @@ test('broker health without no-store, with redirect or with HTML is rejected',as
  const cfg=config();
  for(const central of [
   response({status:'ok',mode:'local',configured:true,buildVersion:cfg.SUITE_BUILD_SHA}),
-  new Response(null,{status:302,headers:{Location:'https://attacker.example.test'}}),
+  new Response(null,{status:302,headers:{Location:'https://attacker.duckbio.net'}}),
   new Response('<html>login</html>',{headers:{'Content-Type':'text/html'}})
  ]){
   const f=stub(cfg,{central});
@@ -156,7 +156,7 @@ test('network outages, oversized payloads, malformed JSON and redirects never co
  for(const bad of [
   new Response('x'.repeat(4097),{headers:{'Content-Type':'application/json'}}),
   new Response('{broken', {headers:{'Content-Type':'application/json'}}),
-  new Response(null,{status:302,headers:{Location:'https://attacker.example.test'}})
+  new Response(null,{status:302,headers:{Location:'https://attacker.duckbio.net'}})
  ]){
   const testFetch=stub(cfg,{override:(id,target)=>id==='mantrain'&&
    target.pathname.includes('/communications/')?bad:null});
