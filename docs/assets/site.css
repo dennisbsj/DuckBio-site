@@ -2619,3 +2619,85 @@ html:not([data-theme="dark"]) body:not(.homepage-exact) .pr-hero.pr-plans-first{
     object-position:center 45%;
   }
 }
+
+
+/* DuckBio approved duck hero set 20261103 */
+body.homepage-exact .home-mockup-exact::before,
+body.homepage-exact .home-mockup-exact::after {content:none!important;display:none!important}
+body.homepage-exact main>.home-mockup-exact,
+body:not(.homepage-exact) main>.pr-banner,
+html body.support-faq-page main>.page-hero.support-hero {
+ width:100%!important;max-width:none!important;
+ height:min(33.333vw,560px)!important;margin:0!important;
+ position:relative;overflow:hidden;
+}
+body.homepage-exact .home-mockup-image,
+body:not(.homepage-exact) main>.pr-banner>img,
+html body.support-faq-page .support-hero-art {
+ display:block!important;width:100%!important;height:100%!important;
+ margin:0!important;object-fit:cover!important;object-position:center top!important;
+}
+.duckbio-banner-brand{
+ position:absolute;z-index:5;left:3.9%;top:2.4%;width:27%;height:11.2%;
+ display:flex;align-items:center;gap:clamp(5px,.55vw,12px);
+ box-sizing:border-box;padding:0 5% 0 .4%;pointer-events:none;
+ background:linear-gradient(90deg,#082e49 0%,#07334e 70%,rgba(7,45,70,0) 100%);
+ color:#f4fbff;line-height:1.05;font:800 clamp(13px,2.1vw,35px)/1.05 Inter,system-ui,sans-serif;
+ letter-spacing:-.045em;white-space:nowrap;
+}
+.duckbio-banner-brand img{
+ display:block;flex-shrink:0;width:clamp(20px,3vw,50px);
+ height:clamp(20px,3vw,50px);max-width:none;object-fit:contain;
+}
+.duckbio-banner-brand em{color:#24caf2;font-style:normal}
+body.homepage-exact .home-mockup-contact{
+ left:4%;top:83%;width:12.8%;height:13%;z-index:6;border-radius:10px;
+}
+body:not(.homepage-exact) .pr-banner .duckbio-pricing-image-cta{
+ position:absolute;z-index:6;left:4%;top:50%;width:16.5%;height:13%;
+ display:block;background:transparent;border-radius:8px;
+}
+body:not(.homepage-exact) .pr-banner .duckbio-pricing-image-cta:focus-visible,
+body.homepage-exact .home-mockup-contact:focus-visible{
+ outline:3px solid #9afafb;outline-offset:3px;
+}
+/* The support artwork contains a rasterized older caption. Hide only its
+   left text region so the revised HTML wording remains clean and selectable. */
+html body.support-faq-page .support-hero::after{
+ content:"";position:absolute;z-index:0;left:0;top:0;
+ width:48%;height:100%;pointer-events:none;
+ background:linear-gradient(90deg,#062f4d 0%,#07344e 58%,rgba(6,48,74,.96) 76%,rgba(6,48,74,0) 100%);
+}
+html body.support-faq-page .support-hero>.wrap{
+ position:relative;z-index:2;width:100%!important;max-width:none!important;
+ padding-left:4.4%!important;padding-right:0!important;
+ margin:0!important;box-sizing:border-box;
+}
+html body.support-faq-page .support-hero .support-hero-copy{max-width:40%!important}
+html body.support-faq-page .support-hero .support-hero-kicker{
+ color:#b6d8e7;font-size:clamp(10px,1.25vw,19px);
+ font-weight:730;letter-spacing:.2em;text-transform:uppercase;
+ margin:0 0 clamp(6px,.9vw,15px);
+}
+html body.support-faq-page .support-hero .support-hero-copy h1{
+ font-size:clamp(27px,3.75vw,62px)!important;
+}
+html body.support-faq-page .support-hero .support-hero-lead{
+ font-size:clamp(12px,1.35vw,20px)!important;
+ line-height:1.45!important;max-width:100%!important;
+ margin:clamp(8px,1vw,16px) 0 clamp(8px,1.1vw,19px)!important;
+}
+.duckbio-banner-brand--support{background:transparent!important;z-index:4}
+@media(max-width:800px){
+ html body.support-faq-page .support-hero .support-hero-copy{max-width:49%!important}
+ html body.support-faq-page .support-hero .support-hero-kicker{font-size:clamp(7px,1.2vw,11px);margin:0 0 3px}
+ html body.support-faq-page .support-hero .support-hero-copy h1{font-size:clamp(17px,5.4vw,36px)!important}
+ html body.support-faq-page .support-hero .support-hero-lead{
+   font-size:clamp(8px,1.7vw,13px)!important;
+   line-height:1.25!important;margin:4px 0 6px!important;
+ }
+ html body.support-faq-page .support-hero .support-hero-contact{
+   font-size:clamp(9px,1.7vw,13px)!important;
+   min-height:25px!important;padding:4px 12px!important;
+ }
+}
