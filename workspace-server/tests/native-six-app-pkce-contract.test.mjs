@@ -44,7 +44,7 @@ async function fixture(t){
  // A test-only private VERIFIED-billing adapter is the sole seat allocator.
  // No checkout URLs, payment provider, production organisation or paid user.
  org.applyVerifiedSeatPurchase({reference:'synthetic-six-app-bundle',organizationId:'lab-a',
-  plan:'Bundle',apps:apps.map(app=>app.id),seats:2});
+  plan:'Bundle',apps:[...apps.map(app=>app.id),'dataduck'],seats:2});
  const roles=Object.fromEntries(apps.map(app=>[app.id,app.role]));
  const member=roles=>({accountId:worker.id,name:'Fixture worker',nickname:'Worker',
   email:'worker@example.test',admin:false,roles});
