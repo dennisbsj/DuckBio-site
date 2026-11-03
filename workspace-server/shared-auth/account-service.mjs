@@ -9,7 +9,7 @@ import {authorizedContentDestination} from '../private-content-launch.mjs';
 import {mentionHandleForUser} from '../message-references.mjs';
 import {nativeConnectRequest} from '../native-connect.mjs';
 
-const APP_NAMES = Object.freeze({ goflo: 'CytoDuck', eel: 'DuckNote', methpipe: 'DuckPipe', mantrain: 'DuckTrain', duckman: 'DuckMan', limsman: 'LabDuck' });
+const APP_NAMES = Object.freeze({ goflo: 'CytoDuck', eel: 'DuckNote', methpipe: 'DuckPipe', mantrain: 'DuckTrain', duckman: 'DuckMan', limsman: 'LabDuck', dataduck: 'DataDuck' });
 const STATIC_APPS = new Set(['goflo', 'methpipe', 'mantrain']);
 // Each native app must have an explicit private client origin; retired domains are not fallbacks.
 const FILES = new Set(['index.html', 'login.css', 'app.js', 'app-registry.mjs', 'auth-client.mjs', 'config.mjs', 'admin.html', 'admin.js', 'admin.css', 'workspace.html', 'workspace.css', 'workspace.js', 'owner.html', 'owner.js', 'communications.html', 'communications.js', 'communications.css', 'communications-launchers.js', 'connect.html', 'connect.js', 'connect.css', ...Object.keys(APP_NAMES).map(id => `assets/${id}.svg`), 'assets/favicon.svg']);
