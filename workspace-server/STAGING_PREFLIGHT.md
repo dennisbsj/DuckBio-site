@@ -279,6 +279,99 @@ approved staging installation, separately run the existing anonymous
 HTTPS smoke and full authenticated MFA/permission/entitlement tests.
 No production, billing or customer system is involved in this planning.
 
+## Prepare six independent native app systemd plans (OFFLINE, UNINSTALLED)
+
+The [seven-host Caddy plan](staging-seven-proxy-plan.mjs) now has a
+corresponding [native service plan generator](staging-six-native-services.mjs).
+It **does not create live services**. It verifies the exact seven pristine,
+approved Git checkouts against the current six-app QA lock and writes six
+systemd **templates only**, one for each native app. Run the generator from
+the *separate, newer operator-tooling checkout* containing the refreshed
+QA lock; the seven actual staging checkouts remain at their historically
+verified immutable commits. The external, private roots below are
+operator-supplied examples, **not existing installed paths**:
+
+```bash
+# Prepare these three separate owner-only directories manually (0700):
+# /srv/duckbio-private/seven-reviewed-sources
+# /srv/duckbio-private/native-data
+# /srv/duckbio-private/native-unit-plans
+cd workspace-server
+npm run staging:six-native-services -- \
+  --config /srv/duckbio-private/staging/workspace-staging.json \
+  --sources-root /srv/duckbio-private/seven-reviewed-sources \
+  --private-data-root /srv/duckbio-private/native-data \
+  --private-output-root /srv/duckbio-private/native-unit-plans \
+  --confirm-uninstalled-only
+```
+
+The source directory must contain **exactly** the original, clean local
+Git checkouts: `DuckBio-site`, `CytoDuck`, `DuckNote`, `DuckPipe`,
+`DuckTrain`, `DuckMan`, `LabDuck`; the immutable `HEAD` SHA,
+remote and the six native workflows' central checkout pins must all
+match the reviewed QA lock. This is the existing
+[seven-source offline gate](staging-seven-source-gate.mjs), now required
+before native service templates can be generated. A newer `main` of any
+app is **not approved automatically**. A single new native source commit
+requires renewed integration CI and a reviewed lock before use.
+
+The generated `six-native-service-plan` directory contains six owner-only
+`duckbio-native-APPID-staging.service` files, and a
+`service-manifest.json` listing names, independent service users,
+exact source SHAs, backend kind, separate ports, required environment
+**variable names** and SHA-256 hashes. Each unit uses a different
+`duckbio-stg-APPID` non-root account and only its own proposed private
+data path. Its `ExecStart` forces `NODE_ENV=production`,
+`HOST=127.0.0.1` and its port (3308–3313), so a later
+`EnvironmentFile` cannot override these listener values. The Node
+executable must be **actual, executable Node.js 22.16+ or 24**.
+The generator writes no secrets, environment files, app databases,
+PostgreSQL schemas, users, roles, certificates, source builds or services;
+it never contacts the network. Output never overwrites existing plans.
+
+**Native-specific runtime requirements, all still requiring operator review:**
+
+| App | Proposed port | Backend private storage | Mandatory operator prerequisites |
+| --- | ---: | --- | --- |
+| CytoDuck (`goflo`) | 3308 | Dedicated SQLite | `SCIENCE_DATABASE_PATH`, `APP_BASE_URL`, separate setup/admin and native Workspace credentials |
+| DuckNote (`eel`) | 3309 | Dedicated PostgreSQL | DB URL or PG variables, independent 32-byte vault key, exact native org binding, `FRONTEND_ORIGIN` / `CANONICAL_ORIGIN` / broker values, backup/restore |
+| DuckPipe (`methpipe`) | 3310 | Dedicated SQLite | `SCIENCE_DATABASE_PATH`, `APP_BASE_URL`, native credentials and app-local permissions |
+| DuckTrain (`mantrain`) | 3311 | Dedicated SQLite | `SCIENCE_DATABASE_PATH`, `APP_BASE_URL`, native identities and training permissions |
+| DuckMan (`duckman`) | 3312 | Dedicated SQLite and document storage | `DUCKMAN_DATABASE_PATH`, `APP_BASE_URL`, existing private files and permissions |
+| LabDuck (`limsman`) | 3313 | SQLite + session directory | `LIMSMAN_CONFIG_PATH` referencing dedicated private JSON config with database and session paths |
+
+**These are templates, not a production-compatible installer.** Each
+native application's `EnvironmentFile` is **only a planned reference**
+under its own private data directory; the generator intentionally does
+not create those files or any directories for services to write into.
+A separately authorized operator must provision the six dedicated
+non-root service users with restrictive filesystem access, select
+nonoverlapping durable paths, generate/transfer only the specific native
+client secret from the existing [one-app-at-a-time handoff](staging-native-handoff.mjs),
+and independently verify every app's remaining settings, local native
+accounts, consent/MFA and organization/seat grants. The central broker
+`SUITE_CLIENTS` configuration must never be installed in a native app.
+
+**Important DuckNote runtime blocker:** Its existing Node runtime also
+references a `tmp/` directory under its source checkout. The proposed
+native units make the checked-out Git tree read-only to preserve integrity.
+Before installing the DuckNote unit, an operator must review and adapt
+its ephemeral write paths to a separate authorized private runtime
+directory **without** mutating the audited source checkout, and rerun
+the real native PostgreSQL/Workspace tests. Do not weaken
+`ProtectSystem=strict` or point the database at production merely to
+make startup succeed.
+
+Likewise, verify that CytoDuck's `dist/` frontend build was created from
+the exact tested source, that LabDuck's session/SQLite configuration is
+prepared from empty synthetic data, and that no native service initializes
+a replacement for an existing database. Review actual Linux permissions,
+systemd syntax, firewall restrictions, isolated backups and restore
+before any future service installation. Do **not** install native
+services or combined seven-host Caddy plans simply because these source
+checks pass. Full seven-origin HTTPS browser/MFA/tenant/licensing failure
+tests require a separately approved live staging environment.
+
 ## Verify seven local Git source checkouts (offline release-candidate gate)
 
 The [coordinated source QA lock](six-app-source-qa-lock.json) is a
