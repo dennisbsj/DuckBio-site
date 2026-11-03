@@ -178,7 +178,8 @@ test('current exact six-app source can build six native service units and seven 
   'ProtectSystem=strict')));
  assert(!existsSync(join(f.proxy,'seven-origin-proxy-plan')));
  assert(!existsSync(join(f.units,'six-native-service-plan')));
- assert(f.gitCalls.some(x=>x.includes('HEAD:.github/workflows/')));
+ assert.equal(f.gitCalls.filter(x=>x.startsWith('show HEAD:')).length,6,
+  'Only the six native workflows pin Workspace; central CI must not pin itself');
 });
 test('CURRENT uninstalled generated artifacts pass the exact four-step private prestart audit',
  {timeout:120000},t=>{
