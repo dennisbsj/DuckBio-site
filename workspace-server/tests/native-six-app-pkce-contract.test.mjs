@@ -195,4 +195,37 @@ test('six separate first-party native clients exchange only their own PKCE codes
  // Retaining a central login cookie never reinstates revoked native grants.
  assert.equal((await f.native(eel,'/api/suite/native/communications/unread',
   {sessionToken:proofs.get('eel')})).status,403);
+
+ // Cross-app child-only disconnect must be idempotent, local to the native
+ // audience and independent of the worker's central Workspace login.
+ const methpipe=f.clients.find(x=>x.id==='methpipe');
+ const mantrain=f.clients.find(x=>x.id==='mantrain');
+ const methpipeToken=proofs.get('methpipe');
+ const foreignRevoke=await f.native(mantrain,'/api/suite/auth/revoke',{
+  clientId:'mantrain',sessionToken:methpipeToken,childOnly:true});
+ assert.equal(foreignRevoke.status,204,
+  'foreign child-only revoke does not reveal whether a different app has a grant');
+ const untouched=await f.native(methpipe,'/api/suite/auth/introspect',{
+  clientId:'methpipe',sessionToken:methpipeToken});
+ assert.equal((await untouched.json()).active,true,
+  'foreign app cannot revoke another app native proof');
+ const disconnect=()=>f.native(methpipe,'/api/suite/auth/revoke',{
+  clientId:'methpipe',sessionToken:methpipeToken,childOnly:true});
+ assert.equal((await disconnect()).status,204);
+ assert.equal((await disconnect()).status,204,'repeated child-only logout stays safe');
+ const revoked=await f.native(methpipe,'/api/suite/auth/introspect',{
+  clientId:'methpipe',sessionToken:methpipeToken});
+ assert.deepEqual(await revoked.json(),{active:false},
+  'native app cannot revive its own disconnected child grant');
+ assert.equal((await f.native(methpipe,'/api/suite/native/communications/unread',
+  {sessionToken:methpipeToken})).status,401,
+  'revoked child cannot fetch Workspace messages');
+ assert.equal((await f.native(mantrain,'/api/suite/native/communications/unread',
+  {sessionToken:proofs.get('mantrain')})).status,200,
+  'another registered app keeps its independent proof');
+ const parent=await fetch(f.origin+'/api/suite/auth/session',{
+  headers:f.browserHeaders});
+ assert.equal(parent.status,200);
+ assert.equal((await parent.json()).authenticated,true,
+  'native child-only disconnect must preserve independent Workspace parent login');
 });
