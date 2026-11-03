@@ -133,7 +133,7 @@ test('real reverse-proxy retains same-origin CSRF and Secure HttpOnly cookies',a
 
 test('actual TLS and Host guards reject wrong site and anonymous organization access',async()=>{
  const wrong=await call('/api/suite/health',{host:'evil.example.invalid'});
- assert.equal(wrong.status,400,'TLS SNI alone must not allow forged HTTP Host');
+ assert.equal(wrong.status,421,'TLS SNI alone must not allow forged HTTP Host');
  const privateRoute=await call('/api/suite/organizations');
  assert.equal(privateRoute.status,401,'anonymous visitor cannot list organizations');
  await assert.rejects(call('/api/suite/health',{
