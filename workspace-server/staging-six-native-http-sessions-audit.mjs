@@ -100,11 +100,12 @@ async function nativeGet(url,cookie,{fetchImpl,timeoutMs}){
 function validCounts(payload,kind){
  if(!payload||typeof payload!=='object'||Array.isArray(payload))
   return false;
- const actual=kind==='duckman'?payload.counts:payload.counts;
+ if(!okKeys(payload,kind==='duckman'?['connected','counts']:['counts']))
+  return false;
  if(kind==='duckman'&&payload.connected!==true)return false;
- if(!okKeys(actual,COUNTS))return false;
- return COUNTS.every(k=>Number.isSafeInteger(actual[k])&&
-  actual[k]>=0&&actual[k]<=1_000_000);
+ if(!okKeys(payload.counts,COUNTS))return false;
+ return COUNTS.every(k=>Number.isSafeInteger(payload.counts[k])&&
+  payload.counts[k]>=0&&payload.counts[k]<=1_000_000);
 }
 const positiveIdentity=(resp,localId)=>resp?.status===200&&
  resp.json?.user?.id===localId;
