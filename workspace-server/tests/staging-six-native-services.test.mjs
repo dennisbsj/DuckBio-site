@@ -34,7 +34,12 @@ function setup(t){
   if(kind){
    const entry=join(root,kind.entrypoint);
    mkdirSync(dirname(entry),{mode:0o700,recursive:true});
-   writeFileSync(entry,'// Synthetic staging entrypoint fixture; never executed\n');
+   writeFileSync(entry,name==='DuckNote'?
+    '// Inert fixture: verifyDuckNoteRuntimeDir(appRoot,process.env.DUCKNOTE_RUNTIME_DIR)\\n':
+    '// Synthetic staging entrypoint fixture; never executed\\n');
+   if(name==='DuckNote')
+    writeFileSync(join(root,'server','runtime-directory.js'),
+     '// Synthetic DUCKNOTE_RUNTIME_DIR fixture; never imported\\n');
    const workflow=join(root,kind.workflow);
    mkdirSync(dirname(workflow),{recursive:true});
    writeFileSync(workflow,
