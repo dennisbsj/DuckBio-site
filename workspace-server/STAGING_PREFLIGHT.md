@@ -108,3 +108,19 @@ The command intentionally accepts **no source database path, config path, hostna
 Every external network call in the drill is blocked. Although the synthetic configuration contains staging-labelled `duckbio.net` origin strings for validation, the process never resolves or contacts those names. No public website, live app, server account, external backup, private staging environment or production database is accessed.
 
 **Important:** This exercise copies files only after the synthetic runtime has stopped and closed its databases. Copying SQLite files from a running service, especially a WAL-mode database, is **not** a safe backup plan. A real environment requires an operator-approved hot-backup/snapshot procedure, private encryption, access controls, retention, off-host backup verification, credentials/session-rotation review, recovery-point objectives and a genuine restoration test against the selected server. A PASS here is **not** proof that a live staging or production backup is safe, recoverable or deployed.
+
+## Prepare the private Workspace web assets for a new staging installation
+
+The current private Workspace UI includes the login/account entry pages and the implemented user-administration, messaging, owner and app-connection screens. **Static GitHub Pages is not the private backend.** Those web files must be copied into a fresh, owner-only private `SUITE_ASSET_ROOT` before first login can be tested on a staging server.
+
+Use a trusted checkout of the exact **reviewed Workspace commit**. The private `workspace-staging.json` must contain that same complete 40-character SHA in `SUITE_BUILD_SHA`; do not use `main` loosely or mix a later untested source revision with the pinned six-app integration baseline. The Git checkout must have no uncommitted tracked changes or untracked source files.
+
+```bash
+cd workspace-server
+npm run staging:preflight -- --config /srv/duckbio-private/staging/workspace-staging.json
+npm run staging:prepare-ui -- --config /srv/duckbio-private/staging/workspace-staging.json --confirm-first-install
+```
+
+The asset installer refuses any invalid synthetic configuration, unreviewed or dirty Git checkout, non-private root, symlinked root, public Pages directory or preexisting `SUITE_ASSET_ROOT`. It copies the 14 explicitly reviewed private HTML/CSS/JS files and six existing source app SVGs, with 0700 directory and 0600 file permissions. It checks local script/style dependencies, writes a private SHA-256 integrity manifest and never touches SQLite, credentials, DNS, email, payment or the network. The operation creates **a new UI directory only** and never updates an installed one; if source copying fails, only the newly created incomplete directory is removed.
+
+This is not a deployment script or a live release/rollback mechanism. It does not prove that the private backend is running or that HTTPS/TLS is configured. Before any staging launch, verify installed app packages, the tested broker/native SHA baseline, local service binding, server logs without secrets, reliable **backup/restore of live WAL-mode databases**, and the separate operator-controlled HTTPS proxy. UI rollouts and credential rotation require a future atomic release-directory switch and rollback review; do **not** delete a running asset directory to make this first-install command accept it.
