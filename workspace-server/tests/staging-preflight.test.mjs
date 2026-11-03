@@ -5,19 +5,19 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {NATIVE_APP_IDS,validateWorkspaceStagingConfig} from '../staging-preflight.mjs';
+import {NATIVE_APP_IDS,validateWorkspaceStagingConfig,stagingHttpsOrigin} from '../staging-preflight.mjs';
 
 function fixture(root='/srv/private/duckbio-staging'){
  const clients=NATIVE_APP_IDS.map(id=>({
   id,appId:id,secret:'synthetic-not-real-'+id+'-x'.repeat(40),
-  nativeOrigin:'https://staging-'+id+'.example.test',
-  redirectUris:['https://staging-'+id+'.example.test/auth/callback']
+  nativeOrigin:'https://staging-'+id+'.duckbio.net',
+  redirectUris:['https://staging-'+id+'.duckbio.net/auth/callback']
  }));
  return {
   SUITE_STAGING_ACK:'synthetic-accounts-only',SUITE_MODE:'broker',
   SUITE_BUILD_SHA:'a'.repeat(40),
-  SUITE_ORIGIN:'https://staging-workspace.example.test',
-  SUITE_ISSUER:'https://staging-workspace.example.test',
+  SUITE_ORIGIN:'https://staging-workspace.duckbio.net',
+  SUITE_ISSUER:'https://staging-workspace.duckbio.net',
   SUITE_CLIENTS:JSON.stringify(clients),
   SUITE_AUTH_DB_PATH:join(root,'sessions.sqlite'),
   SUITE_IDENTITY_DB_PATH:join(root,'identity.sqlite'),
@@ -46,10 +46,40 @@ test('staging requires opt-in marker, broker mode, exact build and same-origin H
   ['SUITE_STAGING_ACK','','synthetic_only_ack_required'],
   ['SUITE_MODE','static','broker_mode_required'],
   ['SUITE_BUILD_SHA','development','reviewed_git_sha_required'],
-  ['SUITE_ORIGIN','http://staging-workspace.example.test','workspace_https_origin_required'],
-  ['SUITE_ORIGIN','https://staging-workspace.example.test/','workspace_https_origin_required'],
-  ['SUITE_ISSUER','https://unrelated.example.test','workspace_issuer_must_match_origin']
+  ['SUITE_ORIGIN','http://staging-workspace.duckbio.net','workspace_https_origin_required'],
+  ['SUITE_ORIGIN','https://staging-workspace.duckbio.net/','workspace_https_origin_required'],
+  ['SUITE_ISSUER','https://unrelated.duckbio.net','workspace_issuer_must_match_origin']
  ])fails({...fixture(),[key]:value},reason);
+});
+test('offline staging guard refuses production, retired, loopback, documentation and Pages origins',()=>{
+ const bad=[
+  'https://duckbio.net','https://www.duckbio.net',
+  'https://workspace.duckbio.net','https://prod.duckbio.net',
+  'https://production.duckbio.net','https://live.duckbio.net',
+  'https://workspace-staging.celluloidconsulting.net',
+  'https://staging-duckbio.github.io','https://staging-app.pages.dev',
+  'https://staging-workspace.example.test',
+  'https://staging-workspace.example.com',
+  'https://staging-workspace.example.org',
+  'https://staging-workspace.example.net',
+  'https://staging.localhost','https://staging.internal',
+  'https://127.0.0.1','https://[::1]',
+  'https://staging-workspace.duckbio.net:8443',
+  'https://staging-workspace.duckbio.net:443',
+  'http://staging-workspace.duckbio.net'
+ ];
+ for(const url of bad){
+  assert.equal(stagingHttpsOrigin(url),null,url);
+  fails({...fixture(),SUITE_ORIGIN:url},'workspace_https_origin_required');
+  fails(withClients(fixture(),clients=>{clients[0].nativeOrigin=url}),
+   'distinct_native_https_origins_required');
+ }
+ for(const allowed of [
+  'https://staging-workspace.duckbio.net',
+  'https://qa.duckbio.net',
+  'https://ducknote-stage.duckbio.net',
+  'https://stage-app.workspace.examplecorp.dk'
+ ])assert.equal(stagingHttpsOrigin(allowed),allowed);
 });
 test('rejects missing, duplicated and additional client registrations',()=>{
  const base=fixture();
@@ -61,15 +91,15 @@ test('rejects missing, duplicated and additional client registrations',()=>{
 });
 test('requires per-app canonical HTTPS, independent hosts and exact native callbacks',()=>{
  const base=fixture();
- fails(withClients(base,list=>list[0].nativeOrigin='http://staging-goflo.example.test'),
+ fails(withClients(base,list=>list[0].nativeOrigin='http://staging-goflo.duckbio.net'),
   'distinct_native_https_origins_required');
  fails(withClients(base,list=>list[0].nativeOrigin=base.SUITE_ORIGIN),
   'distinct_native_https_origins_required');
  fails(withClients(base,list=>list[1].nativeOrigin=list[0].nativeOrigin),
   'distinct_native_https_origins_required');
- fails(withClients(base,list=>list[0].redirectUris.push('https://evil.example.test/auth/callback')),
+ fails(withClients(base,list=>list[0].redirectUris.push('https://evil.duckbio.net/auth/callback')),
   'exact_native_callback_required');
- fails(withClients(base,list=>list[0].redirectUris[0]='https://evil.example.test/auth/callback'),
+ fails(withClients(base,list=>list[0].redirectUris[0]='https://evil.duckbio.net/auth/callback'),
   'exact_native_callback_required');
 });
 test('client secrets are present, private, unambiguous and not echoed into failures',()=>{
