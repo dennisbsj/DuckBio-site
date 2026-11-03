@@ -6,7 +6,7 @@
 
 The historical `six-app-source-qa-lock.json` uses the older immutable Workspace broker version and older native app SHAs. It must remain available without modification for regression and audit. Newer source compatibility was verified independently in `six-native-current-compat-lock.json`, using **six distinct genuine native HTTPS Chromium CI checks** against central Workspace `1a3b19c993fcd63ff625113cc2628b2642fe2d2f`. The newer CI results prove each native app independently communicates with that central source, **not that seven apps have already operated together**.
 
-The new `--snapshot current` flag is an *explicit opt-in* on the existing **offline-only** source/plan/prestart commands. With no flag the old historical source lock remains the default; changing one app's source SHA, using a newer moving `main`, adding a seventh app, or reusing the wrong config/plan causes a fail-closed error.
+The new `--snapshot current` flag is an *explicit opt-in* on the existing **offline-only** source/plan/prestart commands. With no flag the old historical source lock remains the default; changing one app's source SHA, using a newer moving `main`, adding a seventh app, or reusing the wrong config/plan causes a fail-closed error. In addition to validating the versioned lock schema, the staging-specific snapshot policy independently allowlists **all six exact native source SHAs, successful main CI run IDs and workflow IDs** as reviewed evidence. Editing the lock JSON alone cannot promote an unreviewed version; a later staging release candidate requires a separate code and QA review.
 
 ### Reviewed exact source snapshot
 
