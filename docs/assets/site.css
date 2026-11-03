@@ -2701,3 +2701,158 @@ html body.support-faq-page .support-hero .support-hero-lead{
    min-height:25px!important;padding:4px 12px!important;
  }
 }
+
+
+/* DuckBio HTML banner rebuild 20261103 */
+/* Text is real selectable HTML; imagery contains no headlines or fake logos. */
+body.homepage-exact main>.home-mockup-exact.duckbio-real-hero,
+body:not(.homepage-exact) main>.pr-banner.duckbio-real-hero,
+html body.support-faq-page main>.page-hero.support-hero.duckbio-real-hero{
+ display:flex!important;align-items:center!important;isolation:isolate;
+ position:relative!important;width:100%!important;max-width:none!important;
+ height:min(33.333vw,560px)!important;min-height:0!important;
+ margin:0!important;padding:0!important;overflow:hidden!important;
+ background:#062c47!important;
+}
+body.homepage-exact .duckbio-real-hero::before,
+body.homepage-exact .duckbio-real-hero::after,
+body.support-faq-page .duckbio-real-hero::before,
+body.support-faq-page .duckbio-real-hero::after{content:none!important;display:none!important}
+body.homepage-exact .duckbio-real-hero>.duckbio-real-hero-image,
+body:not(.homepage-exact) .duckbio-real-hero>.duckbio-real-hero-image,
+html body.support-faq-page .duckbio-real-hero>.duckbio-real-hero-image{
+ position:absolute!important;inset:0!important;display:block!important;z-index:0!important;
+ width:100%!important;height:100%!important;max-width:none!important;
+ object-fit:cover!important;object-position:center center!important;
+ margin:0!important;padding:0!important;border:0!important;
+ border-radius:0!important;filter:none!important;box-shadow:none!important;
+}
+.duckbio-real-hero .duckbio-real-hero-content{
+ position:relative;z-index:2;flex:0 0 auto;
+ box-sizing:border-box;width:min(39%,720px);max-width:none;
+ margin:0 0 0 4.25%;padding:0;
+ color:#effaff!important;font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif;
+ font-size:clamp(12px,1.03vw,18px);font-weight:450;line-height:1.35!important;
+ letter-spacing:normal;text-align:left;
+}
+.duckbio-real-hero .duckbio-real-hero-logo{
+ display:flex;align-items:center;gap:clamp(7px,.7vw,13px);margin:0 0 clamp(11px,1.5vw,25px);
+ color:#fff;font-size:clamp(22px,2.15vw,38px);line-height:1;font-weight:780;
+ letter-spacing:-.046em;white-space:nowrap;
+}
+.duckbio-real-hero .duckbio-real-hero-logo img{
+ display:block;width:clamp(30px,3.1vw,53px);height:clamp(30px,3.1vw,53px);
+ max-width:none;flex:0 0 auto;object-fit:contain;
+}
+.duckbio-real-hero .duckbio-real-hero-logo em{color:#39d7f0;font-style:normal}
+.duckbio-real-hero .duckbio-real-hero-kicker{
+ display:flex;align-items:center;gap:clamp(8px,.8vw,13px);
+ margin:0 0 clamp(7px,.85vw,15px);color:#e5f6ff;
+ font-size:clamp(10px,1.05vw,19px);font-weight:690;letter-spacing:.16em;
+ text-transform:uppercase;line-height:1.24;
+}
+.duckbio-real-hero .duckbio-real-hero-kicker::before{
+ content:"";display:inline-block;width:4px;height:1.25em;
+ border-radius:2px;background:#26e2e8;flex:0 0 auto;
+}
+.duckbio-real-hero .duckbio-real-hero-title{
+ margin:0 0 clamp(8px,1.05vw,20px);padding:0;
+ color:#fcffff!important;max-width:none!important;
+ font-size:clamp(27px,3.05vw,61px)!important;font-weight:850!important;
+ letter-spacing:-.054em;line-height:1.05!important;text-shadow:none!important;
+}
+.duckbio-real-hero .duckbio-real-hero-title span{color:#2ce4e9}
+.duckbio-real-hero .duckbio-real-hero-desc{
+ margin:0 0 clamp(4px,.55vw,10px);max-width:670px;
+ color:#eaf9ff;font-size:clamp(12px,1.08vw,19px);
+ line-height:1.4;letter-spacing:0;
+}
+.duckbio-real-hero .duckbio-real-hero-benefits-title{
+ margin:clamp(7px,1vw,17px) 0 clamp(6px,.65vw,11px);
+ color:#fff;font-size:clamp(13px,1.12vw,20px);font-weight:850;
+ letter-spacing:0;line-height:1.2;
+}
+.duckbio-real-hero .duckbio-real-hero-benefits{
+ display:grid;grid-template-columns:1fr 1fr;gap:clamp(5px,.45vw,9px) clamp(8px,1.35vw,25px);
+ margin:0 0 clamp(12px,1.25vw,23px);padding:0;list-style:none!important;
+ font-size:clamp(11px,1vw,18px);line-height:1.22;
+}
+.duckbio-real-hero .duckbio-real-hero-benefits li{
+ display:flex;align-items:center;gap:clamp(6px,.65vw,12px);
+ min-width:0;color:#f2fbff;
+}
+.duckbio-real-hero .duckbio-real-hero-benefits li::before{
+ content:"✓";display:grid;place-items:center;flex:0 0 auto;
+ width:clamp(16px,1.36vw,24px);height:clamp(16px,1.36vw,24px);
+ background:#39e6dd;color:#053044;font-size:.85em;font-weight:950;
+ border-radius:50%;
+}
+.duckbio-real-hero .duckbio-real-hero-cta{
+ display:inline-flex;align-items:center;justify-content:center;gap:.75em;
+ border-radius:12px;padding:clamp(9px,.9vw,16px) clamp(18px,2.1vw,38px);
+ background:#28e3ed;color:#072d43!important;
+ font-size:clamp(13px,1.3vw,22px);line-height:1.12;font-weight:820;
+ text-decoration:none;box-shadow:0 2px 13px rgba(0,11,25,.1);
+ transition:filter .16s,transform .16s;position:relative;z-index:6;
+}
+.duckbio-real-hero .duckbio-real-hero-cta:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.duckbio-real-hero .duckbio-real-hero-cta:focus-visible{
+ outline:3px solid #fff!important;outline-offset:4px;
+}
+.duckbio-real-hero--pricing .duckbio-real-hero-content{width:min(35%,650px)}
+.duckbio-real-hero--support .duckbio-real-hero-content{width:min(35%,650px)}
+.duckbio-real-hero--pricing .duckbio-real-hero-title,
+.duckbio-real-hero--support .duckbio-real-hero-title{
+ font-size:clamp(31px,3.15vw,62px)!important;
+}
+.duckbio-real-hero--pricing .duckbio-real-hero-desc,
+.duckbio-real-hero--support .duckbio-real-hero-desc{max-width:570px}
+.duckbio-real-hero--support .duckbio-real-hero-copy-break{margin-top:clamp(10px,1vw,19px)}
+/* At narrow widths the copy and imagery remain in one banner, but stack so
+   no text is cropped or reduced to illegible sizes over the hero artwork. */
+@media(max-width:850px){
+ body.homepage-exact main>.home-mockup-exact.duckbio-real-hero,
+ body:not(.homepage-exact) main>.pr-banner.duckbio-real-hero,
+ html body.support-faq-page main>.page-hero.support-hero.duckbio-real-hero{
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  height:auto!important;min-height:0!important;
+ }
+ body.homepage-exact .duckbio-real-hero>.duckbio-real-hero-image,
+ body:not(.homepage-exact) .duckbio-real-hero>.duckbio-real-hero-image,
+ html body.support-faq-page .duckbio-real-hero>.duckbio-real-hero-image{
+  position:relative!important;inset:auto!important;order:2;
+  width:100%!important;height:auto!important;aspect-ratio:3/1!important;
+  object-fit:contain!important;object-position:center!important;
+ }
+ .duckbio-real-hero .duckbio-real-hero-content,
+ .duckbio-real-hero--pricing .duckbio-real-hero-content,
+ .duckbio-real-hero--support .duckbio-real-hero-content{
+  order:1;position:relative;box-sizing:border-box;width:100%!important;
+  margin:0!important;padding:24px 5% 25px!important;max-width:none;
+  background:linear-gradient(118deg,#06263e,#0b4560);
+  font-size:14px!important;line-height:1.4!important;
+ }
+ .duckbio-real-hero .duckbio-real-hero-logo{font-size:25px!important;margin-bottom:19px}
+ .duckbio-real-hero .duckbio-real-hero-logo img{width:35px;height:35px}
+ .duckbio-real-hero .duckbio-real-hero-kicker{font-size:11px!important;margin-bottom:11px}
+ .duckbio-real-hero .duckbio-real-hero-title,
+ .duckbio-real-hero--pricing .duckbio-real-hero-title,
+ .duckbio-real-hero--support .duckbio-real-hero-title{
+  font-size:clamp(30px,6.5vw,44px)!important;
+  max-width:none!important;margin-bottom:12px;
+ }
+ .duckbio-real-hero .duckbio-real-hero-desc{
+  font-size:14px!important;max-width:600px;line-height:1.45;margin-bottom:7px;
+ }
+ .duckbio-real-hero .duckbio-real-hero-benefits-title{font-size:15px;margin:15px 0 9px}
+ .duckbio-real-hero .duckbio-real-hero-benefits{
+  font-size:13px!important;gap:8px 14px;margin-bottom:18px;
+ }
+ .duckbio-real-hero .duckbio-real-hero-benefits li::before{width:18px;height:18px}
+ .duckbio-real-hero .duckbio-real-hero-cta{
+  font-size:16px!important;padding:12px 25px;border-radius:10px;
+ }
+}
+@media(max-width:360px){
+ .duckbio-real-hero .duckbio-real-hero-benefits{grid-template-columns:1fr}
+}
