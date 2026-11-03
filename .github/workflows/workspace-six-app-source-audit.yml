@@ -1,4 +1,4 @@
-name: Audit six-app immutable source CI evidence (read-only)
+name: Validate six-app historical QA lock (offline only)
 on:
   workflow_dispatch:
   push:
@@ -32,12 +32,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate exact offline lock, documentation and audit source
+      # Private native repos require explicit separately authorized read access.
+      # This public CI deliberately never receives a cross-repository token.
+      - name: Validate offline lock, documentation and local audit regressions
         working-directory: workspace-server
         run: |
           node --check six-app-source-qa-audit.mjs
           node --test tests/six-app-source-qa-audit.test.mjs
           npm run staging:source-audit
-      - name: Recheck public historical GitHub evidence (GET-only)
-        working-directory: workspace-server
-        run: npm run staging:source-audit:remote
