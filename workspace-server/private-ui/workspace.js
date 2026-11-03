@@ -233,7 +233,7 @@ function draftSelection(){
  const plan=$('draft-plan').value,seats=Number($('draft-seats').value);
  const apps=[...$('buy-fields').querySelectorAll('input[type=checkbox]:checked')].map(x=>x.name);
  if(!Number.isSafeInteger(seats)||seats<1||seats>10000)return null;
- if((plan==='Single'&&apps.length!==1)||(plan==='Mixed'&&(apps.length<2||apps.length>5))||(plan==='Bundle'&&apps.length!==6))return null;
+ if((plan==='Single'&&apps.length!==1)||(plan==='Mixed'&&(apps.length<2||apps.length>state.overview.apps.length-1))||(plan==='Bundle'&&apps.length!==state.overview.apps.length))return null;
  return {organizationId:state.selected,plan,apps,seats};
 }
 function applyPlan(){
@@ -260,7 +260,7 @@ $('buy').addEventListener('click',()=>{
 });
 $('review-buy').addEventListener('click',()=>{
  const draft=draftSelection();
- if(!draft){$('buy-summary').textContent='Single requires 1 app, Mixed 2–5, Bundle all six; choose 1–10,000 users per app.';return;}
+ if(!draft){$('buy-summary').textContent='Single requires 1 app, Mixed 2–6, Bundle all seven; choose 1–10,000 users per app.';return;}
  $('buy-summary').textContent=draft.plan+' · '+draft.apps.map(id=>state.overview.apps.find(a=>a.id===id).name).join(', ')+' · '+draft.seats+' users/app. This is not a purchase.';
 });
 $('save-draft').addEventListener('click',async()=>{
