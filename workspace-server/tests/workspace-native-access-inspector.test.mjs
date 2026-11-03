@@ -115,7 +115,7 @@ test('native verifier outage and mismatched native mapping always deny',async t=
  assert.equal((await f.create(async()=>{throw Error('down')}).inspect(f.input)).reason,'native_mapping_unavailable');
  f.setNativeVerified(true);
  f.setNativeUserId('hijacked');
- assert.equal((await f.create().inspect(f.input)).candidateReady,true);
+ assert.equal((await f.create(async x=>x.nativeUserId==='native-user-one').inspect(f.input)).candidateReady,false);
  assert.equal((await f.create(async()=>false).inspect(f.input)).candidateReady,false);
 });
 test('permission revocation or identity remapping DURING native verification invalidates the result',async t=>{
