@@ -1078,6 +1078,47 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       }
       return [...allowed].sort();
     },
+    // READ-ONLY, private, fail-closed native permission candidate. This is
+    // deliberately NOT an app grant or native authorization. The active SSO
+    // broker still requires separate explicit native account linking, and all
+    // downstream apps must recheck their own permissions per operation.
+    //
+    // The six-app verified LIVE ledger is the only eligible paid evidence.
+    // Stripe TEST observations, unpaid drafts, legacy purchase receipts,
+    // pending invitations and the upcoming DataDuck catalog grant nothing.
+    verifiedNativePermissionCandidate({organizationId,accountId,appId,permission}={}){
+      if(!safeId(organizationId)||!safeId(accountId)||!byId.has(appId)||
+         typeof permission!=='string'||!byId.get(appId).permissions.includes(permission))
+        return null;
+      const member=db.prepare('SELECT a.role FROM assignments a JOIN members m ON m.org=a.org AND m.account=a.account WHERE a.org=? AND a.account=? AND a.app=? AND m.active=1')
+        .get(organizationId,accountId,appId);
+      if(!member)return null;
+      const purchased=db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?')
+        .get(organizationId,appId)?.purchased??0;
+      const assigned=db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?')
+        .get(organizationId,appId).n;
+      const reserved=pendingSeats(organizationId,appId);
+      if(purchased<=0||assigned<1||!Number.isSafeInteger(assigned+reserved)||
+         assigned+reserved>purchased)return null;
+      const rows=db.prepare("SELECT sub.seats,sub.paid_through FROM verified_subscription_allocations sub WHERE sub.org=? AND sub.source='stripe_live' AND sub.state='active' AND sub.paid_through>? AND EXISTS (SELECT 1 FROM json_each(sub.apps) app WHERE app.value=?)")
+        .all(organizationId,Math.floor(clock()/1000),appId);
+      let coveredSeats=0,earliestPaidThrough=Infinity;
+      for(const row of rows){
+        coveredSeats+=row.seats;
+        if(!Number.isSafeInteger(coveredSeats))return null;
+        earliestPaidThrough=Math.min(earliestPaidThrough,row.paid_through);
+      }
+      // For this strict candidate, even reservations must be backed by a
+      // currently paid, independently verified live subscription. Mixing in
+      // unverified or test seat sources cannot elevate native privileges.
+      if(coveredSeats<assigned+reserved)return null;
+      if(!this.effectivePermissions({organizationId,accountId,appId}).includes(permission))
+        return null;
+      return Object.freeze({organizationId,accountId,appId,
+        role:member.role,permission,verifiedPaidThroughMs:earliestPaidThrough*1000,
+        source:'verified_live_subscription_ledger',nativeEnforcementRequired:true,
+        accessGranted:false,licensesGranted:false});
+    },
     accessFor({organizationId,accountId,appId}){
       if(!safeId(organizationId)||!safeId(accountId)||!byId.has(appId))return null;
       const grant=db.prepare('SELECT a.role FROM assignments a JOIN members m ON m.org=a.org AND m.account=a.account WHERE a.org=? AND a.account=? AND a.app=? AND m.active=1').get(organizationId,accountId,appId);
