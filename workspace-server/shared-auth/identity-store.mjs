@@ -186,7 +186,22 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
       fail('invalid_org_native_link');
   }
   function nativeOrgLinkRow(userId,appId,workspaceOrganizationId) {
-    return db.prepare('SELECT * FROM suite_identity_org_native_links WHERE user_id=? AND app_id=? AND workspace_org_id=?')
+    // The monotonically increasing AUTOINCREMENT audit ID is the generation
+    // of the currently active link. A revoke/rebind of the exact same native
+    // tuple (even within the same millisecond) must NOT reproduce that ID.
+    // One SQLite statement reads the tuple and its latest audit generation
+    // consistently. A missing/revoked generation is never an access candidate.
+    return db.prepare(`SELECT l.*,
+      (SELECT a.id FROM suite_identity_org_native_audit a
+       WHERE a.user_id=l.user_id AND a.app_id=l.app_id
+         AND a.workspace_org_id=l.workspace_org_id
+       ORDER BY a.id DESC LIMIT 1) AS last_audit_id,
+      (SELECT a.action FROM suite_identity_org_native_audit a
+       WHERE a.user_id=l.user_id AND a.app_id=l.app_id
+         AND a.workspace_org_id=l.workspace_org_id
+       ORDER BY a.id DESC LIMIT 1) AS last_audit_action
+      FROM suite_identity_org_native_links l
+      WHERE l.user_id=? AND l.app_id=? AND l.workspace_org_id=?`)
       .get(userId,appId,workspaceOrganizationId);
   }
   function assertLegacyNativeGrant(userId,appId,nativeUserId,nativeOrganizationId) {
@@ -201,7 +216,12 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
       userId:row.user_id,appId:row.app_id,
       workspaceOrganizationId:row.workspace_org_id,
       nativeUserId:row.native_user_id,nativeOrganizationId:row.native_org_id,
-      verifiedAt:row.verified_at,linkOnly:true,
+      verifiedAt:row.verified_at,
+      linkRevision:(Number.isSafeInteger(row.last_audit_id) &&
+        row.last_audit_id>0 &&
+        ['link.bound','link.migrated'].includes(row.last_audit_action))
+        ?row.last_audit_id:null,
+      linkOnly:true,
       accessGranted:false,licensesGranted:false,loginEnabled:false
     });
   }
