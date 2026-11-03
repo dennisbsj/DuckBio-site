@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "scope": "synthetic-source-ci-only",
+  "central": {
+    "repo": "dennisbsj/DuckBio-site",
+    "sha": "5e0924e9844d36de75ca8e10c08048b3db373359",
+    "runId": 41629386714,
+    "workflowId": 403711277
+  },
+  "apps": [
+    {
+      "name": "CytoDuck",
+      "id": "goflo",
+      "repo": "dennisbsj/CytoDuck",
+      "sha": "b450dc9bb40851f1e58c0bfd79505c28509cf702",
+      "workflow": ".github/workflows/native-cytoduck-real-workspace-e2e.yml",
+      "runId": 41630512546,
+      "workflowId": 405597927
+    },
+    {
+      "name": "DuckNote",
+      "id": "eel",
+      "repo": "dennisbsj/DuckNote",
+      "sha": "1e34258c95d4a1db98e01ac0f055f2d27d864a50",
+      "workflow": ".github/workflows/workspace-native-real-browser.yml",
+      "runId": 41630925678,
+      "workflowId": 405611188
+    },
+    {
+      "name": "DuckPipe",
+      "id": "methpipe",
+      "repo": "dennisbsj/DuckPipe",
+      "sha": "e3080c47074b43103a72a298a819ba28dffb1460",
+      "workflow": ".github/workflows/native-duckpipe-real-workspace-e2e.yml",
+      "runId": 41629904033,
+      "workflowId": 405482221
+    },
+    {
+      "name": "DuckTrain",
+      "id": "mantrain",
+      "repo": "dennisbsj/DuckTrain",
+      "sha": "df2c0a690d98fccacac6f7400fc94770d6afaf13",
+      "workflow": ".github/workflows/native-ducktrain-real-workspace-e2e.yml",
+      "runId": 41630385999,
+      "workflowId": 405508864
+    },
+    {
+      "name": "DuckMan",
+      "id": "duckman",
+      "repo": "dennisbsj/DuckMan",
+      "sha": "35d5db0f86f60928e0fe74604a46cdaa585a6412",
+      "workflow": ".github/workflows/native-duckman-real-workspace-e2e.yml",
+      "runId": 41630577902,
+      "workflowId": 405517369
+    },
+    {
+      "name": "LabDuck",
+      "id": "limsman",
+      "repo": "dennisbsj/LabDuck",
+      "sha": "ce0f055f43e7d6e366219930fc00e250c4d8a6c5",
+      "workflow": ".github/workflows/native-labduck-real-workspace-e2e.yml",
+      "runId": 41630412217,
+      "workflowId": 405603621
+    }
+  ]
+}
