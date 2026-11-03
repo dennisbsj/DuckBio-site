@@ -172,6 +172,10 @@ test('current exact six-app source can build six native service units and seven 
  {timeout:120000},t=>{
  const f=fixture(t),result=plans(f);
  assert.equal(result.proxy.manifest.routeCount,7);
+ assert.equal(result.proxy.manifest.routes[0].id,'workspace');
+ assert.equal(result.proxy.manifest.routes[0].loopbackPort,3307,
+  'pinned Workspace standalone unit and the seven-origin Caddy route must share loopback 3307');
+ assert.match(result.proxy.caddy,/reverse_proxy 127\.0\.0\.1:3307/);
  assert.equal(result.native.manifest.serviceCount,6);
  assert.equal(result.proxy.manifest.sourceQaWorkspaceSha,current.central.sha);
  assert.equal(result.native.manifest.jointlyVerifiedWorkspaceSha,current.central.sha);
