@@ -53,3 +53,38 @@ synthetic CI test credentials or mark them as customer-authorized seats.
 All updates to this baseline require new immutable app/main and Workspace commit
 references **and green CI for every app against that exact same Workspace commit**.
 Track unresolved staging and production gates in [Workspace issue #26](https://github.com/dennisbsj/DuckBio-site/issues/26).
+
+## Recheck the immutable evidence automatically
+
+A machine-readable [source QA lock](six-app-source-qa-lock.json) records the exact
+seven source commits, six native workflow paths and seven successful
+GitHub Actions run IDs. It is verified by the
+[read-only evidence auditor](six-app-source-qa-audit.mjs), whose security
+regressions run as part of the Workspace core CI.
+
+From the `workspace-server` directory:
+
+```bash
+npm run staging:source-audit
+npm run staging:source-audit:remote
+```
+
+The first command requires no network and checks the manifest format, fixed
+allowlisted app IDs/repositories, immutable SHAs and matching documentation.
+The second adds **GET-only public GitHub API** checks: the exact seven CI
+runs must be completed, successful pushes on `main` with the recorded head
+and workflow IDs; central CI must have passed Node 22 and 24; each native
+workflow must check out the same immutable central source commit. No
+credentials, repository write permissions, customer data or production
+systems are needed. Run
+[the separately configured GitHub Actions audit](../../.github/workflows/workspace-six-app-source-audit.yml)
+for repeatable independent evidence checks.
+
+A green **historical evidence audit** proves only that these immutable
+source revisions passed their recorded isolated CI workflows. It does
+**not** prove that any repository's current `main` still equals the lock,
+that a newer Workspace build remains compatible, or that all seven
+services are running simultaneously. It does not verify real DNS/TLS,
+app seats, native MFA, recovery, or a deployed staging environment.
+Changing any source version requires **new verified CI evidence** and an
+explicit new reviewed lock; never silently replace a commit with `main`.
