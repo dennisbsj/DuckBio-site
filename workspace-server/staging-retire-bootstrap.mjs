@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import {existsSync,lstatSync,mkdirSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
 import {dirname,join,resolve} from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {approvedPrivateRoot} from './staging-generate-config.mjs';
 import {readPrivateConfiguration,validateWorkspaceStagingConfig} from './staging-preflight.mjs';
 
@@ -32,7 +32,11 @@ function verifiedClosedStore(filename){
  // This is a conservative offline check, not proof of process shutdown.
  if(existsSync(filename+'-wal')||existsSync(filename+'-shm'))
   throw Error('database_not_checkpointed');
- const db=new DatabaseSync(filename,{readOnly:true});
+ // Standard SQLite readOnly connections can CREATE WAL/SHM sidecars.
+ // immutable=1 is safe only after the operator has stopped/checkpointed
+ // this specifically synthetic database; it prevents ALL filesystem writes.
+ const db=new DatabaseSync(pathToFileURL(filename).href+'?immutable=1',
+  {readOnly:true});
  try{
   const check=db.prepare('PRAGMA quick_check').all();
   if(check.length!==1||check[0].quick_check!=='ok')
