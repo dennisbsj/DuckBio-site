@@ -96,6 +96,22 @@ test('organization role edits and per-user permission overrides take effect on n
   accountId:'alice',appId:'goflo',permission:'workspace.view',enabled:false});
  assert.equal((await p.inspect(f.input)).candidateReady,false);
 });
+test('tenant-defined custom role permissions are consulted afresh for the exact app',async t=>{
+ const f=fixture(t),p=f.create();
+ f.store.saveRole({organizationId:'alpha',actorId:'admin-alpha',appId:'goflo',
+  role:'Custom Scientist',permissions:['workspace.view']});
+ f.store.saveMember({organizationId:'alpha',actorId:'admin-alpha',
+  member:{accountId:'alice',name:'Alice',nickname:'Alice',
+   email:'alice@example.test',admin:false,roles:{goflo:'Custom Scientist'}}});
+ assert.equal((await p.inspect(f.input)).candidateReady,true);
+ assert.equal((await p.inspect(f.input)).role,'Custom Scientist');
+ f.store.saveRole({organizationId:'alpha',actorId:'admin-alpha',appId:'goflo',
+  role:'Custom Scientist',permissions:[]});
+ assert.equal((await p.inspect(f.input)).candidateReady,false);
+ f.store.saveRole({organizationId:'beta',actorId:'admin-beta',appId:'goflo',
+  role:'Custom Scientist',permissions:['workspace.view']});
+ assert.equal((await p.inspect(f.input)).candidateReady,false);
+});
 test('deactivating a member, disabling central account or expiring the paid term denies the next check',async t=>{
  const f=fixture(t),p=f.create();
  f.setCentralActive(false);
