@@ -235,7 +235,7 @@ test('revoke permits secure cleanup after user suspension and expiry, but only f
  assert.equal((await f.controller.bind(f.input())).applied,true);
  f.org.setMemberActive({organizationId:'alpha',actorId:f.userIds.ownerA,
   accountId:f.userIds.member,active:false});
- f.setNow(1900000010000);
+ f.setNow(START+70_000);
  assert.equal((await f.controller.revoke({
   sessionId:f.adminSessionA.id,userId:f.userIds.member,appId,
   workspaceOrganizationId:'alpha'
