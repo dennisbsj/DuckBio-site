@@ -175,3 +175,81 @@ test('untrusted event and wrong organization cannot trigger Stripe requests',asy
  assert.equal(f.requests.length,0);
  assert.equal(f.purchased(),0);
 });
+
+test('wrong subscription, customer, invoice hint or Stripe PaymentIntent lineage denies correlation',async t=>{
+ const f=fixture(t);
+ const eventId=f.put('refund');
+ const invoice=f.snap['invoices/'+ids.invoice];
+ const originalSubscription=invoice.parent.subscription_details.subscription;
+ invoice.parent.subscription_details.subscription='sub_live_FOREIGN1234';
+ let out=await inspect(f,'refund',eventId);
+ assert.equal(out.linksVerifiedForReview,false);
+ assert.equal(out.reason,'historical_invoice_subscription_mismatch');
+ invoice.parent.subscription_details.subscription=originalSubscription;
+
+ const charge=f.snap['charges/'+ids.charge];
+ charge.customer='cus_live_OTHER1234';
+ out=await inspect(f,'refund',eventId);
+ assert.equal(out.linksVerifiedForReview,false);
+ assert.equal(out.reason,'charge_customer_or_intent_mismatch');
+ charge.customer=ids.customer;
+
+ const listing=f.snap['invoices/'+ids.invoice+'/payments?limit=100'];
+ listing.data[0].payment.payment_intent='pi_live_OTHER1234';
+ out=await inspect(f,'refund',eventId);
+ assert.equal(out.linksVerifiedForReview,false);
+ assert.equal(out.reason,'invoice_payment_lineage_mismatch');
+ listing.data[0].payment.payment_intent=ids.intent;
+
+ const wrong=await f.correlate.inspect({
+  organizationId:ids.org,subscriptionId:ids.sub,
+  eventId,invoiceId:'in_live_UNVERIFIED1234'
+ });
+ assert.equal(wrong.linksVerifiedForReview,false);
+ assert.equal(wrong.state,'unavailable');
+ assert.equal(f.purchased(),0);
+});
+test('credit note and invoice void cannot be reassigned through a caller-provided invoice',async t=>{
+ const f=fixture(t);
+ for(const kind of ['credit','void']){
+  const eventId=f.put(kind);
+  const wrong=await f.correlate.inspect({
+   organizationId:ids.org,subscriptionId:ids.sub,
+   eventId,invoiceId:'in_live_WRONG1234'
+  });
+  assert.equal(wrong.linksVerifiedForReview,false);
+  assert.equal(wrong.licensesGranted,false);
+ }
+ const note=f.snap['credit_notes/'+ids.credit];
+ note.customer='cus_live_WRONG1234';
+ assert.equal((await inspect(f,'credit',f.put('credit','evt_live_credit2'))).linksVerifiedForReview,false);
+ assert.equal(f.purchased(),0);
+});
+test('late and out-of-order signed events remain reviewable without granting access',async t=>{
+ const f=fixture(t);
+ const future=f.put('dispute','evt_live_late_newer',Math.floor(NOW/1000));
+ const historic=f.put('refund','evt_live_historic_old',Math.floor(NOW/1000)-100000);
+ for(const id of [historic,future,historic]){
+  const kind=id===historic?'refund':'dispute';
+  const out=await inspect(f,kind,id);
+  assert.equal(out.linksVerifiedForReview,true);
+  assert.equal(out.licensesGranted,false);
+ }
+ assert.equal(f.store.ownerSnapshot().totals.liveWebhookEvents,2);
+ assert.equal(f.purchased(),0);
+});
+test('pin revision changes during a Stripe await invalidate the entire correlation',async t=>{
+ const f=fixture(t),eventId=f.put('refund');
+ let changed=false;
+ f.hook(async path=>{
+  if(path==='invoices/'+ids.invoice&&!changed){
+   changed=true;
+   f.changePin(pin=>({...pin,revision:2}));
+  }
+ });
+ const out=await inspect(f,'refund',eventId);
+ assert.equal(out.state,'unavailable');
+ assert.equal(out.reason,'correlation_source_changed');
+ assert.equal(out.linksVerifiedForReview,false);
+ assert.equal(f.purchased(),0);
+});
