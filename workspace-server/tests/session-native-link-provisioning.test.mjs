@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
+import {DatabaseSync} from 'node:sqlite';
 import {randomUUID,generateKeyPairSync,sign} from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,7 +15,7 @@ const START=1800000000000;
 const PAID_THROUGH=1800000060; // verified term ends 60 seconds after START
 const PASSWORD='only-private-isolated-synthetic-provisioning-password';
 const appId='goflo';
-async function fixture(t,{historicalOnly=false}={}){
+async function fixture(t,{historicalOnly=false,fenceProbe=null}={}){
  const root=mkdtempSync(path.join(os.tmpdir(),'workspace-operator-provision-'));
  let now=START, duringNative=null,nativeVerified=true,nativeRequests=0;
  const userIds=Object.freeze({ownerA:randomUUID(),ownerB:randomUUID(),
@@ -41,14 +42,25 @@ async function fixture(t,{historicalOnly=false}={}){
    });
   }
  });
+ const organizationDatabasePath=path.join(root,'private','org.sqlite');
  const org=createOrganizationStore({
-  databasePath:path.join(root,'private','org.sqlite'),
+  databasePath:organizationDatabasePath,
   clock:()=>now,verifyLiveSubscriptionEvidence:value=>value,
   nativeProvisioningSessionEpochs:true
  });
  let identity;
+ // Synthetic test observer only. The actual organization store still owns
+ // and acquires the real SQLite write lock on its private DB path.
+ const fencedOrg=fenceProbe?Object.freeze({
+  ...org,
+  nativeProvisioningAcquireCommitFence(args){
+   const lease=org.nativeProvisioningAcquireCommitFence(args);
+   if(lease)fenceProbe({lease,organizationDatabasePath,args});
+   return lease;
+  }
+ }):org;
  const controller=createWorkspaceNativeLinkProvisioner({
-  getIdentityStore:()=>identity,organizationStore:org,
+  getIdentityStore:()=>identity,organizationStore:fencedOrg,
   verifyNativeOwnership:signed.verifyNativeOwnership,clock:()=>now
  });
  identity=createIdentityStore({
@@ -97,7 +109,7 @@ async function fixture(t,{historicalOnly=false}={}){
   nativeUserId:'native-user-'+organizationId,
   nativeOrganizationId:'native-tenant-'+organizationId
  });
- return {identity,org,controller,userIds,adminSessionA,adminSessionB,
+ return {identity,org,controller,organizationDatabasePath,userIds,adminSessionA,adminSessionB,
   memberSession,input,now:()=>now,setNow:x=>{now=x},
   duringNative:fn=>{duringNative=fn},
   setNativeVerified:x=>{nativeVerified=x},
