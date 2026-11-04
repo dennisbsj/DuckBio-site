@@ -8,10 +8,13 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {generateKeyPairSync,sign} from 'node:crypto';
+import {generateKeyPairSync,sign,randomBytes,createHash} from 'node:crypto';
+import http from 'node:http';
 import {createIdentityStore} from '../shared-auth/identity-store.mjs';
 import {createOrganizationStore} from '../organization-store.mjs';
 import {createWorkspaceNativeAccessInspector} from '../workspace-native-access-inspector.mjs';
+import {createWorkspaceNativeBrokerDenyAdapter} from '../shared-auth/native-broker-deny-adapter.mjs';
+import {createAuthBroker,createMemoryBrokerStore} from '../shared-auth/broker.mjs';
 import {
  createSignedNativeOwnershipVerifier,canonicalNativeOwnershipProofBytes
 } from '../shared-auth/signed-native-ownership-verifier.mjs';
@@ -191,4 +194,132 @@ test('a VALID signed native proof cannot outlive tenant permission revocation wh
  assert.equal(after.licensesGranted,false);
  assert.equal(after.loginEnabled,false);
  assert.equal(f.requests().at(-1).body.purpose,'inspect');
+});
+
+function signedNativeDenyGuard(f){
+ const identity={
+  async getSession(){return f.identity.getParentSession(f.parent.id)},
+  async authenticate(){return f.parent},
+  async getParentSession(id){return f.identity.getParentSession(id)},
+  async logout(id){f.identity.revokeSession(id)}
+ };
+ return createWorkspaceNativeBrokerDenyAdapter({
+  identity,organizationStore:f.org,inspector:f.inspector,
+  permissions:{goflo:'workspace.view'}
+ });
+}
+
+test('combined signed native proof + real SQLite roles + live-shaped seat yields candidate but zero broker PKCE codes',async t=>{
+ const f=await setup(t);
+ const linked=await f.identity.bindVerifiedOrganizationNativeLink(f.map);
+ assert.equal(linked.applied,true);
+ const guarded=signedNativeDenyGuard(f);
+ const candidate=await guarded.inspectCandidate(f.parent,'goflo');
+ assert.equal(candidate.candidateReady,true);
+ assert.equal(candidate.accessGranted,false);
+ assert.equal(candidate.loginEnabled,false);
+ assert.match(candidate.preflightBindingRevision,/^[a-f0-9]{64}$/);
+ assert.equal(await guarded.getAccess(f.parent,'goflo'),null);
+ const store=createMemoryBrokerStore();
+ let codes=0,proofs=0;
+ const originalCode=store.putCode.bind(store);
+ const originalProof=store.putProof.bind(store);
+ store.putCode=async(...args)=>{codes++;return originalCode(...args)};
+ store.putProof=async(...args)=>{proofs++;return originalProof(...args)};
+ const clients=[{
+  id:'goflo',appId:'goflo',secret:randomBytes(32).toString('base64url'),
+  redirectUris:['https://goflo.example.test/auth/callback']
+ }];
+ let broker;
+ const server=http.createServer(async(req,res)=>{
+  if(!await broker.handle(req,res)){res.statusCode=404;res.end()}
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const origin='http://127.0.0.1:'+server.address().port;
+ t.after(async()=>{server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve))});
+ broker=createAuthBroker({
+  origin,issuer:'https://identity.example.test',clients,
+  identity:guarded,store,clock:()=>NOW
+ });
+ const csr=await fetch(origin+'/api/suite/auth/session');
+ assert.equal(csr.status,200);
+ const csrfToken=(await csr.json()).csrfToken;
+ const cookie=csr.headers.get('set-cookie')?.split(';')[0];
+ assert(cookie);
+ const authorize=await fetch(origin+'/api/suite/auth/authorize',{
+  method:'POST',
+  headers:{'Content-Type':'application/json',Origin:origin,
+   Cookie:cookie,'X-CSRF-Token':csrfToken},
+  body:JSON.stringify({
+   appId:'goflo',returnPath:'/analysis',
+   state:randomBytes(32).toString('base64url'),
+   codeChallenge:createHash('sha256').update(randomBytes(32).toString('base64url')).digest('base64url'),
+   codeChallengeMethod:'S256',redirectUri:clients[0].redirectUris[0]
+  })
+ });
+ assert.equal(authorize.status,403);
+ assert.deepEqual(await authorize.json(),{error:'access_denied'});
+ assert.deepEqual([codes,proofs],[0,0],
+  'positive cryptographic proof is never a login entitlement');
+});
+
+test('combined signed native verifier detects in-flight permission revoke/regrant ABA and refuses broker access',async t=>{
+ const f=await setup(t);
+ await f.identity.bindVerifiedOrganizationNativeLink(f.map);
+ const guarded=signedNativeDenyGuard(f);
+ const before=await guarded.inspectCandidate(f.parent,'goflo');
+ assert.equal(before.candidateReady,true);
+ let changed=false;
+ f.onRequest(async body=>{
+  if(body.purpose!=='inspect'||changed)return;
+  changed=true;
+  f.org.setPermission({organizationId:WORKSPACE_TENANT,
+   actorId:ACCOUNT,accountId:ACCOUNT,appId:'goflo',
+   permission:'workspace.view',enabled:false});
+  f.org.setPermission({organizationId:WORKSPACE_TENANT,
+   actorId:ACCOUNT,accountId:ACCOUNT,appId:'goflo',
+   permission:'workspace.view',enabled:true});
+ });
+ const denied=await guarded.inspectCandidate(f.parent,'goflo');
+ assert.equal(changed,true);
+ assert.equal(denied.candidateReady,false);
+ assert.equal(denied.loginEnabled,false);
+ assert.equal(await guarded.getAccess(f.parent,'goflo'),null);
+ f.onRequest(null);
+ const after=await guarded.inspectCandidate(f.parent,'goflo');
+ assert.equal(after.candidateReady,true);
+ assert.equal(after.role,before.role);
+ assert.equal(after.nativeUserId,before.nativeUserId);
+ assert.notEqual(after.preflightBindingRevision,before.preflightBindingRevision);
+ assert.equal(await guarded.getAccess(f.parent,'goflo'),null);
+});
+
+test('combined signed native verifier denies in-flight same-user/tenant native link revoke-rebind ABA',async t=>{
+ const f=await setup(t);
+ await f.identity.bindVerifiedOrganizationNativeLink(f.map);
+ const guarded=signedNativeDenyGuard(f);
+ const before=await guarded.inspectCandidate(f.parent,'goflo');
+ assert.equal(before.candidateReady,true);
+ let changed=false;
+ f.onRequest(async body=>{
+  if(body.purpose!=='inspect'||changed)return;
+  changed=true;
+  await f.identity.revokeVerifiedOrganizationNativeLink({
+   actorId:ACCOUNT,userId:ACCOUNT,appId:'goflo',
+   workspaceOrganizationId:WORKSPACE_TENANT
+  });
+  const rebound=await f.identity.bindVerifiedOrganizationNativeLink(f.map);
+  assert.equal(rebound.applied,true);
+ });
+ const denied=await guarded.inspectCandidate(f.parent,'goflo');
+ assert.equal(changed,true);
+ assert.equal(denied.candidateReady,false);
+ assert.equal(denied.loginEnabled,false);
+ f.onRequest(null);
+ const after=await guarded.inspectCandidate(f.parent,'goflo');
+ assert.equal(after.candidateReady,true);
+ assert.equal(after.nativeUserId,before.nativeUserId);
+ assert.equal(after.nativeOrganizationId,before.nativeOrganizationId);
+ assert.notEqual(after.preflightBindingRevision,before.preflightBindingRevision);
+ assert.equal(await guarded.getAccess(f.parent,'goflo'),null);
 });
