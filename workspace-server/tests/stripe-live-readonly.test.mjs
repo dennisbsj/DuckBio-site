@@ -185,3 +185,17 @@ test('Stripe lookup failures and malformed responses fail closed without returni
   assert.equal(f.calls.length,1);
  }
 });
+
+test('Stripe LIVE reader accepts exactly 131072 UTF-8 bytes without seat authorization',async()=>{
+ const empty=JSON.stringify({...subscription(),padding:''});
+ const body=JSON.stringify({...subscription(),padding:'x'.repeat(131072-Buffer.byteLength(empty))});
+ assert.equal(Buffer.byteLength(body),131072);
+ const f=fixture({responseChange:(response,resource)=>
+  resource.object==='subscription'?new Response(body,{
+   headers:{'content-type':'application/json','content-length':'131072'}
+  }):response});
+ const out=await f.reader.inspect(binding());
+ assert.equal(out.state,'candidate_for_manual_review');
+ assert.equal(out.licensesGranted,false);
+ assert.equal(out.authorizesSeatChanges,false);
+});
