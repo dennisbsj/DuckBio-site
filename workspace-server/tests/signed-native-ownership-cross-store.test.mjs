@@ -26,10 +26,11 @@ async function setup(t){
  const root=mkdtempSync(path.join(os.tmpdir(),'duckbio-real-native-proof-'));
  const keys=generateKeyPairSync('ed25519');
  const publicKeyPem=keys.publicKey.export({type:'spki',format:'pem'});
- let mode='valid',requests=[];
+ let mode='valid',requests=[],onNativeRequest=null;
  const transport=async(url,init)=>{
   const body=JSON.parse(init.body);
   requests.push({url,body});
+  if(onNativeRequest)await onNativeRequest(body);
   if(mode==='offline')throw Error('synthetic native service offline');
   const proof={...body,keyId:'native-key-a',issuedAt:NOW,
    expiresAt:NOW+20_000,active:true,ownershipVerified:true};
@@ -101,7 +102,7 @@ async function setup(t){
   verifyNativeMapping:verifier.verifyNativeMapping,clock:()=>NOW
  });
  return {identity,org,parent,verifier,inspector,map,input,
-  setMode:v=>{mode=v},requests:()=>requests};
+  setMode:v=>{mode=v},onRequest:fn=>{onNativeRequest=fn},requests:()=>requests};
 }
 
 test('signed native bind + real SQLite session, tenant, role and verified-live-shaped seat yields NON-authorizing candidate',async t=>{
@@ -172,4 +173,22 @@ test('a native proof cannot provision an unlicensed, unassigned or unreleased ap
  await assert.rejects(f.identity.bindVerifiedOrganizationNativeLink({
   ...f.map,appId:'dataduck'
  }),/invalid_org_native_link/);
+});
+
+
+test('a VALID signed native proof cannot outlive tenant permission revocation while the signature is being prepared',async t=>{
+ const f=await setup(t);
+ await f.identity.bindVerifiedOrganizationNativeLink(f.map);
+ f.onRequest(async body=>{
+  if(body.purpose!=='inspect')return;
+  f.org.setPermission({organizationId:WORKSPACE_TENANT,
+   actorId:ACCOUNT,accountId:ACCOUNT,appId:'goflo',
+   permission:'workspace.view',enabled:false});
+ });
+ const after=await f.inspector.inspect(f.input);
+ assert.equal(after.candidateReady,false);
+ assert.equal(after.accessGranted,false);
+ assert.equal(after.licensesGranted,false);
+ assert.equal(after.loginEnabled,false);
+ assert.equal(f.requests().at(-1).body.purpose,'inspect');
 });
