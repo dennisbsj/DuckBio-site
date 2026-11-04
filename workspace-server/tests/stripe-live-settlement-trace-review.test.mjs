@@ -95,8 +95,9 @@ function fixture(t){
   revise:()=>{event++;return store.pinVerifiedStripeLiveBinding(opaque)},
   purchased:()=>store.overview(org,'owner').apps.find(x=>x.id==='eel').purchased};
 }
-const isDenied=x=>x.state==='manual_review'&&
- x.reason!=='payment_chain_traced_at_check'&&x.licensesGranted===false;
+const isDenied=x=>['manual_review','unavailable'].includes(x.state)&&
+ x.reason!=='payment_chain_traced_at_check'&&x.licensesGranted===false&&
+ x.authorizesSeatChanges===false;
 test('private pinned LIVE payment chain can only be traced for manual review, never licensing',async t=>{
  const f=fixture(t);
  const result=await f.review.inspect(input);
