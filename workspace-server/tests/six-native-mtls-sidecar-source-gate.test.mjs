@@ -44,9 +44,9 @@ function fixture(t){
   if(cmd==='rev-parse --show-toplevel')return options.cwd+'\n';
   if(cmd==='remote get-url origin')return 'https://github.com/'+row.repo+'.git\n';
   if(cmd==='rev-parse --verify HEAD')return (
-   overrides.wrongHead===row.id?'f'.repeat(40):row.sha)+'\n';
+   overrides.wrongHead!==undefined&&overrides.wrongHead===row.id?'f'.repeat(40):row.sha)+'\n';
   if(cmd==='status --porcelain --untracked-files=normal')
-   return overrides.dirty===row.id?' M server/workspace-native-ownership-https.cjs\n':'';
+   return overrides.dirty!==undefined&&overrides.dirty===row.id?' M server/workspace-native-ownership-https.cjs\n':'';
   if(action[0]==='show'&&action[1]==='HEAD:'+row.workflow)
    return 'steps:\n  - uses: actions/checkout@v4\n'+
     '    with:\n      repository: dennisbsj/DuckBio-site\n'+
