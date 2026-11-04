@@ -19,7 +19,7 @@ function fixture(){
    ?{id:'sess1',subject:'alice1'}:null,
   getOrganizationNativeLink:({userId,appId,workspaceOrganizationId})=>
    live.linked&&userId==='alice1'&&appId==='limsman'&&
-   workspaceOrganizationId===live.org?{
+   workspaceOrganizationId==='org1'?{
     userId,appId,workspaceOrganizationId,
     nativeUserId:live.nativeUser,nativeOrganizationId:live.nativeOrg,
     linkRevision:live.linkEpoch,linkOnly:true,
