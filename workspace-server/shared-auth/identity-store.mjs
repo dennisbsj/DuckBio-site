@@ -57,7 +57,14 @@ function ttl(value, fallback, maximum) {
 
 /** A dedicated portable account database. Never use a business-data database.
  * All account provisioning methods are private server/CLI seams, not public registration APIs. */
-export function createIdentityStore({ databasePath, clock = Date.now }) {
+export function createIdentityStore({ databasePath, clock = Date.now, orgNativeLinks = null }) {
+  // This additive migration is OFF in all existing production/staging callers.
+  // Explicit private trusted adapters are mandatory; no HTTP API uses these methods.
+  const orgLinksEnabled = orgNativeLinks !== null;
+  if (orgLinksEnabled && (!orgNativeLinks || typeof orgNativeLinks.authorizeMutation !== 'function' ||
+      typeof orgNativeLinks.verifyNativeOwnership !== 'function')) {
+    throw new Error('Trusted organization/native identity verifiers are required');
+  }
   if (typeof databasePath !== 'string' || !path.isAbsolute(databasePath) || databasePath.split(path.sep).includes('public_html')) throw new Error('An absolute private identity database path is required');
   mkdirSync(path.dirname(databasePath), { recursive: true, mode: 0o700 });
   const actualParent = realpathSync(path.dirname(databasePath));
@@ -112,6 +119,31 @@ export function createIdentityStore({ databasePath, clock = Date.now }) {
       expires_at INTEGER NOT NULL
     );
   `);
+  if (orgLinksEnabled) db.exec(`
+    CREATE TABLE IF NOT EXISTS suite_identity_org_native_links (
+      user_id TEXT NOT NULL REFERENCES suite_identity_users(id) ON DELETE CASCADE,
+      app_id TEXT NOT NULL,
+      workspace_org_id TEXT NOT NULL,
+      native_user_id TEXT NOT NULL,
+      native_org_id TEXT NOT NULL,
+      verified_at INTEGER NOT NULL,
+      PRIMARY KEY(user_id,app_id,workspace_org_id),
+      UNIQUE(app_id,native_user_id)
+    );
+    CREATE INDEX IF NOT EXISTS suite_identity_org_native_by_org
+      ON suite_identity_org_native_links(app_id,workspace_org_id,native_org_id);
+    CREATE INDEX IF NOT EXISTS suite_identity_org_native_by_native_tenant
+      ON suite_identity_org_native_links(app_id,native_org_id,workspace_org_id);
+    CREATE TABLE IF NOT EXISTS suite_identity_org_native_audit (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      actor_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      app_id TEXT NOT NULL,
+      workspace_org_id TEXT NOT NULL,
+      action TEXT NOT NULL CHECK(action IN ('link.bound','link.migrated','link.revoked')),
+      recorded_at INTEGER NOT NULL
+    );
+  `);
   function privateFiles() {
     for (const suffix of ['', '-wal', '-shm']) {
       try { chmodSync(databasePath + suffix, 0o600); } catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -142,6 +174,129 @@ export function createIdentityStore({ databasePath, clock = Date.now }) {
     const grant = grantValue(input);
     if (db.prepare('SELECT user_id FROM suite_identity_grants WHERE app_id=? AND local_user_id=? AND user_id<>?').get(grant.appId, grant.localUserId, userId)) fail('mapping_already_linked');
     db.prepare('INSERT INTO suite_identity_grants(user_id,app_id,local_user_id,organization_id) VALUES(?,?,?,?) ON CONFLICT(user_id,app_id) DO UPDATE SET local_user_id=excluded.local_user_id,organization_id=excluded.organization_id').run(userId, grant.appId, grant.localUserId, grant.organizationId ?? null);
+  }
+  // These private functions never return a login/authorization grant and
+  // never fall back to suite_identity_grants. They are not used by the broker.
+  function validOrganizationNativeInput({actorId,userId,appId,workspaceOrganizationId,
+    nativeUserId,nativeOrganizationId}={}) {
+    if(!orgLinksEnabled) fail('org_native_links_disabled');
+    if(!uuidPattern.test(userId)||!uuidPattern.test(actorId)||
+       !APP_IDS.has(appId)||!textId(workspaceOrganizationId)||
+       !textId(nativeUserId)||!textId(nativeOrganizationId))
+      fail('invalid_org_native_link');
+  }
+  function nativeOrgLinkRow(userId,appId,workspaceOrganizationId) {
+    // An AUTOINCREMENT audit row is a stable link generation. It changes
+    // after revoke/rebind even when native IDs and timestamps are unchanged.
+    return db.prepare(`SELECT l.*,
+      (SELECT a.id FROM suite_identity_org_native_audit a
+       WHERE a.user_id=l.user_id AND a.app_id=l.app_id
+         AND a.workspace_org_id=l.workspace_org_id
+       ORDER BY a.id DESC LIMIT 1) AS last_audit_id,
+      (SELECT a.action FROM suite_identity_org_native_audit a
+       WHERE a.user_id=l.user_id AND a.app_id=l.app_id
+         AND a.workspace_org_id=l.workspace_org_id
+       ORDER BY a.id DESC LIMIT 1) AS last_audit_action
+      FROM suite_identity_org_native_links l
+      WHERE l.user_id=? AND l.app_id=? AND l.workspace_org_id=?`)
+      .get(userId,appId,workspaceOrganizationId);
+  }
+  function assertLegacyNativeGrant(userId,appId,nativeUserId,nativeOrganizationId) {
+    const legacy=db.prepare('SELECT local_user_id,organization_id FROM suite_identity_grants WHERE user_id=? AND app_id=?')
+      .get(userId,appId);
+    if(!legacy||legacy.local_user_id!==nativeUserId||
+       (legacy.organization_id!==null&&legacy.organization_id!==nativeOrganizationId))
+      fail('legacy_native_link_mismatch');
+  }
+  function verifiedNativeLinkView(row) {
+    return Object.freeze({
+      userId:row.user_id,appId:row.app_id,
+      workspaceOrganizationId:row.workspace_org_id,
+      nativeUserId:row.native_user_id,nativeOrganizationId:row.native_org_id,
+      verifiedAt:row.verified_at,
+      linkRevision:(Number.isSafeInteger(row.last_audit_id) &&
+        row.last_audit_id>0 &&
+        ['link.bound','link.migrated'].includes(row.last_audit_action))
+        ?row.last_audit_id:null,
+      linkOnly:true,
+      accessGranted:false,licensesGranted:false,loginEnabled:false
+    });
+  }
+  async function verifiedNativeLink(input,{legacyOnly=false}={}) {
+    validOrganizationNativeInput(input);
+    const {actorId,userId,appId,workspaceOrganizationId,nativeUserId,nativeOrganizationId}=input;
+    if(requireUser(userId).state!=='active')fail('access_denied');
+    if(legacyOnly)assertLegacyNativeGrant(userId,appId,nativeUserId,nativeOrganizationId);
+    const authority={actorId,userId,appId,workspaceOrganizationId,
+      nativeUserId,nativeOrganizationId,operation:legacyOnly?'migrate':'bind'};
+    // Only trusted private adapters may assert BOTH actor membership and
+    // exact native user + native tenant ownership. No email-based joining.
+    if((await orgNativeLinks.authorizeMutation(authority))!==true)
+      fail('org_native_link_not_authorized');
+    if((await orgNativeLinks.verifyNativeOwnership(authority))!==true)
+      fail('native_ownership_unverified');
+    if((await orgNativeLinks.authorizeMutation(authority))!==true)
+      fail('org_native_link_not_authorized');
+    return transaction(()=>{
+      if(requireUser(userId).state!=='active')fail('access_denied');
+      if(legacyOnly)assertLegacyNativeGrant(userId,appId,nativeUserId,nativeOrganizationId);
+      const existing=nativeOrgLinkRow(userId,appId,workspaceOrganizationId);
+      if(existing){
+        if(existing.native_user_id!==nativeUserId||existing.native_org_id!==nativeOrganizationId)
+          fail('org_native_link_conflict');
+        return {applied:false,link:verifiedNativeLinkView(existing)};
+      }
+      // Neither native user IDs nor native organization IDs can be silently
+      // shared between Workspace organizations for the same app.
+      if(db.prepare('SELECT 1 FROM suite_identity_org_native_links WHERE app_id=? AND native_user_id=? LIMIT 1')
+        .get(appId,nativeUserId)||
+        db.prepare('SELECT 1 FROM suite_identity_org_native_links WHERE app_id=? AND workspace_org_id=? AND native_org_id<>? LIMIT 1')
+          .get(appId,workspaceOrganizationId,nativeOrganizationId)||
+        db.prepare('SELECT 1 FROM suite_identity_org_native_links WHERE app_id=? AND native_org_id=? AND workspace_org_id<>? LIMIT 1')
+          .get(appId,nativeOrganizationId,workspaceOrganizationId))
+        fail('org_native_link_conflict');
+      // An old global mapping owned by another Workspace identity cannot be
+      // used as an apparently new, verified organization-native identity.
+      if(db.prepare('SELECT 1 FROM suite_identity_grants WHERE app_id=? AND local_user_id=? AND user_id<>? LIMIT 1')
+        .get(appId,nativeUserId,userId))fail('mapping_already_linked');
+      const stamp=clock();
+      if(!Number.isSafeInteger(stamp)||stamp<=0)fail('invalid_clock');
+      db.prepare('INSERT INTO suite_identity_org_native_links(user_id,app_id,workspace_org_id,native_user_id,native_org_id,verified_at) VALUES(?,?,?,?,?,?)')
+        .run(userId,appId,workspaceOrganizationId,nativeUserId,nativeOrganizationId,stamp);
+      db.prepare('INSERT INTO suite_identity_org_native_audit(actor_id,user_id,app_id,workspace_org_id,action,recorded_at) VALUES(?,?,?,?,?,?)')
+        .run(actorId,userId,appId,workspaceOrganizationId,legacyOnly?'link.migrated':'link.bound',stamp);
+      return {applied:true,link:verifiedNativeLinkView(nativeOrgLinkRow(userId,appId,workspaceOrganizationId))};
+    });
+  }
+  async function verifiedNativeRevoke({actorId,userId,appId,workspaceOrganizationId}={}) {
+    if(!orgLinksEnabled)fail('org_native_links_disabled');
+    if(!uuidPattern.test(userId)||!uuidPattern.test(actorId)||
+       !APP_IDS.has(appId)||!textId(workspaceOrganizationId))
+      fail('invalid_org_native_link');
+    const authority={actorId,userId,appId,workspaceOrganizationId,operation:'revoke'};
+    if((await orgNativeLinks.authorizeMutation(authority))!==true)
+      fail('org_native_link_not_authorized');
+    return transaction(()=>{
+      const existing=nativeOrgLinkRow(userId,appId,workspaceOrganizationId);
+      if(!existing)return {applied:false};
+      db.prepare('DELETE FROM suite_identity_org_native_links WHERE user_id=? AND app_id=? AND workspace_org_id=?')
+        .run(userId,appId,workspaceOrganizationId);
+      db.prepare('INSERT INTO suite_identity_org_native_audit(actor_id,user_id,app_id,workspace_org_id,action,recorded_at) VALUES(?,?,?,?,?,?)')
+        .run(actorId,userId,appId,workspaceOrganizationId,'link.revoked',clock());
+      return {applied:true};
+    });
+  }
+  function hasNativeOrgHistory(){
+    // Both live mappings AND revocation/migration audit history must survive
+    // a full backup. After a last link is revoked, portable v1 is still
+    // incomplete and must never appear to be a recoverable full export.
+    const tableExists = name => Boolean(db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"
+    ).get(name));
+    return (tableExists('suite_identity_org_native_links') &&
+      Boolean(db.prepare('SELECT 1 FROM suite_identity_org_native_links LIMIT 1').get())) ||
+      (tableExists('suite_identity_org_native_audit') &&
+      Boolean(db.prepare('SELECT 1 FROM suite_identity_org_native_audit LIMIT 1').get()));
   }
   function parentSession(row) {
     return row ? { id: row.id, subject: row.user_id, displayName: row.display_name, expiresAt: row.expires_at, passwordChangeRequired: false } : null;
@@ -217,6 +372,35 @@ export function createIdentityStore({ databasePath, clock = Date.now }) {
     getParentSession(id) { return typeof id === 'string' && uuidPattern.test(id) ? parentSession(sessionRow('s.id', id)) : null; },
     revokeSession(id) { db.prepare('DELETE FROM suite_identity_sessions WHERE id=?').run(id); },
     revokeUserSessions(id) { requireUser(id); db.prepare('DELETE FROM suite_identity_sessions WHERE user_id=?').run(id); },
+    // Explicit VERIFIED opt-in organization mapping, fully separate from the
+    // six-app global grant and broker API. No automatic migration.
+    bindVerifiedOrganizationNativeLink(input){return verifiedNativeLink(input);},
+    async migrateVerifiedLegacyNativeLink({actorId,userId,appId,workspaceOrganizationId,nativeOrganizationId}={}){
+      if(!orgLinksEnabled)fail('org_native_links_disabled');
+      if(!uuidPattern.test(userId)||!APP_IDS.has(appId)||!textId(workspaceOrganizationId)||
+         !textId(nativeOrganizationId))fail('invalid_org_native_link');
+      const legacy=db.prepare('SELECT local_user_id,organization_id FROM suite_identity_grants WHERE user_id=? AND app_id=?')
+        .get(userId,appId);
+      if(!legacy||!textId(legacy.local_user_id)||
+         (legacy.organization_id!==null&&legacy.organization_id!==nativeOrganizationId))
+        fail('legacy_native_link_mismatch');
+      return verifiedNativeLink({actorId,userId,appId,workspaceOrganizationId,
+        nativeUserId:legacy.local_user_id,nativeOrganizationId},{legacyOnly:true});
+    },
+    revokeVerifiedOrganizationNativeLink(input){return verifiedNativeRevoke(input);},
+    getOrganizationNativeLink({userId,appId,workspaceOrganizationId}={}){
+      if(!orgLinksEnabled||!uuidPattern.test(userId)||!APP_IDS.has(appId)||
+         !textId(workspaceOrganizationId))return null;
+      const account=userRow(userId);
+      if(!account||account.state!=='active')return null;
+      const link=nativeOrgLinkRow(userId,appId,workspaceOrganizationId);
+      return link?verifiedNativeLinkView(link):null;
+    },
+    orgNativeLinkAudit({appId,workspaceOrganizationId}={}){
+      if(!orgLinksEnabled||!APP_IDS.has(appId)||!textId(workspaceOrganizationId))return [];
+      return db.prepare('SELECT actor_id,user_id,app_id,workspace_org_id,action,recorded_at FROM suite_identity_org_native_audit WHERE app_id=? AND workspace_org_id=? ORDER BY id DESC LIMIT 100')
+        .all(appId,workspaceOrganizationId);
+    },
     grantAppAccess({ userId, ...grant }) { return transaction(() => grantAccess(userId, grant)); },
     getAccess(userId, appId) {
       const row = db.prepare("SELECT g.* FROM suite_identity_grants g JOIN suite_identity_users u ON u.id=g.user_id WHERE g.user_id=? AND g.app_id=? AND u.state='active'").get(userId, appId);
@@ -276,11 +460,17 @@ export function createIdentityStore({ databasePath, clock = Date.now }) {
     },
     exportPortable({ includePasswordHashes = false } = {}) {
       if (typeof includePasswordHashes !== 'boolean') fail('invalid_export');
-      return transaction(() => ({
+      // Portable v1 cannot encode verified org-native mappings. Never silently
+      // create an incomplete backup. Operators must use an SQLite snapshot
+      // and a future reviewed portable v2 export/migration instead.
+      return transaction(() => {
+        if(hasNativeOrgHistory())fail('org_native_links_require_database_backup');
+        return {
         format: 'celluloid-local-identity', version: 1, exportedAt: clock(),
         users: db.prepare('SELECT * FROM suite_identity_users ORDER BY id').all().map(row => ({ ...publicUser(row), ...(includePasswordHashes && row.credential ? { credential: JSON.parse(row.credential) } : {}) })),
         grants: db.prepare('SELECT * FROM suite_identity_grants ORDER BY user_id,app_id').all().map(row => ({ userId: row.user_id, appId: row.app_id, localUserId: row.local_user_id, ...(row.organization_id !== null ? { organizationId: row.organization_id } : {}) })),
-      }));
+        };
+      });
     },
     importPortable(bundle) {
       let users; let grants;
@@ -297,6 +487,9 @@ export function createIdentityStore({ databasePath, clock = Date.now }) {
         if (new Set(grants.map(grant => `${grant.appId}\0${grant.localUserId}`)).size !== grants.length) fail('invalid_import');
       } catch { fail('invalid_import'); }
       return transaction(() => {
+        // A v1 restore into an apparently empty account store can still
+        // overwrite/mix a previously verified tenant's retained audit trail.
+        if(hasNativeOrgHistory())fail('org_native_links_require_database_backup');
         if (db.prepare('SELECT COUNT(*) AS count FROM suite_identity_users').get().count > 0) fail('import_requires_empty_store');
         db.exec('DELETE FROM suite_identity_sessions; DELETE FROM suite_identity_invitations; DELETE FROM suite_identity_bootstrap;');
         for (const user of users) insertUser(user);
