@@ -26,12 +26,16 @@ function privatePath(file){
   while(!existsSync(ancestor)&&path.dirname(ancestor)!==ancestor)ancestor=path.dirname(ancestor);
   if(invalid(realpathSync(ancestor)))fail('private_path_required');
 }
-export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveSubscriptionEvidence=null,ownerAlertsOptIn=false}){
+export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveSubscriptionEvidence=null,verifyLiveBillingBindingEvidence=null,ownerAlertsOptIn=false}){
   if(typeof ownerAlertsOptIn!=='boolean')fail('invalid_owner_alerts_config');
   // Production must inject a PRIVATE verifier of live billing evidence.
   // Neither browser requests nor sk_test_/TEST observations are accepted here.
   if(verifyLiveSubscriptionEvidence!==null&&typeof verifyLiveSubscriptionEvidence!=='function')
     fail('invalid_verified_billing_adapter');
+  // Separate, explicitly injected trust boundary for pinning a Stripe customer
+  // and subscription to one Workspace tenant. A pin is never proof of payment.
+  if(verifyLiveBillingBindingEvidence!==null&&typeof verifyLiveBillingBindingEvidence!=='function')
+    fail('invalid_live_billing_binding_verifier');
   privatePath(databasePath);
   mkdirSync(path.dirname(databasePath),{recursive:true,mode:0o700});
   const db=new DatabaseSync(databasePath);
@@ -58,7 +62,10 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     "CREATE TABLE IF NOT EXISTS verified_subscription_allocations(subscription_id TEXT PRIMARY KEY,source TEXT NOT NULL CHECK(source='stripe_live'),org TEXT NOT NULL REFERENCES organizations(id),revision INTEGER NOT NULL CHECK(revision>0),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),state TEXT NOT NULL CHECK(state IN ('active','canceled')),paid_through INTEGER,updated_at INTEGER NOT NULL)",
     "CREATE TABLE IF NOT EXISTS verified_subscription_revisions(subscription_id TEXT NOT NULL REFERENCES verified_subscription_allocations(subscription_id),revision INTEGER NOT NULL CHECK(revision>0),event_key TEXT NOT NULL UNIQUE,digest TEXT NOT NULL,org TEXT NOT NULL REFERENCES organizations(id),recorded_at INTEGER NOT NULL,PRIMARY KEY(subscription_id,revision))",
     "CREATE TABLE IF NOT EXISTS owner_alert_outbox(id INTEGER PRIMARY KEY AUTOINCREMENT,audit_id INTEGER NOT NULL UNIQUE REFERENCES organization_audit(id),category TEXT NOT NULL CHECK(category IN ('organization','subscription','user','permission')),state TEXT NOT NULL CHECK(state IN ('pending','sending','sent','failed')),attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),lease_token TEXT,locked_until INTEGER,next_attempt_at INTEGER NOT NULL,sent_at INTEGER)",
-    "CREATE TABLE IF NOT EXISTS stripe_live_event_log(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,object_id TEXT NOT NULL,event_created INTEGER NOT NULL,raw_digest TEXT NOT NULL,received_at INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS stripe_live_event_log(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,object_id TEXT NOT NULL,event_created INTEGER NOT NULL,raw_digest TEXT NOT NULL,received_at INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS stripe_live_customer_pins(customer_id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),pinned_at INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS stripe_live_subscription_pins(subscription_id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),customer_id TEXT NOT NULL REFERENCES stripe_live_customer_pins(customer_id),price_id TEXT NOT NULL,plan TEXT NOT NULL CHECK(plan IN ('Single','Mixed','Bundle')),apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats BETWEEN 1 AND 10000),revision INTEGER NOT NULL CHECK(revision>0),digest TEXT NOT NULL,pinned_at INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS stripe_live_binding_revisions(subscription_id TEXT NOT NULL REFERENCES stripe_live_subscription_pins(subscription_id),revision INTEGER NOT NULL CHECK(revision>0),event_key TEXT NOT NULL UNIQUE,digest TEXT NOT NULL,recorded_at INTEGER NOT NULL,PRIMARY KEY(subscription_id,revision))"
   ].join(';')+';');
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
