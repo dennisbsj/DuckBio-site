@@ -180,7 +180,8 @@ export function createAccountService({ origin, issuer = origin, clients, identit
               'Referrer-Policy':'no-referrer'});res.end();return true;
           }
           const destination=await authorizedContentDestination({
-            contentId,viewerId:user.id,resolveResource:resolveContentResource,
+            contentId,viewerId:user.id,sessionId:parent.id,
+            identityStore,resolveResource:resolveContentResource,
             clients,organizationStore});
           if(!destination)throw new ServiceError(404,'not_found');
           res.writeHead(303,{'Location':destination,'Cache-Control':'private, no-store',
