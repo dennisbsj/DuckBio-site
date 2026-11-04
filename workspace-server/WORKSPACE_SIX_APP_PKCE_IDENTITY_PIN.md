@@ -33,6 +33,17 @@ node --test tests/shared-auth-pkce-identity-pin.test.mjs tests/shared-auth-broke
 npm test
 ```
 
+
+## Immutable client-app audience on redeploy
+
+A second replay boundary now pins `appId` in every newly minted **durable child proof**, in addition to the `clientId`. Code exchange requires the stored `record.appId` to match the exact registered `client.appId`, not merely the same client ID/secret/redirect and user mapping. Introspection, server-side native session authentication and revoke also require the stored app ID to match the currently registered client app.
+
+A swapped or reused client registration (same `clientId`, client secret, local native user/tenant and authorization revision, but a different `appId`) therefore cannot redeem an old code, transform an old app session into a session for another app or use its old proof to revoke a different app's parent session. A `getParentSession` adapter must return the **exact requested parent ID**, not a different valid session for the same Workspace subject.
+
+**Compatibility:** Existing child proofs from earlier builds do not include `appId` and are intentionally treated as inactive after updating to this version. Users with old child sessions must reauthenticate to the native apps. Prior PKCE codes without a native identity snapshot were already denied by this branch. These changes are draft-only: review coordinated session cutover, communication and rollback before any production deployment.
+
+The new tests retain one disposable SQLite auth DB while swapping trusted registered-app configuration for each of the six clients, and check code exchange, HTTP introspection, direct native backend proof validation, old stored proof rows parent-session identity mismatches, and rejected cross-app global logout while preserving a valid same-app revoke. No application native backend or customer app server is contacted.
+
 ## Release boundary
 
 Keep draft, unmerged and undeployed. #149 continues to return `null` for native broker `getAccess`. A future authoritative adapter must not infer permission from a positive #168 preflight, and security gating remains under #140 / #26.
