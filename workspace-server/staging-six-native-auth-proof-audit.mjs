@@ -185,8 +185,8 @@ if(invoked){
  const oldArgs=a.length===7&&a[6]==='--confirm-synthetic-auth-proof-inspection-only';
  const postPkce=a.length===9&&a[6]==='--snapshot'&&
   a[7]==='post-pkce'&&a[8]==='--confirm-synthetic-auth-proof-inspection-only';
- if(!oldArgs&&!postPkce||a[0]!=='--config'||a[2]!=='--sources-root'||
-    a[4]!=='--proofs'||false){
+ if((!oldArgs&&!postPkce)||a[0]!=='--config'||a[2]!=='--sources-root'||
+    a[4]!=='--proofs'){
   console.error('Usage: node staging-six-native-auth-proof-audit.mjs --config PRIVATE_JSON --sources-root PRIVATE_SEVEN_GIT_SOURCES --proofs PRIVATE_SYNTHETIC_PROOFS_JSON [--snapshot post-pkce] --confirm-synthetic-auth-proof-inspection-only');
   process.exitCode=2;
  }else{
