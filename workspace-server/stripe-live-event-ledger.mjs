@@ -1,4 +1,4 @@
-import {STRIPE_LIVE_EVENT_PREFIXES,stripeLiveReviewCategory} from './stripe-live-review-event-catalog.mjs';
+import {STRIPE_LIVE_EVENT_PREFIXES,stripeLiveReviewCategory,stripeLiveEventIdMatches} from './stripe-live-review-event-catalog.mjs';
 // Private, metadata-only persistence for events already checked by the
 // detached cryptographic Stripe LIVE webhook verifier.
 // Not a payment attestation or entitlement source.
@@ -9,8 +9,6 @@ export function createStripeLiveEventLedger({db,clock=Date.now}={}){
   fail('invalid_stripe_live_event_ledger');
  return Object.freeze({
   record(event){
-   const prefix=Object.hasOwn(STRIPE_LIVE_EVENT_PREFIXES,event?.type)
-     ?STRIPE_LIVE_EVENT_PREFIXES[event.type]:null;
    const reviewRequired=stripeLiveReviewCategory(event?.type)!==null;
    if(!event||typeof event!=='object'||Array.isArray(event)||
       event.mode!=='live'||event.licensesGranted!==false||
@@ -21,9 +19,7 @@ export function createStripeLiveEventLedger({db,clock=Date.now}={}){
         event.financialReviewRequired!==undefined&&
         event.financialReviewRequired!==false)||
       typeof event.id!=='string'||!/^evt_[A-Za-z0-9_]{4,128}$/.test(event.id)||
-      !prefix||typeof event.objectId!=='string'||
-      !event.objectId.startsWith(prefix)||
-      !/^[A-Za-z0-9_]{4,128}$/.test(event.objectId.slice(prefix.length))||
+      !stripeLiveEventIdMatches(event.type,event.objectId)||
       !Number.isSafeInteger(event.created)||event.created<1||
       typeof event.digest!=='string'||!/^[a-f0-9]{64}$/.test(event.digest))
     fail('invalid_stripe_live_event');
