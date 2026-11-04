@@ -209,7 +209,7 @@ test('refunded, disputed, uncaptured or failed charge always demands manual revi
 test('a binding revision change while Stripe responds invalidates the complete trace',async t=>{
  const f=fixture(t);
  let changed=false;
- f.hook:path=>{
+ f.hook(path=>{
   if(path==='charges/'+chargeId&&!changed){changed=true;f.revise();}
  });
  const result=await f.review.inspect(input);
