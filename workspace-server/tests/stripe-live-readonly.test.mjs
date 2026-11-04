@@ -35,8 +35,9 @@ function fixture({sub=subscription(),inv=invoice(),at=now,responseChange=respons
   const isSub=url==='https://api.stripe.com/v1/subscriptions/sub_live_ABCD1234';
   const isInvoice=url==='https://api.stripe.com/v1/invoices/in_live_ABCD1234';
   if(!isSub&&!isInvoice)throw Error('Unexpected Stripe endpoint');
-  const response={ok:true,headers:{get:()=> 'application/json; charset=utf-8'},
-   text:async()=>JSON.stringify(isSub?sub:inv)};
+  const response=new Response(JSON.stringify(isSub?sub:inv),{
+   status:200,headers:{'content-type':'application/json; charset=utf-8'}
+  });
   return responseChange(response,isSub?sub:inv);
  };
  return {calls,reader:createStripeLiveBillingReader({
@@ -172,14 +173,77 @@ test('scheduled cancellation uses the earliest effective date, never an expired 
 });
 test('Stripe lookup failures and malformed responses fail closed without returning data',async()=>{
  for(const change of [
-  response=>({...response,ok:false}),
-  response=>({...response,headers:{get:()=> 'text/html'}}),
-  response=>({...response,text:async()=> 'not-json'}),
-  response=>({...response,text:async()=> 'x'.repeat(131073)}),
+  ()=>new Response('Unavailable',{status:503,
+   headers:{'content-type':'application/json'}}),
+  ()=>new Response('{}',{headers:{'content-type':'text/html'}}),
+  ()=>new Response('not-json',{headers:{'content-type':'application/json'}}),
+  ()=>new Response('x'.repeat(131073),{headers:{'content-type':'application/json'}}),
  ]){
   const f=fixture({responseChange:change});
   await assert.rejects(()=>f.reader.inspect(binding()),
    /Stripe LIVE lookup unavailable|Malformed Stripe LIVE response|Stripe LIVE response exceeds safe limit/);
   assert.equal(f.calls.length,1);
  }
+});
+
+test('Stripe LIVE reader accepts exactly 131072 UTF-8 bytes without seat authorization',async()=>{
+ const empty=JSON.stringify({...subscription(),padding:''});
+ const body=JSON.stringify({...subscription(),padding:'x'.repeat(131072-Buffer.byteLength(empty))});
+ assert.equal(Buffer.byteLength(body),131072);
+ const f=fixture({responseChange:(response,resource)=>
+  resource.object==='subscription'?new Response(body,{
+   headers:{'content-type':'application/json','content-length':'131072'}
+  }):response});
+ const out=await f.reader.inspect(binding());
+ assert.equal(out.state,'candidate_for_manual_review');
+ assert.equal(out.licensesGranted,false);
+ assert.equal(out.authorizesSeatChanges,false);
+});
+
+test('Stripe LIVE rejects misleading Content-Length and cancels oversized stream promptly',async()=>{
+ for(const length of ['131073','000123','-1','NaN','18446744073709551616']){
+  const g=fixture({responseChange:()=>new Response(JSON.stringify(subscription()),{
+   headers:{'content-type':'application/json','content-length':length}
+  })});
+  await assert.rejects(()=>g.reader.inspect(binding()),/exceeds safe limit/);
+  assert.equal(g.calls.length,1);
+ }
+ let pulls=0,canceled=false;
+ const stream=new ReadableStream({
+  pull(controller){pulls++;controller.enqueue(new Uint8Array(65536));},
+  cancel(){canceled=true;}
+ },{highWaterMark:0});
+ const g=fixture({responseChange:()=>new Response(stream,{
+  headers:{'content-type':'application/json','content-length':'2'}
+ })});
+ await assert.rejects(()=>g.reader.inspect(binding()),/exceeds safe limit/);
+ assert.equal(g.calls.length,1);
+ assert.equal(pulls,3);
+ assert.equal(canceled,true);
+});
+
+test('UTF-8 bytes and truncated or malformed upstream data fail closed',async()=>{
+ const body=JSON.stringify({...subscription(),padding:'🦆'.repeat(32769)});
+ assert(body.length<131072);
+ assert(Buffer.byteLength(body)>131072);
+ const values=[body,new Uint8Array([123,34,120,34,58,34,195,40,34,125]),
+  '', '{"livemode":true'];
+ for(const value of values){
+  const f=fixture({responseChange:()=>new Response(value,{
+   headers:{'content-type':'application/json'}
+  })});
+  await assert.rejects(()=>f.reader.inspect(binding()),/exceeds safe limit|Malformed/);
+  assert.equal(f.calls.length,1);
+ }
+});
+
+test('interrupted Stripe LIVE streaming body cannot return a positive result',async()=>{
+ const stream=new ReadableStream({
+  pull(controller){controller.error(Error('upstream connection lost'));}
+ });
+ const f=fixture({responseChange:()=>new Response(stream,{
+  headers:{'content-type':'application/json'}
+ })});
+ await assert.rejects(()=>f.reader.inspect(binding()),/upstream connection lost/);
+ assert.equal(f.calls.length,1);
 });
