@@ -212,3 +212,24 @@ test('suspension between code issuance and exchange denies even when identity re
   assert.deepEqual(result, { status: 401, data: { error: 'invalid_grant' } });
   assert.equal(f.codeWrites(), 0);
 });
+
+test('legacy single-tenant local identity stays compatible until its native tenant changes', async t => {
+  const f = await fixture(t);
+  for (const appId of APP_IDS) {
+    const userId = 'legacy-' + appId + '-user';
+    f.setGrant(appId, { userId });
+    const ticket = await f.authorize(appId);
+    const successful = await f.exchange(appId, ticket);
+    assert.equal(successful.status, 200, appId);
+    assert.deepEqual(successful.data.localIdentity, { userId });
+    assert.equal((await f.introspect(appId, successful.data.sessionToken)).data.active, true);
+    const beforeTenantBinding = await f.authorize(appId);
+    f.setGrant(appId, { userId, organizationId: 'new-native-tenant' });
+    assert.deepEqual(await f.exchange(appId, beforeTenantBinding), {
+      status: 401, data: { error: 'invalid_grant' },
+    }, appId + ' newly introduced native tenant invalidates outstanding code');
+    assert.deepEqual((await f.introspect(appId, successful.data.sessionToken)).data, {
+      active: false,
+    }, appId + ' outstanding proof cannot survive a changed local identity');
+  }
+});
