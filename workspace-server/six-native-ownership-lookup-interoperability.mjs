@@ -206,7 +206,7 @@ export async function rehearseSixNativeLookupFactories({
   return result(false,'invalid_native_lookup_matrix');
  const root=mkdtempSync(join(tmpdir(),'duckbio-six-native-lookups-'));
  chmodSync(root,0o700);
- const checks=[],lookups=new Map();
+ const checks=[],lookups=new Map(),syntheticControls=new Map();
  try{
   for(const row of SIX_NATIVE_LOOKUP_MODULES){
    const factory=factories.get(row.id);
@@ -224,6 +224,13 @@ export async function rehearseSixNativeLookupFactories({
      throw Error('invalid_lookup');
    }catch{return result(false,'invalid_'+row.id+'_native_lookup',checks)}
    lookups.set(row.id,fixture.lookup);
+   // Controls only disposable native DBs while the TLS rehearsal is active.
+   syntheticControls.set(row.id,Object.freeze({
+    revoke:fixture.revoke,restore:fixture.restore,
+    expire:fixture.expire,unexpire:fixture.unexpire,
+    removeAccount:fixture.removeAccount,restoreAccount:fixture.restoreAccount,
+    duplicate:fixture.duplicate,unduplicate:fixture.unduplicate
+   }));
    try{
     for(const purpose of ['inspect','bind','migrate']){
      if(!sameProof(await fixture.lookup(input(row.id,purpose))))
@@ -269,7 +276,7 @@ export async function rehearseSixNativeLookupFactories({
   // and the central Workspace Ed25519 verifier, in the SAME offline flow.
   if(onVerifiedLookups){
    let linked;
-   try{linked=await onVerifiedLookups(lookups)}
+   try{linked=await onVerifiedLookups(lookups,syntheticControls)}
    catch{return result(false,'signed_native_lookup_chain_failed',checks)}
    if(!linked||linked.ok!==true||linked.deploymentAuthorized!==false||
       !Array.isArray(linked.checks)||linked.checks.length!==6)
