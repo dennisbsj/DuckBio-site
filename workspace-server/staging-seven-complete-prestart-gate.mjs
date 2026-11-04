@@ -29,7 +29,7 @@ export function auditSevenCompleteUninstalledPrestart({
  sourceGate=auditSevenLocalSources
 }={}){
  const checks=[];
- if(!['current','post-pkce'].includes(validateSixNativeStagingSnapshot(lock).kind))
+ if(!['current','post-pkce','ownership-mtls'].includes(validateSixNativeStagingSnapshot(lock).kind))
   return stop('current-six-native-qa-lock-required',checks);
  let native;
  try{
@@ -84,15 +84,15 @@ if(direct){
   '--proxy-plan-root','--native-plan-root'];
  const prior=args.length===11&&args[10]==='--confirm-offline-seven-uninstalled-only';
  const newer=args.length===13&&args[10]==='--snapshot'&&
-  args[11]==='post-pkce'&&args[12]==='--confirm-offline-seven-uninstalled-only';
+  ['post-pkce','ownership-mtls'].includes(args[11])&&args[12]==='--confirm-offline-seven-uninstalled-only';
  if((!prior&&!newer)||!expected.every((flag,i)=>args[i*2]===flag)){
-  console.error('Usage: node staging-seven-complete-prestart-gate.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_GIT_CHECKOUTS --private-data-root PRIVATE_NATIVE_ROOT --proxy-plan-root PRIVATE_PROXY_ROOT --native-plan-root PRIVATE_UNIT_ROOT [--snapshot post-pkce] --confirm-offline-seven-uninstalled-only');
+  console.error('Usage: node staging-seven-complete-prestart-gate.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_GIT_CHECKOUTS --private-data-root PRIVATE_NATIVE_ROOT --proxy-plan-root PRIVATE_PROXY_ROOT --native-plan-root PRIVATE_UNIT_ROOT [--snapshot post-pkce|ownership-mtls] --confirm-offline-seven-uninstalled-only');
   process.exitCode=2;
  }else{
   try{
    const config=readPrivateConfiguration(args[1]);
    const lock=JSON.parse(readFileSync(new URL(
-    './'+stagingSnapshotFile(newer?'post-pkce':'current'),import.meta.url),'utf8'));
+    './'+stagingSnapshotFile(newer?args[11]:'current'),import.meta.url),'utf8'));
    const result=auditSevenCompleteUninstalledPrestart({
     config,lock,sourcesRoot:args[3],dataRoot:args[5],
     proxyOutputRoot:args[7],nativeOutputRoot:args[9]
