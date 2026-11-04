@@ -56,7 +56,7 @@ async function serverFixture(t,{organizationMode=false}={}){
  }else broker=createAuthBroker({origin,issuer:'https://sso.example.test',
   clients:[client],identity:createLocalIdentityAdapter({store,origin}),
   store:createMemoryBrokerStore(),clock:()=>NOW});
- t.after(async()=>{await new Promise(resolve=>server.close(resolve));
+ t.after(async()=>{server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));
   auth?.close();org?.close();store.close();rmSync(root,{recursive:true,force:true})});
  const cookies=new Map();
  let csrf=null;
@@ -69,7 +69,7 @@ async function serverFixture(t,{organizationMode=false}={}){
    if(csrf)headers['X-CSRF-Token']=csrf;
   }
   const response=await fetch(origin+'/api/suite/'+route,{
-   method:body===undefined?'GET':'POST',headers,
+   method:body===undefined?'GET':'POST',headers,signal:AbortSignal.timeout(15000),
    ...(body===undefined?{}:{body:JSON.stringify(body)})
   });
   if(!serverAuth)for(const header of response.headers.getSetCookie()){
