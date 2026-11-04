@@ -61,7 +61,7 @@ function trustedPost(origin,path,ca,secret,payload){
   req.on('error',reject);req.end(jsonBody);
  });
 }
-async function fixture(t){
+async function fixture(t,{standalone=false}={}){
  const dir=mkdtempSync(join(tmpdir(),'duckbio-two-https-'));
  const tls=ephemeralTLS(dir);
  const ids=createIdentityStore({databasePath:join(dir,'identity.sqlite')});
@@ -197,7 +197,8 @@ async function fixture(t){
  client.nativeOrigin=nativeOrigin;
  client.redirectUris=[nativeOrigin+'/auth/callback'];
  service=createAccountService({origin:workspace,issuer:workspace,clients:[client],
-  identityStore:ids,authStore:auth.brokerStore,organizationStore:org,
+  identityStore:ids,authStore:auth.brokerStore,
+  organizationStore:standalone?null:org,
   communicationsStore:messages,ownerAccountId:owner.id,
   assetRoot:fileURLToPath(new URL('../private-ui/',import.meta.url)),
   getClientAddress:req=>req.socket.remoteAddress});
@@ -217,7 +218,7 @@ async function fixture(t){
  return {page,context,workspace,nativeOrigin,org,owner,member,client,
   callbackRequests,requests,nativeName};
 }
-test('real Chromium HTTPS cross-site callback preserves Strict native cookie and private child proof',{timeout:90000},async t=>{
+test('real Chromium HTTPS cross-site org-mode Connect denies legacy grants without child proof',{timeout:60000},async t=>{
  const f=await fixture(t);
  await f.page.goto(f.nativeOrigin+'/native-login');
  await f.page.waitForURL(f.nativeOrigin+'/');
@@ -234,37 +235,66 @@ test('real Chromium HTTPS cross-site callback preserves Strict native cookie and
  await f.page.locator('#email').fill('worker@example.test');
  await f.page.locator('#password').fill('Worker synthetic password 123456');
  await f.page.getByRole('button',{name:'Sign in and continue'}).click();
- await f.page.waitForURL(f.nativeOrigin+'/?result=connected');
- assert.equal(f.callbackRequests.length,1);
- assert(!f.callbackRequests[0].cookie.includes(f.nativeName+'='),
-  'SameSite=Strict cookie MUST NOT accompany cross-site callback GET');
- assert.equal(f.callbackRequests[0].referer,'','callback code must not be a Referer');
- assert.deepEqual(f.callbackRequests[0].params.sort(),['code','state']);
- assert.deepEqual(await(await f.page.request.get(f.nativeOrigin+'/api/status')).json(),{linked:true});
- assert.deepEqual(await(await f.page.request.get(f.nativeOrigin+'/api/unread')).json(),
-  {counts:{chat:1,mail:1,notifications:0}});
- assert(!f.requests.some(url=>url.includes('/api/suite/auth/exchange')||
-   url.includes('/api/suite/native/communications/unread')),
-  'browser must never receive Basic client secret or child proof');
+ await f.page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('could not be authorized'));
+ assert(f.page.url().startsWith(f.workspace+'/connect?'),
+  'legacy grant cannot trigger native HTTPS callback even when IDs match');
+ assert.equal(f.callbackRequests.length,0);
  const centralCookie=(await f.context.cookies(f.workspace))
   .find(row=>row.name.includes('suite_identity'));
  assert(centralCookie?.httpOnly&&centralCookie?.secure);
  assert(!(await f.context.cookies(f.nativeOrigin))
   .some(row=>row.name.includes('suite_identity')));
- await f.page.goto(f.nativeOrigin+'/auth/callback?code='+token()+'&state='+token());
- await f.page.waitForURL(f.nativeOrigin+'/?result=error');
- assert.deepEqual(await(await f.page.request.get(f.nativeOrigin+'/api/status')).json(),{linked:true},
-  'invalid callback cannot revoke a legitimate linked session');
- f.org.saveMember({organizationId:'lab-a',actorId:f.owner.id,member:f.member({})});
+ // The local native login still works; its independent session was neither
+ // promoted into a Workspace child proof nor revoked by denied central SSO.
+ assert.deepEqual(await(await f.page.request.get(f.nativeOrigin+'/api/status')).json(),
+  {linked:false});
  assert.equal((await f.page.request.get(f.nativeOrigin+'/api/unread')).status(),409,
-  'revoked native role hides unread instead of fabricating zero');
- const result=await f.page.evaluate(async()=>{
-  const res=await fetch('/api/unlink',{method:'POST',
-   headers:{'Content-Type':'application/json'},body:'{}'});return res.json();
+  'native route cannot mistake an old global mapping for a child proof');
+ await f.page.goto(f.nativeOrigin+'/native-login');
+ await f.page.waitForURL(f.nativeOrigin+'/');
+ const unlinked=await f.page.evaluate(async()=>{
+  const r=await fetch('/api/unlink',{method:'POST',
+   headers:{'Content-Type':'application/json'},body:'{}'});
+  return r.json();
  });
- assert.deepEqual(result,{linked:false});
- assert.equal((await f.page.request.get(f.nativeOrigin+'/api/unread')).status(),409);
- const central=await f.page.request.get(f.workspace+'/api/suite/auth/session');
- assert.equal((await central.json()).authenticated,true,
-  'native child unlink MUST NOT sign out the central Workspace parent');
+ assert.deepEqual(unlinked,{linked:false});
+ assert.deepEqual(await(await f.page.request.get(f.nativeOrigin+'/api/status')).json(),
+  {linked:false});
+});
+
+test('standalone native HTTPS browser login still completes exact PKCE callback and child-only unlink',{timeout:90000},async t=>{
+ const f=await fixture(t,{standalone:true});
+ await f.page.goto(f.nativeOrigin+'/native-login');
+ await f.page.waitForURL(f.nativeOrigin+'/');
+ const nativeCookie=(await f.context.cookies(f.nativeOrigin))
+  .find(row=>row.name===f.nativeName);
+ assert(nativeCookie?.httpOnly&&nativeCookie?.secure);
+ assert.equal(nativeCookie.sameSite,'Strict');
+ await f.page.locator('#connect').click();
+ await f.page.waitForURL(u=>u.origin===f.workspace&&u.pathname==='/connect');
+ await f.page.locator('#login:not([hidden])').waitFor();
+ await f.page.locator('#email').fill('worker@example.test');
+ await f.page.locator('#password').fill('Worker synthetic password 123456');
+ await f.page.getByRole('button',{name:'Sign in and continue'}).click();
+ await f.page.waitForURL(f.nativeOrigin+'/?result=connected');
+ assert.equal(f.callbackRequests.length,1);
+ assert(!f.callbackRequests[0].cookie.includes(f.nativeName+'='),
+  'Strict native cookie must NOT cross an external first-party SSO callback');
+ assert.equal(f.callbackRequests[0].referer,'');
+ assert.deepEqual(f.callbackRequests[0].params.sort(),['code','state']);
+ assert.deepEqual(await(await f.page.request.get(f.nativeOrigin+'/api/status')).json(),
+  {linked:true});
+ // Native resource APIs independently enforce authorization. A child identity
+ // proof is not a Workspace entitlement or a license for scientific operations.
+ const child=await f.page.evaluate(async()=>{
+  const r=await fetch('/api/unlink',{method:'POST',
+   headers:{'Content-Type':'application/json'},body:'{}'});
+  return r.json();
+ });
+ assert.deepEqual(child,{linked:false});
+ assert.deepEqual(await(await f.page.request.get(f.nativeOrigin+'/api/status')).json(),
+  {linked:false});
+ const session=await f.page.request.get(f.workspace+'/api/suite/auth/session');
+ assert.equal((await session.json()).authenticated,true,
+  'child-only unlink must keep standalone parent session active');
 });

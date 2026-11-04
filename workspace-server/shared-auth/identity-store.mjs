@@ -144,6 +144,31 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
       recorded_at INTEGER NOT NULL
     );
   `);
+  // First-time migration: create an independent monotonic legacy grant
+  // generation table AND seed existing grants in one IMMEDIATE transaction.
+  // A second process rechecks table existence after the write lock.
+  // Once created, missing/corrupted records are NEVER backfilled on restart.
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const versionTableExists=Boolean(db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='suite_identity_grant_versions'"
+    ).get());
+    if(!versionTableExists) {
+      db.exec(`CREATE TABLE suite_identity_grant_versions (
+        user_id TEXT NOT NULL,
+        app_id TEXT NOT NULL,
+        revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991),
+        PRIMARY KEY(user_id,app_id)
+      )`);
+      db.prepare(`INSERT INTO suite_identity_grant_versions(user_id,app_id,revision)
+        SELECT user_id,app_id,1 FROM suite_identity_grants`).run();
+    }
+    db.exec('COMMIT');
+  } catch(error) {
+    db.exec('ROLLBACK');
+    db.close();
+    throw error;
+  }
   function privateFiles() {
     for (const suffix of ['', '-wal', '-shm']) {
       try { chmodSync(databasePath + suffix, 0o600); } catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -169,10 +194,24 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
     db.prepare('INSERT INTO suite_identity_users(id,email,display_name,state,role,credential,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)').run(id, email, name, state, role, credential ? JSON.stringify(credential) : null, createdAt, updatedAt);
     return publicUser(userRow(id));
   }
+  function advanceGlobalGrantRevision(userId,appId) {
+    const revision=db.prepare(`INSERT INTO suite_identity_grant_versions(user_id,app_id,revision)
+      VALUES(?,?,1) ON CONFLICT(user_id,app_id) DO UPDATE SET
+        revision=revision+1 RETURNING revision`).get(userId,appId)?.revision;
+    if(!Number.isSafeInteger(revision)||revision<1)fail('invalid_grant_revision');
+    return revision;
+  }
   function grantAccess(userId, input) {
     requireUser(userId);
     const grant = grantValue(input);
     if (db.prepare('SELECT user_id FROM suite_identity_grants WHERE app_id=? AND local_user_id=? AND user_id<>?').get(grant.appId, grant.localUserId, userId)) fail('mapping_already_linked');
+    const exists=Boolean(db.prepare('SELECT 1 FROM suite_identity_grants WHERE user_id=? AND app_id=?').get(userId,grant.appId));
+    const old=db.prepare('SELECT revision FROM suite_identity_grant_versions WHERE user_id=? AND app_id=?')
+      .get(userId,grant.appId);
+    // A live row without a durable generation is corrupted, not "new".
+    if(exists&&(!old||!Number.isSafeInteger(old.revision)||old.revision<1))
+      fail('invalid_grant_revision');
+    advanceGlobalGrantRevision(userId,grant.appId);
     db.prepare('INSERT INTO suite_identity_grants(user_id,app_id,local_user_id,organization_id) VALUES(?,?,?,?) ON CONFLICT(user_id,app_id) DO UPDATE SET local_user_id=excluded.local_user_id,organization_id=excluded.organization_id').run(userId, grant.appId, grant.localUserId, grant.organizationId ?? null);
   }
   // These private functions never return a login/authorization grant and
@@ -403,14 +442,42 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
     },
     grantAppAccess({ userId, ...grant }) { return transaction(() => grantAccess(userId, grant)); },
     getAccess(userId, appId) {
-      const row = db.prepare("SELECT g.* FROM suite_identity_grants g JOIN suite_identity_users u ON u.id=g.user_id WHERE g.user_id=? AND g.app_id=? AND u.state='active'").get(userId, appId);
-      return row ? { localIdentity: { userId: row.local_user_id, ...(row.organization_id !== null ? { organizationId: row.organization_id } : {}) } } : null;
+      // Backwards-compatible direct native mapping view for trusted standalone
+      // administration. No revision exposed in this existing public API.
+      const record=this.getAccessWithRevision(userId,appId);
+      return record?{localIdentity:record.localIdentity}:null;
+    },
+    getAccessWithRevision(userId,appId) {
+      const row = db.prepare(`SELECT g.*,v.revision AS grant_revision
+        FROM suite_identity_grants g
+        JOIN suite_identity_grant_versions v
+          ON v.user_id=g.user_id AND v.app_id=g.app_id
+        JOIN suite_identity_users u ON u.id=g.user_id
+        WHERE g.user_id=? AND g.app_id=? AND u.state='active'`)
+        .get(userId,appId);
+      if(!row||!Number.isSafeInteger(row.grant_revision)||
+         row.grant_revision<1)return null;
+      return {localIdentity:{
+        userId:row.local_user_id,
+        ...(row.organization_id!==null?{organizationId:row.organization_id}:{})
+      },bindingRevision:'legacy-global:'+row.grant_revision};
     },
     listAppGrants(userId) {
       requireUser(userId);
       return db.prepare('SELECT * FROM suite_identity_grants WHERE user_id=? ORDER BY app_id').all(userId).map(row => ({ appId: row.app_id, localUserId: row.local_user_id, ...(row.organization_id !== null ? { organizationId: row.organization_id } : {}) }));
     },
-    revokeAppAccess(userId, appId) { db.prepare('DELETE FROM suite_identity_grants WHERE user_id=? AND app_id=?').run(userId, appId); },
+    revokeAppAccess(userId, appId) {
+      return transaction(()=>{
+        const old=db.prepare('SELECT 1 FROM suite_identity_grants WHERE user_id=? AND app_id=?')
+          .get(userId,appId);
+        if(!old)return;
+        const revision=db.prepare('SELECT revision FROM suite_identity_grant_versions WHERE user_id=? AND app_id=?')
+          .get(userId,appId)?.revision;
+        if(!Number.isSafeInteger(revision)||revision<1)fail('invalid_grant_revision');
+        advanceGlobalGrantRevision(userId,appId);
+        db.prepare('DELETE FROM suite_identity_grants WHERE user_id=? AND app_id=?').run(userId,appId);
+      });
+    },
     configureBootstrapToken(token, { expiresAt = clock() + 24 * 60 * 60_000 } = {}) {
       if (typeof token !== 'string' || !tokenPattern.test(token) || !Number.isSafeInteger(expiresAt) || expiresAt <= clock() || expiresAt > clock() + 7 * 24 * 60 * 60_000) fail('invalid_setup_token');
       return transaction(() => {
@@ -508,7 +575,7 @@ function appendCookie(res, value) {
 
 /** Browser-session adapter for the portable local accounts. Origin checking here
  * supplements the broker's CSRF checks; it never replaces them. */
-export function createLocalIdentityAdapter({ store, origin, sessionTtlMs = 8 * 60 * 60_000, rememberedSessionTtlMs = 14 * 24 * 60 * 60_000 }) {
+export function createLocalIdentityAdapter({ store, origin, organizationStore = null, sessionTtlMs = 8 * 60 * 60_000, rememberedSessionTtlMs = 14 * 24 * 60 * 60_000 }) {
   const url = new URL(origin);
   const development = url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
   if (url.origin !== origin || (!development && url.protocol !== 'https:') || url.username || url.password) throw new Error('A secure local identity origin is required');
@@ -547,7 +614,14 @@ export function createLocalIdentityAdapter({ store, origin, sessionTtlMs = 8 * 6
     async getParentSession(id) { return store.getParentSession(id); },
     async getAccess(parent, appId) {
       const current = store.getParentSession(parent.id);
-      return current && current.subject === parent.subject ? store.getAccess(current.subject, appId) : null;
+      if(!current||current.subject!==parent.subject)return null;
+      // Legacy GLOBAL app grants have no tenant, verified paid-seat policy or
+      // native ownership proof. They must NEVER authorize organization SSO.
+      // The reviewed native broker adapter is currently deny-only; do not
+      // invent a route around it. Standalone mode remains fully supported.
+      if(organizationStore!==null)return null;
+      return typeof store.getAccessWithRevision==='function'
+        ?store.getAccessWithRevision(current.subject,appId):null;
     },
     async logout(parentSessionId) { store.revokeSession(parentSessionId); },
     clearCookie(res) { appendCookie(res, `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${development ? '' : '; Secure'}`); },

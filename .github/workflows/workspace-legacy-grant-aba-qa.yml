@@ -1,0 +1,34 @@
+name: Workspace legacy grant ABA and org-mode trust QA (offline)
+on:
+  pull_request:
+    paths:
+      - 'workspace-server/shared-auth/identity-store.mjs'
+      - 'workspace-server/shared-auth/account-service.mjs'
+      - 'workspace-server/tests/shared-auth-legacy-grant-generation.test.mjs'
+      - '.github/workflows/workspace-legacy-grant-aba-qa.yml'
+permissions:
+  contents: read
+jobs:
+  legacy-global-grant-epoch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Verify source and focused security tests
+        working-directory: workspace-server
+        run: |
+          node --check shared-auth/identity-store.mjs
+          node --check shared-auth/account-service.mjs
+          node --check tests/shared-auth-legacy-grant-generation.test.mjs
+          node --test tests/shared-auth-legacy-grant-generation.test.mjs
+      - name: Release isolation
+        run: echo "SOURCE-ONLY tests, private synthetic data, no live native grant or production service"
