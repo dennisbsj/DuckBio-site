@@ -1143,6 +1143,16 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       if(!safeId(organizationId)||!safeId(accountId)||!byId.has(appId)||
          typeof permission!=='string'||!byId.get(appId).permissions.includes(permission))
         return null;
+      // A native candidate reads membership, seat capacity, paid period and
+      // effective permissions across multiple SQLite SELECT statements. A
+      // second Workspace connection can commit a revoke/regrant in between.
+      // Record a monotonic audit barrier before the first policy read and
+      // refuse any mixed-epoch result even when the final values match.
+      const startingAuditRevision=db.prepare(
+        'SELECT MAX(id) AS revision FROM organization_audit WHERE org=?'
+      ).get(organizationId)?.revision;
+      if(!Number.isSafeInteger(startingAuditRevision)||
+         startingAuditRevision<1)return null;
       const member=db.prepare('SELECT a.role FROM assignments a JOIN members m ON m.org=a.org AND m.account=a.account WHERE a.org=? AND a.account=? AND a.app=? AND m.active=1')
         .get(organizationId,accountId,appId);
       if(!member)return null;
@@ -1175,7 +1185,8 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         'SELECT MAX(id) AS revision FROM organization_audit WHERE org=?'
       ).get(organizationId)?.revision;
       if(!Number.isSafeInteger(authorizationAuditRevision)||
-         authorizationAuditRevision<1)return null;
+         authorizationAuditRevision<1||
+         authorizationAuditRevision!==startingAuditRevision)return null;
       return Object.freeze({organizationId,accountId,appId,
         role:member.role,permission,verifiedPaidThroughMs:earliestPaidThrough*1000,
         authorizationAuditRevision,
