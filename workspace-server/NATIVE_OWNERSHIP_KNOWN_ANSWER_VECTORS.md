@@ -1,26 +1,34 @@
-# Public v1 Ed25519 native ownership known-answer vectors (offline QA only)
+# Six independent Ed25519 native ownership known-answer vectors (offline QA only)
 
-The source-only Workspace verifier and the six native signers normally generate
-signed proofs during each test. If both implementations share an incorrect
-serializer, such mutually generated test signatures can still validate. This
-fixture pins **independently generated, fixed Ed25519 answers** to detect a
-silent wire-format regression, and allows native owners to compare their own
-byte encoding with Workspace without using a running service.
+The source-only Workspace verifier and native signers ordinarily generate both
+signatures and expected proofs dynamically inside a test. If two implementations
+share a broken serializer, their roundtrip tests may both pass. This source
+fixture fixes **external, independently signed cryptographic answers** to catch
+wire-format drift without requiring deployed native apps or test private keys.
 
 - Fixture: `tests/fixtures/native-ownership-v1-known-answer.json`
 - Test: `tests/native-ownership-known-answer-vectors.test.mjs`
 - Protocol: `SIGNED_NATIVE_OWNERSHIP_PROTOCOL.md`
-- Scope: three synthetic messages: `inspect` / GoFlo, `bind` /
-  DuckNote, `migrate` / DuckMan. These are **not** privileged app grants.
-- All fixture fields, signatures and canonical strings are static. A temporary
-  Ed25519 key was generated **outside the repo** and the signing private key
-  discarded. Only its public key and signatures are committed.
+- Six distinct synthetic applications and **six distinct Ed25519 public keys**:
+  `limsman` (LabDuck), `eel` (DuckNote), `methpipe` (DuckPipe),
+  `mantrain` (DuckTrain), `duckman` (DuckMan), `goflo` (CytoDuck).
+- Two fixed examples of each proof purpose: `inspect`, `bind`, `migrate`.
+  These examples **do not grant app permissions, accounts, roles or licenses**.
+- Generation: the public fixture was created by Python's `cryptography`
+  Ed25519 implementation and canonical JSON encoding. The **six transient
+  test-only signing private keys were not committed or stored**; the repository
+  contains only SPKI public keys, static signed answers and expected UTF-8.
+- The test independently checks six positive signatures, all 30 cross-app
+  wrong-key combinations, all 78 single-field signed-message changes,
+  JSON object-property reordering and the explicit canonical byte strings.
 
 ## Independent native-language check
 
-1. Load one `vectors[].proof` without changing types: timestamps are integer
-   epoch milliseconds, booleans are JSON booleans and identifiers are strings.
-2. Serialize **this exact ordered array**, with compact JSON (no spaces):
+For **each** `vectors[]` entry:
+
+1. Read `proof`. Preserve field values and types: timestamp fields are integer
+   epoch milliseconds; `active` and `ownershipVerified` are JSON booleans.
+2. Serialize exactly this ordered array using compact JSON (no whitespace):
 
    ```text
    [version, keyId, purpose, nonce, appId, workspaceAccountId,
@@ -28,37 +36,42 @@ byte encoding with Workspace without using a running service.
     issuedAt, expiresAt, active, ownershipVerified]
    ```
 
-3. Encode to UTF-8. Compare **exactly** against `canonicalUtf8` in the
-   fixture, including punctuation, escaping and number representation.
-4. Decode `signatureBase64url` as unpadded base64url (64 signature bytes).
-   Verify Ed25519 over the **canonical UTF-8 bytes**, with the fixture
-   `publicKeyPem` (SPKI) public key. It must verify for every fixture.
-5. Change any one signed field and repeat: the static signature MUST fail.
-   Reorder fields in the **original JSON object**: the canonical array and
-   signature MUST remain unchanged.
-6. Do not sign an object serialization; JSON object keys are not part of the
-   specified canonical signing representation. The test explicitly denies it.
+3. Convert the result to UTF-8 and compare byte-for-byte with the literal
+   `canonicalUtf8` value; do not sign the object serialization or alphabetize
+   fields. The v1 format follows ECMAScript `JSON.stringify` for array values.
+4. Decode the fixture's unpadded `signatureBase64url` as **64 bytes** and verify
+   Ed25519 over those UTF-8 bytes using
+   `publicKeys[proof.appId]` (PEM/SPKI); all six must verify.
+5. Verify with **every other app's fixture public key** instead; all 30
+   cross-app checks must fail. A second app cannot inherit another app's signer.
+6. Change any of the 13 tuple values without re-signing: each static signature
+   must fail. Reordering the original **JSON object**'s properties must *not*
+   affect the ordered-array canonical bytes or signature.
 
-The fixture's nonce is deliberately predictable and its proof timestamps are
-fixed. **Neither is suitable for a real challenge.** Production Workspace must
-generate a new unpredictable 32-byte nonce for each request, match it exactly,
-and apply real proof TTL, pinned per-app signer and rotation windows, a
-private authenticated HTTPS connection, native account/tenant validation and
-all separate central role, session and verified-live billing gates.
+The fixed nonce bytes are intentionally predictable, and the timestamps are
+deliberately old/preset: these are cryptographic known-answer examples, **not
+fresh proof requests**. Production Workspace must generate an unpredictable
+32-byte challenge each time; enforce exact nonce matching, strict proof TTL,
+independently pinned per-app current signing keys, private mTLS + bearer, an
+independent authoritative native ownership lookup, current central session,
+permissions, paid LIVE app seat and per-resource native authorization.
 
-**Never configure the fixture public key as an actual app pin.** The fixture
-uses one synthetic public key for three *isolated* protocol examples; actual
-multi-app configuration rejects shared signing key material across apps.
-Never reuse the known challenge or create a live identity mapping from it.
+**Never install any fixture public key as a native production pin.** Public
+fixture keys cannot serve as evidence of native identity or ownership. Never
+reuse a known nonce, public key, certificate or synthetic account ID to create
+an actual native identity link. DataDuck remains outside this six-app contract.
 
-## Validation and release boundary
+## Verification and release boundary
 
-Run `cd workspace-server && node --test tests/native-ownership-known-answer-vectors.test.mjs`.
-The regular `npm test` command also discovers the test.
+```sh
+cd workspace-server
+node --test tests/native-ownership-known-answer-vectors.test.mjs
+npm test
+```
 
-This is offline source-contract QA only. It does not run the genuine native
-servers, attest real native ownership, enable the inactive broker or provide
-valid production SSO, paid seats, scientific record access, or DataDuck
-integration. It changes no existing native repository or active routes.
-Keep this draft stacked on the current six-app mTLS rehearsal; require native
-owner review and the documented full release gates before merge/deployment.
+The fixture and test are offline, public, source-contract QA. They do not run
+private native apps, real PostgreSQL, real Stripe, deployed mTLS services or
+the active SSO broker. They change no native repository and cannot create
+license/access/login grants. Maintain this as a **draft, unmerged and
+undeployed** stacked on the reviewed six-app mTLS rehearsal; require native
+owner validation and the entire #140 / #26 release matrix before any activation.
