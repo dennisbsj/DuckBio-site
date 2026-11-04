@@ -278,3 +278,47 @@ test('two concurrent real administrators stay isolated between Workspace organiz
  assert.notEqual(aLink.nativeUserId,bLink.nativeUserId);
  assert.equal(f.identity.getAccess(f.userIds.member,appId),null);
 });
+
+
+test('organization admin demotion WHILE a valid native signature is prepared denies link and audit',async t=>{
+ const f=await fixture(t);
+ // Make a second real active alpha admin so removal of the original
+ // admin does not violate the last-admin safety invariant.
+ f.org.saveMember({organizationId:'alpha',actorId:f.userIds.ownerA,
+  member:{accountId:f.userIds.ownerB,name:'ownerB',nickname:'ownerB',
+   email:'ownerB@example.test',admin:true,roles:{}}});
+ f.duringNative(request=>{
+  assert.equal(request.workspaceOrganizationId,'alpha');
+  f.org.saveMember({organizationId:'alpha',actorId:f.userIds.ownerB,
+   member:{accountId:f.userIds.ownerA,name:'ownerA',nickname:'ownerA',
+    email:'ownerA@example.test',admin:false,roles:{}}});
+ });
+ await assert.rejects(f.controller.bind(f.input()),
+  /native_ownership_unverified/);
+ assert.equal(f.nativeRequests(),1);
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
+ }),null);
+ assert.deepEqual(f.identity.orgNativeLinkAudit({
+  appId,workspaceOrganizationId:'alpha'
+ }),[]);
+});
+
+test('target workspace.view permission revoked DURING signed ownership verification denies bind',async t=>{
+ const f=await fixture(t);
+ f.duringNative(request=>{
+  assert.equal(request.workspaceOrganizationId,'alpha');
+  f.org.setPermission({organizationId:'alpha',
+   actorId:f.userIds.ownerA,accountId:f.userIds.member,
+   appId,permission:'workspace.view',enabled:false});
+ });
+ await assert.rejects(f.controller.bind(f.input()),
+  /native_ownership_unverified/);
+ assert.equal(f.nativeRequests(),1);
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
+ }),null);
+ assert.deepEqual(f.identity.orgNativeLinkAudit({
+  appId,workspaceOrganizationId:'alpha'
+ }),[]);
+});
