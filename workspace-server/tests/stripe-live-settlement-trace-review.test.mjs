@@ -218,3 +218,28 @@ test('a binding revision change while Stripe responds invalidates the complete t
  assert.equal(result.licensesGranted,false);
  assert.equal(f.purchased(),0);
 });
+
+test('malformed, oversized or failing private Stripe responses never become entitlement evidence',async t=>{
+ const f=fixture(t);
+ const id='payment_intents/'+intentId,prior=f.records[id];
+ for(const reply of [
+  new Response('<html>error</html>',{headers:{'content-type':'text/html'}}),
+  new Response(JSON.stringify({livemode:true,padding:'x'.repeat(150000)}),{
+   headers:{'content-type':'application/json'}
+  }),
+  new Response('not json',{headers:{'content-type':'application/json'}}),
+  new Response(new Uint8Array([123,34,120,34,58,34,195,40,34,125]),{
+   headers:{'content-type':'application/json'}
+  }),
+  new Response('{"error":"unavailable"}',{status:503,
+   headers:{'content-type':'application/json'}})
+ ]){
+  f.records[id]=reply;
+  const result=await f.review.inspect(input);
+  assert.equal(result.state,'unavailable');
+  assert.equal(result.licensesGranted,false);
+  assert.equal(result.paymentEvidenceAuthoritative,false);
+  assert.equal(f.purchased(),0);
+ }
+ f.records[id]=prior;
+});
