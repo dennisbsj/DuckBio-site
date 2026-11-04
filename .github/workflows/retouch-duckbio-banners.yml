@@ -1,0 +1,45 @@
+name: Apply pixel edits to existing DuckBio banners
+on:
+  push:
+    branches: [development]
+    paths:
+      - "scripts/retouch-duckbio-banners.py"
+      - ".github/workflows/retouch-duckbio-banners.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  retouch:
+    name: Edit original website image files (no scene generation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deterministic pixel editors
+        run: python -m pip install "Pillow>=11,<13" "numpy>=1.26,<3" "opencv-python-headless>=4.9,<5"
+      - name: Modify the THREE existing raster banners
+        run: python scripts/retouch-duckbio-banners.py
+      - name: Validate originals and published references
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          items=[('index.html','duckbio-home-printed-core-20261104.webp'),('support.html','duckbio-support-printed-20261104.webp'),('pricing.html','duckbio-pricing-printed-20261104.webp')]
+          for page,name in items:
+              assert f'assets/{name}' in Path('docs',page).read_text()
+              with Image.open(Path('docs/assets',name)) as img:
+                  assert img.size==(2172,724),(name,img.size)
+              print('Verified',page,name)
+          PY
+      - name: Commit ONLY new edited raster files and matching HTML references
+        run: |
+          git config user.name "DuckBio image retoucher"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/assets/duckbio-home-printed-core-20261104.webp docs/assets/duckbio-support-printed-20261104.webp docs/assets/duckbio-pricing-printed-20261104.webp docs/index.html docs/support.html docs/pricing.html
+          git diff --cached --quiet || git commit -m "Integrate printed DuckBio logos and replace home holograms with four Core apps"
+          git push origin HEAD:development
