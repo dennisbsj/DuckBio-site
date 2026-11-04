@@ -211,3 +211,102 @@ test('only a complete exact mapping tuple can request verification, no browser r
  }
  assert.equal(f.requests.length,0);
 });
+
+test('key rotation accepts only explicitly pinned keys inside their individual windows',async()=>{
+ const old=generateKeyPairSync('ed25519'),next=generateKeyPairSync('ed25519');
+ const pinned=key=>key.publicKey.export({type:'spki',format:'pem'});
+ const config={
+  endpoint:ENDPOINT,token:TOKEN,
+  signingKeys:[
+   {keyId:'old',publicKeyPem:pinned(old),
+    notBeforeMs:NOW-10_000,notAfterMs:NOW+7_000},
+   {keyId:'next',publicKeyPem:pinned(next),
+    notBeforeMs:NOW,notAfterMs:NOW+20_000}
+  ]
+ };
+ let now=NOW-2_000,keyId='old',privateKey=old.privateKey;
+ const verifier=createSignedNativeOwnershipVerifier({
+  clients:{goflo:config},clock:()=>now,
+  fetchImpl:async(_url,init)=>{
+   const payload={...JSON.parse(init.body),keyId,
+    issuedAt:now,expiresAt:now+1_000,
+    active:true,ownershipVerified:true};
+   const signature=signProof(null,canonicalNativeOwnershipProofBytes(payload),
+    privateKey).toString('base64url');
+   return new Response(JSON.stringify({payload,signature}),{
+    headers:{'content-type':'application/json'}
+   });
+  }
+ });
+ assert.equal(await verifier.verifyNativeMapping(ID),true,'old key valid before rollout');
+ keyId='next';privateKey=next.privateKey;
+ assert.equal(await verifier.verifyNativeMapping(ID),false,'new key cannot predate rollout');
+ now=NOW;
+ assert.equal(await verifier.verifyNativeMapping(ID),true,'new key valid in overlap');
+ keyId='old';privateKey=old.privateKey;
+ assert.equal(await verifier.verifyNativeMapping(ID),true,'old key valid in overlap');
+ now=NOW+8_000;
+ assert.equal(await verifier.verifyNativeMapping(ID),false,'old key retired');
+ keyId='next';privateKey=next.privateKey;
+ assert.equal(await verifier.verifyNativeMapping(ID),true,'new key survives cutover');
+ now=NOW+19_500;
+ assert.equal(await verifier.verifyNativeMapping(ID),false,
+  'proof may not extend beyond pinned key expiry');
+ now=NOW+20_000;
+ assert.equal(await verifier.verifyNativeMapping(ID),false,
+  'retired key cannot be accepted at the expiry instant');
+ now=NOW;
+ keyId='not-pinned';
+ assert.equal(await verifier.verifyNativeMapping(ID),false,
+  'a genuine signature cannot introduce a new key ID');
+});
+
+test('cross-app Ed25519 signing keys stay isolated even for equal key IDs',async()=>{
+ const other=generateKeyPairSync('ed25519');
+ const duckman={...client,endpoint:'https://duckman.example.test/private/verify',
+  publicKeyPem:other.publicKey.export({type:'spki',format:'pem'})};
+ const verifier=createSignedNativeOwnershipVerifier({
+  clients:{goflo:client,duckman},clock:()=>NOW,
+  fetchImpl:async(_url,init)=>{
+   const payload={...JSON.parse(init.body),keyId:client.keyId,
+    issuedAt:NOW,expiresAt:NOW+1000,
+    active:true,ownershipVerified:true};
+   // The GoFlo private signing key must not verify for DuckMan.
+   const signature=signProof(null,canonicalNativeOwnershipProofBytes(payload),
+    keys.privateKey).toString('base64url');
+   return new Response(JSON.stringify({payload,signature}),{
+    headers:{'content-type':'application/json'}
+   });
+  }
+ });
+ assert.equal(await verifier.verifyNativeMapping(ID),true);
+ assert.equal(await verifier.verifyNativeMapping({...ID,appId:'duckman'}),false);
+});
+
+test('rejects ambiguous, duplicate, unbounded or malformed key-rotation policies',()=>{
+ const k=key=>key.publicKey.export({type:'spki',format:'pem'});
+ const one={keyId:'old',publicKeyPem:k(keys),
+  notBeforeMs:NOW-1000,notAfterMs:NOW+20_000};
+ const different={...one,keyId:'new'};
+ const invalid=[
+  {signingKeys:[]},
+  {signingKeys:[one,one]},
+  {signingKeys:[one,different,{...one,keyId:'third'}]},
+  {signingKeys:[{...one,notAfterMs:one.notBeforeMs}]},
+  {signingKeys:[{...one,notBeforeMs:-1}]},
+  {signingKeys:[{...one,notAfterMs:Infinity}]},
+  {signingKeys:[{...one,notAfterMs:'tomorrow'}]},
+  {signingKeys:[{...one,keyId:'bad key'}]},
+  {signingKeys:[{...one,unexpected:true}]},
+  {signingKeys:[{...one,publicKeyPem:'invalid'}]},
+  {signingKeys:[{keyId:one.keyId,publicKeyPem:one.publicKeyPem}]},
+  {signingKeys:[one],keyId:'also-configured'},
+  {signingKeys:[one],publicKeyPem:one.publicKeyPem},
+  {signingKeys:'not-an-array'}
+ ];
+ for(const overrides of invalid){
+  assert.throws(()=>createSignedNativeOwnershipVerifier({
+   clients:{goflo:{endpoint:ENDPOINT,token:TOKEN,...overrides}}
+  }),/invalid_private_native_client/);
+ }
+});
