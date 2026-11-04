@@ -173,10 +173,13 @@ test('one-time legacy DB migration seeds existing grants atomically, and subsequ
   password});
  store.grantAppAccess({userId:user.id,appId:'eel',localUserId:'old-native',organizationId:'old-org'});
  store.close();
- // Simulate pre-migration v1 schema by dropping only the newly introduced
- // version table. Never do this on a deployed/modern database.
+ // Simulate a genuine pre-migration v1 schema and its SQLite header.
+ // Never reset a deployed/modern database's migration marker.
  let db=new DatabaseSync(dbPath);
- try{db.exec('DROP TABLE suite_identity_grant_versions');}finally{db.close();}
+ try{
+  db.exec('DROP TABLE suite_identity_grant_versions');
+  db.exec('PRAGMA user_version=0');
+ }finally{db.close();}
  store=createIdentityStore({databasePath:dbPath,clock:()=>NOW});
  assert.equal(store.getAccessWithRevision(user.id,'eel').bindingRevision,'legacy-global:1');
  store.revokeAppAccess(user.id,'eel');
@@ -213,4 +216,31 @@ test('legacy grant revision overflow rolls back without deleting an existing map
  assert.equal(f.store.getAccessWithRevision(f.user.id,'goflo')?.localIdentity.userId,nativeUser);
  assert.equal(f.store.getAccessWithRevision(f.user.id,'goflo').bindingRevision,
   'legacy-global:'+Number.MAX_SAFE_INTEGER);
+});
+
+test('a previously migrated identity DB refuses restart if the complete grant-generation table is lost',async t=>{
+ const dir=mkdtempSync(path.join(os.tmpdir(),'duckbio-legacy-table-loss-'));
+ const dbPath=path.join(dir,'identity.sqlite');
+ t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ const store=createIdentityStore({databasePath:dbPath,clock:()=>NOW});
+ const user=await store.createUser({email:'lost-table@example.test',displayName:'Lost Table',
+  password});
+ store.grantAppAccess({userId:user.id,appId:'goflo',localUserId:'stable-native'});
+ assert.match(store.getAccessWithRevision(user.id,'goflo').bindingRevision,/^legacy-global:/);
+ store.close();
+ const db=new DatabaseSync(dbPath);
+ try{
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version,1,
+   'migration marker must survive closing the original SQLite handle');
+  db.exec('DROP TABLE suite_identity_grant_versions');
+ }finally{db.close();}
+ assert.throws(()=>createIdentityStore({databasePath:dbPath,clock:()=>NOW}),
+  /invalid_grant_revision/,
+  'a lost version table cannot re-seed live grants at the original epoch');
+ const check=new DatabaseSync(dbPath);
+ try{
+  assert.equal(check.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table' AND name='suite_identity_grant_versions'").get().n,0,
+   'failed initialization must roll back without constructing new versions');
+  assert.equal(check.prepare('PRAGMA user_version').get().user_version,1);
+ }finally{check.close();}
 });
