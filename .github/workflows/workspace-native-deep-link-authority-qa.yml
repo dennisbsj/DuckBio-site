@@ -1,0 +1,33 @@
+name: Workspace native deep-link authority QA (offline)
+on:
+  pull_request:
+    paths:
+      - 'workspace-server/private-content-launch.mjs'
+      - 'workspace-server/tests/private-content-launch.test.mjs'
+      - 'workspace-server/shared-auth/account-service.mjs'
+      - '.github/workflows/workspace-native-deep-link-authority-qa.yml'
+permissions:
+  contents: read
+jobs:
+  native-deep-link-authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22','24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Verify no-payment/no-legacy navigation tests
+        working-directory: workspace-server
+        run: |
+          node --check private-content-launch.mjs
+          node --check tests/private-content-launch.test.mjs
+          node --test tests/private-content-launch.test.mjs
+      - name: No app or payment activation
+        run: echo "OFFLINE SYNTHETIC NAVIGATION QA — no native app access or paid seat is granted"
