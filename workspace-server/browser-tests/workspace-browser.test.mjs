@@ -833,7 +833,7 @@ test('Chromium Remember me uses a persistent expiring cookie only when explicitl
 
 // A content reference must survive central login, but must never provide direct
 // access to native app data or allow a caller-controlled redirect origin.
-test('Chromium global content ID continues after login through the protected gateway',{timeout:45000},async t=>{
+test('Chromium global content ID reaches the gateway but denies without paid scoped native authority',{timeout:45000},async t=>{
  const calls=[];
  const f=await fixture(t,{resolveContentResource:async args=>{
   calls.push(args);
@@ -858,14 +858,13 @@ test('Chromium global content ID continues after login through the protected gat
  await page.waitForURL(origin+'/content/dn000001');
  assert.equal(await page.locator('h1').textContent(),'Protected gateway requested');
  assert.equal(calls.length,0,'browser interception must not call the real resolver');
- // The real authenticated gateway is checked separately without following the
- // external native redirect or pretending that an app session exists.
+ // Browser continuation reaches only the private gateway. A legacy
+ // membership/role and an apparently approved resolver URL alone cannot
+ // bypass current verified LIVE seats or exact scoped native identity.
  const verified=await page.request.get(origin+'/content/dn000001',{maxRedirects:0});
- assert.equal(verified.status(),303);
- assert.equal(verified.headers().location,'https://example.invalid/content/dn000001');
- assert.equal(calls.length,1);
- assert.equal(calls[0].viewerId,worker.id);
- assert.equal(calls[0].appId,'eel');
+ assert.equal(verified.status(),404);
+ assert.equal(calls.length,0,
+  'central authority must deny before native resource lookup');
  assert.equal((await context.cookies('https://example.invalid')).length,0,
   'central login does not install any native app session cookie');
 });
