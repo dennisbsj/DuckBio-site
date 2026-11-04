@@ -48,7 +48,11 @@ export function createWorkspaceNativeBrokerDenyAdapter({
       const selected = organizationStore.currentSessionOrganization({
         sessionId:current.id,accountId:current.subject
       });
-      if (!selected || !safe(selected.id))
+      // The session lock must carry a durable epoch. Comparing only the
+      // organization name would miss a clear/reselect ABA during await.
+      if (!selected || !safe(selected.id) ||
+          !Number.isSafeInteger(selected.sessionSelectionRevision) ||
+          selected.sessionSelectionRevision <= 0)
         return denied('session_organization_missing');
       const result = await inspector.inspect({
         sessionId:current.id,organizationId:selected.id,
@@ -61,7 +65,9 @@ export function createWorkspaceNativeBrokerDenyAdapter({
       });
       if (!latest || latest.id !== current.id ||
           latest.subject !== current.subject ||
-          !finalSelection || finalSelection.id !== selected.id)
+          !finalSelection || finalSelection.id !== selected.id ||
+          !Number.isSafeInteger(finalSelection.sessionSelectionRevision) ||
+          finalSelection.sessionSelectionRevision !== selected.sessionSelectionRevision)
         return denied('session_or_tenant_changed_during_inspection');
       // A malformed verifier response cannot promote login or licensing.
       if (result?.candidateReady !== true ||

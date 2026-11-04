@@ -54,7 +54,9 @@ export function createWorkspaceNativeAccessInspector({
   const selected=organizationStore.currentSessionOrganization({
    sessionId,accountId:parent.subject
   });
-  if(!selected||selected.id!==organizationId)return null;
+  if(!selected||selected.id!==organizationId||
+     !Number.isSafeInteger(selected.sessionSelectionRevision)||
+     selected.sessionSelectionRevision<=0)return null;
   const policy=organizationStore.verifiedNativePermissionCandidate({
    organizationId,accountId:parent.subject,appId,permission
   });
@@ -81,7 +83,8 @@ export function createWorkspaceNativeAccessInspector({
    return null;
   return {parent,policy,nativeUserId:grant.nativeUserId,
    nativeOrganizationId:grant.nativeOrganizationId,
-   linkRevision:grant.linkRevision};
+   linkRevision:grant.linkRevision,
+   sessionSelectionRevision:selected.sessionSelectionRevision};
  }
  return Object.freeze({
   async inspect({sessionId,organizationId,appId,permission}={}){
@@ -103,12 +106,14 @@ export function createWorkspaceNativeAccessInspector({
      nativeOrganizationId:first.nativeOrganizationId}))===true;
    }catch{return deny('native_mapping_unavailable');}
    if(!verified)return deny('native_mapping_unverified');
-   // A native call may take time. Re-read session, account state, org lock,
-   // live seat and custom role/permission edits after awaiting it.
+   // A native call may take time. Re-read session, account state, org lock
+   // AND its durable selection revision (clear + reselect ABA), live seat,
+   // and custom role/permission edits after awaiting it.
    let second;
    try{second=current(sessionId,organizationId,appId,permission);}
    catch{return deny('current_access_unavailable');}
    if(!second||first.parent.subject!==second.parent.subject||
+      first.sessionSelectionRevision!==second.sessionSelectionRevision||
       first.nativeUserId!==second.nativeUserId||
       first.nativeOrganizationId!==second.nativeOrganizationId||
       first.linkRevision!==second.linkRevision||

@@ -267,3 +267,58 @@ test('construction refuses missing trust adapters and unregistered apps',()=>{
   identity,organizationStore:org,inspector,permissions:{goflo:'*'}
  }),/explicit_six_app_permission/);
 });
+
+
+test('broker diagnostic rejects same-session same-tenant clear/reselect ABA even if inspector supplies an old positive candidate',async t=>{
+ const f=await fixture(t);
+ const request={sessionId:f.alpha.id,organizationId:'alpha',appId:'goflo',
+  permission:'workspace.view'};
+ const earlier=await f.inspector.inspect(request);
+ assert.equal(earlier.candidateReady,true);
+ assert.equal(earlier.accessGranted,false);
+ const first=f.organizationStore.currentSessionOrganization({
+  sessionId:f.alpha.id,accountId:f.user.id});
+ const adapter=createWorkspaceNativeBrokerDenyAdapter({
+  identity:f.parentAdapter,organizationStore:f.organizationStore,
+  permissions:{goflo:'workspace.view'},
+  inspector:{inspect:async()=>{
+   f.organizationStore.clearSessionOrganization(f.alpha.id);
+   f.organizationStore.selectSessionOrganization({
+    sessionId:f.alpha.id,accountId:f.user.id,organizationId:'alpha'});
+   return earlier; // Must be treated as stale even when its shape looks valid.
+  }}
+ });
+ const inspected=await adapter.inspectCandidate(f.alpha,'goflo');
+ const final=f.organizationStore.currentSessionOrganization({
+  sessionId:f.alpha.id,accountId:f.user.id});
+ assert.equal(final.id,first.id);
+ assert.equal(final.sessionSelectionRevision,first.sessionSelectionRevision+2);
+ assert.equal(inspected.reason,'session_or_tenant_changed_during_inspection');
+ assert.equal(inspected.candidateReady,false);
+ assert.equal(inspected.accessGranted,false);
+ assert.equal(inspected.licensesGranted,false);
+ assert.equal(await adapter.getAccess(f.alpha,'goflo'),null);
+ assert.deepEqual(f.authWrites(),{codes:0,proofs:0});
+});
+
+test('broker diagnostic fails closed if the organization store omits a durable selection epoch',async t=>{
+ const f=await fixture(t);
+ let called=false;
+ const adapter=createWorkspaceNativeBrokerDenyAdapter({
+  identity:f.parentAdapter,
+  organizationStore:{currentSessionOrganization:()=>{
+   const selected=f.organizationStore.currentSessionOrganization({
+    sessionId:f.alpha.id,accountId:f.user.id});
+   return selected?{id:selected.id,name:selected.name,admin:selected.admin}:null;
+  }},
+  inspector:{inspect:async()=>{called=true;return {candidateReady:true}}},
+  permissions:{goflo:'workspace.view'}
+ });
+ const decision=await adapter.inspectCandidate(f.alpha,'goflo');
+ assert.equal(decision.reason,'session_organization_missing');
+ assert.equal(decision.candidateReady,false);
+ assert.equal(decision.accessGranted,false);
+ assert.equal(called,false);
+ assert.equal(await adapter.getAccess(f.alpha,'goflo'),null);
+ assert.deepEqual(f.authWrites(),{codes:0,proofs:0});
+});
