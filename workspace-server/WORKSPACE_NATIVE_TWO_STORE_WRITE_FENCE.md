@@ -28,7 +28,9 @@ Concurrent organization writers, including separate service processes using the 
 - Identity commit conflict in the second tenant, proving the final lock is released even when the identity transaction fails.
 - Secure native mapping revocation under the same cross-process write fence after target suspension and paid term expiry.
 
-The tests use only disposable **real** identity/organization SQLite databases, synthetic current-paid-shaped allocations, ephemeral Ed25519 test keys and an intercepted native transport. They do not contact real native apps or a payment processor.
+The tests use only disposable **real** identity/organization SQLite databases, synthetic current-paid-shaped allocations, ephemeral Ed25519 test keys and an intercepted native transport.
+
+A further regression creates a detached promise **inside** an authenticated `AsyncLocalStorage` operator scope, but resumes it **after** the canonical SQLite commit and fence release. The controller now permanently marks each operation scope as closed in `finally` and rejects both late authorization callbacks and late native ownership proof requests. This prevents an inherited async context from being reused as a stale operator capability after the originally requested mutation finished. They do not contact real native apps or a payment processor.
 
 ## Limitations and release blockers
 
