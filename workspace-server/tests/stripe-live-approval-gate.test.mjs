@@ -42,6 +42,7 @@ function fixture(t){
  }};
  const fetchImpl=async(url,init)=>{
   called.push({url,init});
+  if(state.advanceOnFetch){now+=state.advanceOnFetch;state.advanceOnFetch=0;}
   if(url==='https://api.stripe.com/v1/customers/'+base().customerId)
    return new Response(JSON.stringify(state.customer),{
     headers:{'content-type':'application/json'}
@@ -175,18 +176,13 @@ test('Stripe subscription must corroborate exact customer, tenant, price, and se
   f.state.subscription=current;
  }
 });
-test('short-lived operator approval expiring during provider await fails closed',async t=>{
+test('short-lived operator approval expiring during Stripe HTTPS lookup fails closed',async t=>{
  const f=fixture(t);
- const bridge=createStripeLiveApprovalGate({
-  approvalKeyId:'duckbio-operator-v1',approvalPublicKeyPem:publicKeyPem,
-  customerReader:{verify:async()=>{f.setNow(NOW+190000);return true;}},
-  subscriptionReader:{inspect:async()=>({
-   state:'manual_review',licensesGranted:false,authorizesSeatChanges:false
-  })},clock:()=>NOW
- });
- // Distinct gate's opaque token is not accepted by the existing store verifier.
- assert.equal(await bridge.verifyAndPin({
-  organizationStore:f.store,approval:base(),signature:signature(base())
- }),false);
+ f.state.advanceOnFetch=190000;
+ assert.equal(await f.approve(),false);
+ assert.equal(f.calls().length,2,'real customer and subscription readers both executed');
  assert.equal(f.purchased(),0);
+ assert.equal(f.store.readPinnedStripeLiveBinding({
+  organizationId:'org-alpha',subscriptionId:base().subscriptionId
+ }),null);
 });
