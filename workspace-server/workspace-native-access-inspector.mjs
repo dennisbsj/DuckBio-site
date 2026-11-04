@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 /**
  * Private, DORMANT SSO authorization preflight for the six currently
  * registered apps and the unreleased DataDuck seventh candidate.
@@ -63,7 +65,9 @@ export function createWorkspaceNativeAccessInspector({
      policy.appId!==appId||policy.accountId!==parent.subject||
      policy.organizationId!==organizationId||policy.permission!==permission||
      !safeRole(policy.role)||!Number.isSafeInteger(policy.verifiedPaidThroughMs)||
-     policy.verifiedPaidThroughMs<=clock())return null;
+     policy.verifiedPaidThroughMs<=clock()||
+     !Number.isSafeInteger(policy.authorityAuditRevision)||
+     policy.authorityAuditRevision<=0)return null;
   // Never fall back to legacy (user,app) grants across organizations.
   // Missing explicit (user,session-locked org,app) binding always denies.
   const grant=identityStore.getOrganizationNativeLink({
@@ -109,10 +113,24 @@ export function createWorkspaceNativeAccessInspector({
       first.nativeUserId!==second.nativeUserId||
       first.nativeOrganizationId!==second.nativeOrganizationId||
       first.linkRevision!==second.linkRevision||
-      first.policy.role!==second.policy.role)
+      first.policy.role!==second.policy.role||
+      first.policy.authorityAuditRevision!==second.policy.authorityAuditRevision||
+      first.policy.verifiedPaidThroughMs!==second.policy.verifiedPaidThroughMs)
      return deny('access_changed_during_verification');
+   // Private, non-authorizing generation fingerprint. It changes on native
+   // mapping revoke/rebind and on relevant audited Workspace role, account,
+   // app permission or LIVE subscription transitions, even if the final
+   // values and wall clock timestamp are unchanged.
+   const preflightBindingRevision=createHash('sha256')
+     .update(JSON.stringify(['workspace-native-preflight-v1',
+       organizationId,second.parent.subject,appId,permission,
+       second.nativeUserId,second.nativeOrganizationId,
+       second.linkRevision,second.policy.authorityAuditRevision,
+       second.policy.role,second.policy.verifiedPaidThroughMs]))
+     .digest('hex');
    return Object.freeze({candidateReady:true,accessGranted:false,
     licensesGranted:false,loginEnabled:false,appId,permission,
+    preflightBindingRevision,
     workspaceOrganizationId:organizationId,workspaceAccountId:second.parent.subject,
     nativeUserId:second.nativeUserId,
     nativeOrganizationId:second.nativeOrganizationId,
