@@ -172,7 +172,7 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
   async function issueCode(parent, target) {
     const initialAccess = await checkAccess(parent, target.client.appId);
     const code = opaque();
-    await store.putCode(digest(code), { clientId: target.client.id, appId: target.client.appId, parentSessionId: parent.id, subject: parent.subject, state: target.state, challenge: target.challenge, redirectUri: target.redirectUri, returnPath: target.returnPath, bindingRevision: initialAccess.bindingRevision, expiresAt: Math.min(clock() + 60_000, parent.expiresAt) });
+    await store.putCode(digest(code), { clientId: target.client.id, appId: target.client.appId, parentSessionId: parent.id, subject: parent.subject, state: target.state, challenge: target.challenge, redirectUri: target.redirectUri, returnPath: target.returnPath, localIdentity: initialAccess.localIdentity, bindingRevision: initialAccess.bindingRevision, expiresAt: Math.min(clock() + 60_000, parent.expiresAt) });
     const redirect = new URL(target.redirectUri);
     redirect.searchParams.set('code', code); redirect.searchParams.set('state', target.state);
     return { redirectUrl: redirect.href };
@@ -278,7 +278,14 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
               let granted;
               try { granted = await checkAccess(parent, client.appId); } catch (error) { if (error instanceof BrokerError) throw new BrokerError(401, 'invalid_grant'); throw error; }
               const codeBinding = Object.hasOwn(record, 'bindingRevision') ? record.bindingRevision : null;
-              if (granted.bindingRevision !== codeBinding) throw new BrokerError(401, 'invalid_grant');
+              // The code is valid only for the exact native account/tenant
+              // checked at issuance. Revisions alone cannot protect unbound
+              // legacy grants or mistakenly unchanged future adapter epochs.
+              // Historical codes without a snapshot expire closed.
+              if (granted.bindingRevision !== codeBinding ||
+                  !record.localIdentity ||
+                  JSON.stringify(granted.localIdentity) !== JSON.stringify(record.localIdentity))
+                throw new BrokerError(401, 'invalid_grant');
               const localIdentity = granted.localIdentity;
               const sessionToken = opaque(); const expiresAt = Math.min(parent.expiresAt, clock() + 8 * 60 * 60_000);
               await store.putProof(digest(sessionToken), { clientId: client.id, parentSessionId: parent.id, subject: parent.subject, localIdentity, bindingRevision: granted.bindingRevision, expiresAt });
