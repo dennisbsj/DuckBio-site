@@ -163,6 +163,12 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     recordVerifiedStripeLiveEvent(event){
       return tx(()=>liveEventLedger.record(event));
     },
+    // PRIVATE, route-free lookup for reviewed financial event correlation.
+    // Unlike ownerSnapshot(), this contains source object IDs. Never expose
+    // it through a user/owner HTTP response or log raw provider metadata.
+    readVerifiedStripeLiveEventPrivate(eventId){
+      return liveEventLedger.readPrivate(eventId);
+    },
     // INTERNAL outbox operations. No HTTP routes. Claim tokens make competing
     // private workers mutually exclusive even across multiple Passenger processes.
     claimOwnerAlert(){

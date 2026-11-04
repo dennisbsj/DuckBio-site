@@ -35,6 +35,25 @@ export function createStripeLiveEventLedger({db,clock=Date.now}={}){
      .run(event.id,event.type,event.objectId,event.created,event.digest,clock());
    return {recorded:true,duplicate:false,licensesGranted:false};
   },
+  // Private internal worker API: source IDs needed for independent Stripe
+  // lookups must never be included in owner/browser diagnostic snapshots.
+  readPrivate(eventId){
+   if(typeof eventId!=='string'||!/^evt_[A-Za-z0-9_]{4,128}$/.test(eventId))
+    return null;
+   const row=db.prepare('SELECT event_id,event_type,object_id,event_created,raw_digest FROM stripe_live_event_log WHERE event_id=?')
+    .get(eventId);
+   if(!row||!stripeLiveEventIdMatches(row.event_type,row.object_id)||
+      stripeLiveReviewCategory(row.event_type)===null||
+      typeof row.raw_digest!=='string'||!/^[a-f0-9]{64}$/.test(row.raw_digest))
+    return null;
+   return Object.freeze({
+    eventId:row.event_id,eventType:row.event_type,
+    objectId:row.object_id,created:row.event_created,
+    rawDigest:row.raw_digest,
+    reviewCategory:stripeLiveReviewCategory(row.event_type),
+    licensesGranted:false,authorizesSeatChanges:false
+   });
+  },
   count(){return db.prepare('SELECT count(*) AS n FROM stripe_live_event_log').get().n;},
   latest(limit=101){
    if(!Number.isSafeInteger(limit)||limit<1||limit>101)fail('invalid_stripe_live_event_limit');
