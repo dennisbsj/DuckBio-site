@@ -11,7 +11,7 @@ import {createSignedNativeOwnershipVerifier,
  canonicalNativeOwnershipProofBytes} from '../shared-auth/signed-native-ownership-verifier.mjs';
 
 const START=1800000000000;
-const PAID_THROUGH=1900000000;
+const PAID_THROUGH=1800000060; // verified term ends 60 seconds after START
 const PASSWORD='only-private-isolated-synthetic-provisioning-password';
 const appId='goflo';
 async function fixture(t,{historicalOnly=false}={}){
@@ -173,10 +173,8 @@ test('revoked operator session during native signed await denies and leaves audi
 
 test('admin suspension during native signed await denies exact link',async t=>{
  const f=await fixture(t);
- f.duringNative(()=>f.org.setMemberActive({organizationId:'alpha',
-  actorId:f.userIds.ownerB,accountId:f.userIds.ownerA,active:false}));
- // The owner of alpha cannot be deactivated as the last active admin;
- // verify through central account disabling instead.
+ // The owner cannot be deactivated as last org admin, so verify disabling
+ // the central identity while a valid native signature is being prepared.
  f.duringNative(()=>f.identity.setUserState(f.userIds.ownerA,'disabled'));
  await assert.rejects(f.controller.bind(f.input()),
   /native_ownership_unverified/);
@@ -192,7 +190,7 @@ test('member suspension or verified paid period expiry during native verificatio
     organizationId:'alpha',actorId:f.userIds.ownerA,
     accountId:f.userIds.member,active:false
    });
-   else f.setNow(1900000010000);
+   else f.setNow(START+70_000);
   });
   await assert.rejects(f.controller.bind(f.input()),
    /native_ownership_unverified/);
