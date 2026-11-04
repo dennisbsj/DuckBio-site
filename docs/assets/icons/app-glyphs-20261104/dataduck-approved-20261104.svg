@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="DataDuck analytics icon">
+ <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0c354d"/><stop offset=".58" stop-color="#123d58"/><stop offset="1" stop-color="#0c3149"/></linearGradient></defs>
+ <rect x="4" y="4" width="120" height="120" rx="37" fill="url(#bg)" stroke="#40d9de" stroke-width="4"/>
+ <path d="M22 27Q30 18 43 17" fill="none" stroke="#c6fafb" stroke-width="2.5" opacity=".65" stroke-linecap="round"/>
+ <circle cx="105" cy="29" r="6" fill="#27bed8" opacity=".22"/>
+ <rect x="25" y="23" width="78" height="79" rx="9.5" fill="#113b55" stroke="#e0fcfd" stroke-width="5.5"/>
+ <path d="M37 87V73h12v14zM57 87V63h12v24zM78 87V50h12v37z" fill="#2ed4da"/>
+ <path d="M37 59L57 48 73 55 92 33" fill="none" stroke="#dffbff" stroke-width="4.7" stroke-linecap="round" stroke-linejoin="round"/>
+ <g fill="#96f3f4"><circle cx="37" cy="59" r="3.8"/><circle cx="57" cy="48" r="3.8"/><circle cx="73" cy="55" r="3.8"/><circle cx="92" cy="33" r="3.8"/></g>
+</svg>
