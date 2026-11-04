@@ -217,7 +217,7 @@ async function fixture(t){
  return {page,context,workspace,nativeOrigin,org,owner,member,client,
   callbackRequests,requests,nativeName};
 }
-test('real Chromium HTTPS cross-site callback preserves Strict native cookie and private child proof',{timeout:90000},async t=>{
+test('real Chromium HTTPS cross-site org-mode Connect denies legacy grants without child proof',{timeout:60000},async t=>{
  const f=await fixture(t);
  await f.page.goto(f.nativeOrigin+'/native-login');
  await f.page.waitForURL(f.nativeOrigin+'/');
@@ -234,37 +234,29 @@ test('real Chromium HTTPS cross-site callback preserves Strict native cookie and
  await f.page.locator('#email').fill('worker@example.test');
  await f.page.locator('#password').fill('Worker synthetic password 123456');
  await f.page.getByRole('button',{name:'Sign in and continue'}).click();
- await f.page.waitForURL(f.nativeOrigin+'/?result=connected');
- assert.equal(f.callbackRequests.length,1);
- assert(!f.callbackRequests[0].cookie.includes(f.nativeName+'='),
-  'SameSite=Strict cookie MUST NOT accompany cross-site callback GET');
- assert.equal(f.callbackRequests[0].referer,'','callback code must not be a Referer');
- assert.deepEqual(f.callbackRequests[0].params.sort(),['code','state']);
- assert.deepEqual(await(await f.page.request.get(f.nativeOrigin+'/api/status')).json(),{linked:true});
- assert.deepEqual(await(await f.page.request.get(f.nativeOrigin+'/api/unread')).json(),
-  {counts:{chat:1,mail:1,notifications:0}});
- assert(!f.requests.some(url=>url.includes('/api/suite/auth/exchange')||
-   url.includes('/api/suite/native/communications/unread')),
-  'browser must never receive Basic client secret or child proof');
+ await f.page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('could not be authorized'));
+ assert(f.page.url().startsWith(f.workspace+'/connect?'),
+  'legacy grant cannot trigger native HTTPS callback even when IDs match');
+ assert.equal(f.callbackRequests.length,0);
  const centralCookie=(await f.context.cookies(f.workspace))
   .find(row=>row.name.includes('suite_identity'));
  assert(centralCookie?.httpOnly&&centralCookie?.secure);
  assert(!(await f.context.cookies(f.nativeOrigin))
   .some(row=>row.name.includes('suite_identity')));
- await f.page.goto(f.nativeOrigin+'/auth/callback?code='+token()+'&state='+token());
- await f.page.waitForURL(f.nativeOrigin+'/?result=error');
- assert.deepEqual(await(await f.page.request.get(f.nativeOrigin+'/api/status')).json(),{linked:true},
-  'invalid callback cannot revoke a legitimate linked session');
- f.org.saveMember({organizationId:'lab-a',actorId:f.owner.id,member:f.member({})});
+ // The local native login still works; its independent session was neither
+ // promoted into a Workspace child proof nor revoked by denied central SSO.
+ assert.deepEqual(await(await f.page.request.get(f.nativeOrigin+'/api/status')).json(),
+  {linked:false});
  assert.equal((await f.page.request.get(f.nativeOrigin+'/api/unread')).status(),409,
-  'revoked native role hides unread instead of fabricating zero');
- const result=await f.page.evaluate(async()=>{
-  const res=await fetch('/api/unlink',{method:'POST',
-   headers:{'Content-Type':'application/json'},body:'{}'});return res.json();
+  'native route cannot mistake an old global mapping for a child proof');
+ await f.page.goto(f.nativeOrigin+'/native-login');
+ await f.page.waitForURL(f.nativeOrigin+'/');
+ const unlinked=await f.page.evaluate(async()=>{
+  const r=await fetch('/api/unlink',{method:'POST',
+   headers:{'Content-Type':'application/json'},body:'{}'});
+  return r.json();
  });
- assert.deepEqual(result,{linked:false});
- assert.equal((await f.page.request.get(f.nativeOrigin+'/api/unread')).status(),409);
- const central=await f.page.request.get(f.workspace+'/api/suite/auth/session');
- assert.equal((await central.json()).authenticated,true,
-  'native child unlink MUST NOT sign out the central Workspace parent');
+ assert.deepEqual(unlinked,{linked:false});
+ assert.deepEqual(await(await f.page.request.get(f.nativeOrigin+'/api/status')).json(),
+  {linked:false});
 });
