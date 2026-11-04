@@ -26,12 +26,16 @@ function privatePath(file){
   while(!existsSync(ancestor)&&path.dirname(ancestor)!==ancestor)ancestor=path.dirname(ancestor);
   if(invalid(realpathSync(ancestor)))fail('private_path_required');
 }
-export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveSubscriptionEvidence=null,ownerAlertsOptIn=false}){
+export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveSubscriptionEvidence=null,verifyLiveBillingBindingEvidence=null,ownerAlertsOptIn=false}){
   if(typeof ownerAlertsOptIn!=='boolean')fail('invalid_owner_alerts_config');
   // Production must inject a PRIVATE verifier of live billing evidence.
   // Neither browser requests nor sk_test_/TEST observations are accepted here.
   if(verifyLiveSubscriptionEvidence!==null&&typeof verifyLiveSubscriptionEvidence!=='function')
     fail('invalid_verified_billing_adapter');
+  // Integration QA of draft #172 only: no trusted LIVE binding verifier is
+  // configured by default, and neither pins nor events grant paid seats.
+  if(verifyLiveBillingBindingEvidence!==null&&typeof verifyLiveBillingBindingEvidence!=='function')
+    fail('invalid_live_billing_binding_verifier');
   privatePath(databasePath);
   mkdirSync(path.dirname(databasePath),{recursive:true,mode:0o700});
   const db=new DatabaseSync(databasePath);
@@ -58,7 +62,10 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     "CREATE TABLE IF NOT EXISTS verified_subscription_allocations(subscription_id TEXT PRIMARY KEY,source TEXT NOT NULL CHECK(source='stripe_live'),org TEXT NOT NULL REFERENCES organizations(id),revision INTEGER NOT NULL CHECK(revision>0),plan TEXT NOT NULL,apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats>0),state TEXT NOT NULL CHECK(state IN ('active','canceled')),paid_through INTEGER,updated_at INTEGER NOT NULL)",
     "CREATE TABLE IF NOT EXISTS verified_subscription_revisions(subscription_id TEXT NOT NULL REFERENCES verified_subscription_allocations(subscription_id),revision INTEGER NOT NULL CHECK(revision>0),event_key TEXT NOT NULL UNIQUE,digest TEXT NOT NULL,org TEXT NOT NULL REFERENCES organizations(id),recorded_at INTEGER NOT NULL,PRIMARY KEY(subscription_id,revision))",
     "CREATE TABLE IF NOT EXISTS owner_alert_outbox(id INTEGER PRIMARY KEY AUTOINCREMENT,audit_id INTEGER NOT NULL UNIQUE REFERENCES organization_audit(id),category TEXT NOT NULL CHECK(category IN ('organization','subscription','user','permission')),state TEXT NOT NULL CHECK(state IN ('pending','sending','sent','failed')),attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),lease_token TEXT,locked_until INTEGER,next_attempt_at INTEGER NOT NULL,sent_at INTEGER)",
-    "CREATE TABLE IF NOT EXISTS stripe_live_event_log(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,object_id TEXT NOT NULL,event_created INTEGER NOT NULL,raw_digest TEXT NOT NULL,received_at INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS stripe_live_event_log(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,object_id TEXT NOT NULL,event_created INTEGER NOT NULL,raw_digest TEXT NOT NULL,received_at INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS stripe_live_customer_pins(customer_id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),pinned_at INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS stripe_live_subscription_pins(subscription_id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),customer_id TEXT NOT NULL REFERENCES stripe_live_customer_pins(customer_id),price_id TEXT NOT NULL,plan TEXT NOT NULL CHECK(plan IN ('Single','Mixed','Bundle')),apps TEXT NOT NULL CHECK(json_valid(apps)),seats INTEGER NOT NULL CHECK(seats BETWEEN 1 AND 10000),revision INTEGER NOT NULL CHECK(revision>0),digest TEXT NOT NULL,pinned_at INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS stripe_live_binding_revisions(subscription_id TEXT NOT NULL REFERENCES stripe_live_subscription_pins(subscription_id),revision INTEGER NOT NULL CHECK(revision>0),event_key TEXT NOT NULL UNIQUE,digest TEXT NOT NULL,recorded_at INTEGER NOT NULL,PRIMARY KEY(subscription_id,revision))"
   ].join(';')+';');
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
@@ -168,6 +175,117 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     // it through a user/owner HTTP response or log raw provider metadata.
     readVerifiedStripeLiveEventPrivate(eventId){
       return liveEventLedger.readPrivate(eventId);
+    },
+    // DORMANT, private only: pin an independently authenticated LIVE Stripe
+    // subscription/customer/price to one exact Workspace organization.
+    // A trusted callback MUST fetch/verify the source itself; never forward
+    // unverified browser fields, TEST records or raw webhook metadata here.
+    // Pins are identification only, NOT paid subscription attestations.
+    pinVerifiedStripeLiveBinding(evidence){
+      if(!verifyLiveBillingBindingEvidence)fail('stripe_live_binding_verifier_unavailable');
+      let v;
+      try{v=verifyLiveBillingBindingEvidence(evidence);}
+      catch{fail('stripe_live_binding_rejected');}
+      const stripeId=(x,prefix)=>typeof x==='string'&&
+        new RegExp('^'+prefix+'[A-Za-z0-9_]{4,128}$').test(x);
+      const keys=['source','eventKey','organizationId','subscriptionId',
+        'customerId','priceId','plan','apps','seats','revision'];
+      try{
+        if(!v||typeof v!=='object'||Array.isArray(v)||
+           Object.keys(v).length!==keys.length||
+           keys.some(k=>!Object.hasOwn(v,k))||
+           v.source!=='stripe_live'||!safeId(v.eventKey)||
+           !safeId(v.organizationId)||
+           !stripeId(v.subscriptionId,'sub_')||
+           !stripeId(v.customerId,'cus_')||
+           !stripeId(v.priceId,'price_')||
+           !['Single','Mixed','Bundle'].includes(v.plan)||
+           !Array.isArray(v.apps)||
+           new Set(v.apps).size!==v.apps.length||
+           v.apps.some(app=>!byId.has(app))||
+           (v.plan==='Single'&&v.apps.length!==1)||
+           (v.plan==='Mixed'&&(v.apps.length<2||v.apps.length>5))||
+           (v.plan==='Bundle'&&v.apps.length!==APPLICATIONS.length)||
+           !Number.isSafeInteger(v.seats)||v.seats<1||v.seats>10000||
+           !Number.isSafeInteger(v.revision)||v.revision<1)
+          fail('stripe_live_binding_rejected');
+      }catch{fail('stripe_live_binding_rejected');}
+      const selection=[...v.apps].sort();
+      const digest=createHash('sha256').update(JSON.stringify([
+        v.organizationId,v.subscriptionId,v.customerId,v.priceId,
+        v.plan,selection,v.seats,v.revision
+      ])).digest('hex');
+      return tx(()=>{
+        if(!db.prepare('SELECT 1 FROM organizations WHERE id=?')
+           .get(v.organizationId))fail('organization_not_found');
+        // A customer can have many subscriptions, but never be mapped
+        // to two Workspace organizations, including across restarts.
+        const customer=db.prepare('SELECT org FROM stripe_live_customer_pins WHERE customer_id=?')
+          .get(v.customerId);
+        if(customer&&customer.org!==v.organizationId)
+          fail('stripe_live_customer_tenant_conflict');
+        const prior=db.prepare('SELECT org,customer_id,revision,digest FROM stripe_live_subscription_pins WHERE subscription_id=?')
+          .get(v.subscriptionId);
+        if(prior&&(prior.org!==v.organizationId||prior.customer_id!==v.customerId))
+          fail('stripe_live_subscription_tenant_conflict');
+        const byEvent=db.prepare('SELECT subscription_id,revision,digest FROM stripe_live_binding_revisions WHERE event_key=?')
+          .get(v.eventKey);
+        if(byEvent){
+          if(byEvent.subscription_id!==v.subscriptionId||
+             byEvent.revision!==v.revision||byEvent.digest!==digest)
+            fail('stripe_live_binding_event_conflict');
+          return {pinned:false,idempotent:true,licensesGranted:false};
+        }
+        const byRevision=db.prepare('SELECT event_key,digest FROM stripe_live_binding_revisions WHERE subscription_id=? AND revision=?')
+          .get(v.subscriptionId,v.revision);
+        if(byRevision){
+          if(byRevision.digest!==digest||byRevision.event_key!==v.eventKey)
+            fail('stripe_live_binding_revision_conflict');
+          return {pinned:false,idempotent:true,licensesGranted:false};
+        }
+        if(prior&&v.revision<=prior.revision)fail('stripe_live_binding_stale');
+        const at=clock();
+        if(!Number.isSafeInteger(at)||at<=0)fail('stripe_live_binding_clock_invalid');
+        if(!customer)db.prepare('INSERT INTO stripe_live_customer_pins VALUES(?,?,?)')
+          .run(v.customerId,v.organizationId,at);
+        if(!prior){
+          db.prepare('INSERT INTO stripe_live_subscription_pins VALUES(?,?,?,?,?,?,?,?,?,?)')
+            .run(v.subscriptionId,v.organizationId,v.customerId,v.priceId,
+              v.plan,JSON.stringify(selection),v.seats,v.revision,digest,at);
+        }else{
+          db.prepare('UPDATE stripe_live_subscription_pins SET price_id=?,plan=?,apps=?,seats=?,revision=?,digest=?,pinned_at=? WHERE subscription_id=?')
+            .run(v.priceId,v.plan,JSON.stringify(selection),v.seats,
+              v.revision,digest,at,v.subscriptionId);
+        }
+        db.prepare('INSERT INTO stripe_live_binding_revisions VALUES(?,?,?,?,?)')
+          .run(v.subscriptionId,v.revision,v.eventKey,digest,at);
+        // Audit contains no customer, subscription, price, secrets or email.
+        audit(v.organizationId,'verified-billing-binding','stripe.live.binding.pinned',
+          digest.slice(0,24),{revision:v.revision,apps:selection.length,
+            seats:v.seats,licensesGranted:false});
+        return {pinned:true,revision:v.revision,licensesGranted:false,
+          authorizesSeatChanges:false};
+      });
+    },
+    // Read only from a PRIVATE server adapter; this method is not routed.
+    // The returned tuple is suitable for the LIVE read-only reader, but
+    // is NEVER evidence that the subscription was paid or not refunded.
+    readPinnedStripeLiveBinding({organizationId,subscriptionId}={}){
+      if(!safeId(organizationId)||typeof subscriptionId!=='string'||
+         !/^sub_[A-Za-z0-9_]{4,128}$/.test(subscriptionId))return null;
+      const row=db.prepare(`SELECT b.org,b.subscription_id,b.customer_id,b.price_id,
+         b.plan,b.apps,b.seats,b.revision FROM stripe_live_subscription_pins b
+         JOIN stripe_live_customer_pins c ON c.customer_id=b.customer_id
+          AND c.org=b.org WHERE b.org=? AND b.subscription_id=?`)
+        .get(organizationId,subscriptionId);
+      if(!row)return null;
+      return Object.freeze({
+        organizationId:row.org,subscriptionId:row.subscription_id,
+        customerId:row.customer_id,priceId:row.price_id,
+        plan:row.plan,apps:Object.freeze(JSON.parse(row.apps)),
+        seats:row.seats,revision:row.revision,source:'pinned_stripe_live',
+        licensesGranted:false,authorizesSeatChanges:false
+      });
     },
     // INTERNAL outbox operations. No HTTP routes. Claim tokens make competing
     // private workers mutually exclusive even across multiple Passenger processes.
