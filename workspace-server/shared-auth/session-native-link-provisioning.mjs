@@ -80,7 +80,10 @@ export function createWorkspaceNativeLinkProvisioner({
     organizationId:ctx.workspaceOrganizationId,
     accountId:ctx.actorId,sessionId:ctx.sessionId
    });
-   if(!Number.isSafeInteger(revision)||revision!==ctx.auditRevision)
+   if(!revision||!Number.isSafeInteger(revision.organizationAuditRevision)||
+      !Number.isSafeInteger(revision.sessionLockEpoch)||
+      revision.organizationAuditRevision!==ctx.auditRevision||
+      revision.sessionLockEpoch!==ctx.sessionLockEpoch)
      return false;
 
    // Deprovision even if target member was suspended, seat expired, or
@@ -153,13 +156,18 @@ export function createWorkspaceNativeLinkProvisioner({
   if(!parent||!validUuid(parent.subject))deny();
   // Read the durable monotonic audit generation BEFORE creating the
   // trusted per-request scope. Every callback compares it after native IO.
-  const auditRevision=organizationStore.nativeProvisioningAuditRevision({
+  const revision=organizationStore.nativeProvisioningAuditRevision({
    organizationId:request.workspaceOrganizationId,
    accountId:parent.subject,sessionId:request.sessionId
   });
-  if(!Number.isSafeInteger(auditRevision)||auditRevision<=0)deny();
+  if(!revision||!Number.isSafeInteger(revision.organizationAuditRevision)||
+     revision.organizationAuditRevision<=0||
+     !Number.isSafeInteger(revision.sessionLockEpoch)||
+     revision.sessionLockEpoch<=0)deny();
   const ctx=Object.freeze({
-   operation,auditRevision,sessionId:request.sessionId,actorId:parent.subject,
+   operation,auditRevision:revision.organizationAuditRevision,
+   sessionLockEpoch:revision.sessionLockEpoch,
+   sessionId:request.sessionId,actorId:parent.subject,
    userId:request.userId,appId:request.appId,
    workspaceOrganizationId:request.workspaceOrganizationId,
    ...(operation!=='revoke'?{
