@@ -77,4 +77,6 @@ Both ends must follow exactly this order and the same JSON number and string enc
 
 `workspace-server/tests/signed-native-ownership-verifier.test.mjs` generates synthetic ephemeral Ed25519 keys and intercepts a fake fetch transport. It checks valid proof binding, per-purpose domain separation, replay protection, tampered signatures, mismatched tenant IDs, inactive users, expired/future proofs, oversized/non-JSON/redirect responses, insecure configuration and browser-injected role claims.
 
+Additional `signed-native-ownership-cross-store.test.mjs` integration tests use the same signed proof contract with **real disposable Workspace identity and organization SQLite databases**. They verify an explicit signed `bind` without activating a legacy broker grant, a valid signed `inspect` producing **only** a non-authorizing candidate, signed but wrong native identity/tenant, central session/permission revocation (including while a valid signature is being produced), and DataDuck/unassigned-app denial. All trust and billing callbacks in these tests are synthetic.
+
 The module and its test are **not** proof of real native ownership. Keep the PR draft/unmerged and coordinate across the existing six app stream before introducing any native verification route.
