@@ -1114,8 +1114,18 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       if(coveredSeats<assigned+reserved)return null;
       if(!this.effectivePermissions({organizationId,accountId,appId}).includes(permission))
         return null;
+      // AUTOINCREMENT-backed per-organization audit cursor: role edits,
+      // per-user overrides, membership changes and verified LIVE billing
+      // transitions advance this even if they later restore identical values.
+      // It is private preflight freshness evidence, never an app grant.
+      const authorizationAuditRevision=db.prepare(
+        'SELECT MAX(id) AS revision FROM organization_audit WHERE org=?'
+      ).get(organizationId)?.revision;
+      if(!Number.isSafeInteger(authorizationAuditRevision)||
+         authorizationAuditRevision<1)return null;
       return Object.freeze({organizationId,accountId,appId,
         role:member.role,permission,verifiedPaidThroughMs:earliestPaidThrough*1000,
+        authorizationAuditRevision,
         source:'verified_live_subscription_ledger',nativeEnforcementRequired:true,
         accessGranted:false,licensesGranted:false});
     },
