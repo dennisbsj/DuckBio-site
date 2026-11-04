@@ -198,10 +198,11 @@ function duckNoteFixture(id,factory,now){
  * and MUST NOT become central SSO authority.
  */
 export async function rehearseSixNativeLookupFactories({
- factories,now=NOW
+ factories,onVerifiedLookups=null,now=NOW
 }={}){
  if(!(factories instanceof Map)||factories.size!==6||
-    !Number.isSafeInteger(now)||now<=0)
+    !Number.isSafeInteger(now)||now<=0||
+    (onVerifiedLookups!==null&&typeof onVerifiedLookups!=='function'))
   return result(false,'invalid_native_lookup_matrix');
  const root=mkdtempSync(join(tmpdir(),'duckbio-six-native-lookups-'));
  chmodSync(root,0o700);
@@ -263,9 +264,20 @@ export async function rehearseSixNativeLookupFactories({
     checks.push({id:row.id,ok:true});
    }catch{return result(false,'native_lookup_failed_'+row.id,checks)}
   }
-  // The central signed verifier consumes these lookups only in a separate
-  // isolated rehearsal; they are never returned as a live permission/grant.
-  return result(true,'five_real_sqlite_stores_plus_one_mock_pg_query',checks);
+  // Before disposable databases are destroyed, optionally connect the
+  // genuinely imported lookup implementations to the six native signers
+  // and the central Workspace Ed25519 verifier, in the SAME offline flow.
+  if(onVerifiedLookups){
+   let linked;
+   try{linked=await onVerifiedLookups(lookups)}
+   catch{return result(false,'signed_native_lookup_chain_failed',checks)}
+   if(!linked||linked.ok!==true||linked.deploymentAuthorized!==false||
+      !Array.isArray(linked.checks)||linked.checks.length!==6)
+    return result(false,'signed_native_lookup_chain_failed',checks);
+  }
+  const done=result(true,'five_real_sqlite_stores_plus_one_mock_pg_query',checks);
+  return Object.freeze({...done,
+   signedNativeChainChecked:onVerifiedLookups!==null});
  }finally{rmSync(root,{recursive:true,force:true})}
 }
 
@@ -275,9 +287,9 @@ export async function rehearseSixNativeLookupFactories({
 export async function auditSixGenuineNativeLookups({sourcesRoot}={}){
  const before=verifySixNativeLookupSources(sourcesRoot);
  if(!before.ok)return before;
- let factories;
+ let factories,signerFactories;
  try{
-  factories=new Map();
+  factories=new Map();signerFactories=new Map();
   for(let i=0;i<SIX_NATIVE_LOOKUP_MODULES.length;i++){
    const row=SIX_NATIVE_LOOKUP_MODULES[i];
    const repo=SIX_NATIVE_SIGNER_CHECKOUTS[i];
@@ -287,14 +299,26 @@ export async function auditSixGenuineNativeLookups({sourcesRoot}={}){
    if(typeof factory!=='function')
     return result(false,'missing_'+row.id+'_native_lookup_export');
    factories.set(row.id,factory);
+   const signerModule=await import(pathToFileURL(join(
+     sourcesRoot,repo.repo,repo.file)).href);
+   const signerFactory=signerModule[repo.factory]??
+    signerModule.default?.[repo.factory];
+   if(typeof signerFactory!=='function')
+    return result(false,'missing_'+row.id+'_native_signer_export');
+   signerFactories.set(row.id,signerFactory);
   }
  }catch{return result(false,'native_lookup_import_failed')}
- const output=await rehearseSixNativeLookupFactories({factories});
+ const output=await rehearseSixNativeLookupFactories({
+  factories,
+  onVerifiedLookups:lookups=>rehearseSixNativeSignerFactories({
+    factories:signerFactories,nativeLookups:lookups
+  })
+ });
  if(!output.ok)return output;
  const after=verifySixNativeLookupSources(sourcesRoot);
  if(!after.ok)return result(false,'native_lookup_sources_changed');
  return Object.freeze({...output,
-  reason:'six_real_native_lookup_implementations_offline_verified',
+  reason:'six_real_native_signer_and_lookup_chain_offline_verified',
   sourcesPinned:true,deploymentAuthorized:false});
 }
 
@@ -312,6 +336,6 @@ if(process.argv[1]&&resolve(process.argv[1])===
   if(!output.ok){
    console.error('BLOCKED offline native lookup: '+output.reason);
    process.exitCode=1;
-  }else console.log('PASS six real native ownership lookup modules with synthetic data; five real SQLite DBs, one mocked DuckNote PostgreSQL query; NO native service, live SSO or deployment');
+  }else console.log('PASS six real native signer+lookup modules against Workspace Ed25519 with synthetic data; five real SQLite DBs, one mocked DuckNote PostgreSQL query; NO native service, live SSO or deployment');
  }
 }
