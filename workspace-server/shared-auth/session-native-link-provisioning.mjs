@@ -41,7 +41,7 @@ export function createWorkspaceNativeLinkProvisioner({
 }={}){
  if(typeof getIdentityStore!=='function'||!organizationStore||
     ['currentSessionOrganization','verifiedNativePermissionCandidate',
-     'nativeProvisioningAuditRevision']
+     'nativeProvisioningAuditRevision','nativeProvisioningAcquireCommitFence']
       .some(k=>typeof organizationStore[k]!=='function')||
     typeof verifyNativeOwnership!=='function'||typeof clock!=='function')
    throw Error('trusted_native_operator_dependencies_required');
@@ -111,7 +111,7 @@ export function createWorkspaceNativeLinkProvisioner({
 
  function matchesScope(tuple){
   const ctx=scope.getStore();
-  if(!ctx||!tuple||typeof tuple!=='object')return false;
+  if(!ctx||ctx.guard.closed||!tuple||typeof tuple!=='object')return false;
   if(tuple.operation!==ctx.operation||
      tuple.actorId!==ctx.actorId||tuple.userId!==ctx.userId||
      tuple.appId!==ctx.appId||
@@ -125,20 +125,45 @@ export function createWorkspaceNativeLinkProvisioner({
   return true;
  }
 
+ // The private commit fence must be taken AFTER the native HTTPS await
+ // but BEFORE the last role/seat check and the canonical identity INSERT.
+ // A separate SQLite writer cannot modify the organization while held.
+ function takeCommitFence(ctx){
+  if(ctx.guard.lease!==null)return false;
+  const lease=organizationStore.nativeProvisioningAcquireCommitFence({
+   organizationId:ctx.workspaceOrganizationId,accountId:ctx.actorId,
+   sessionId:ctx.sessionId,
+   organizationAuditRevision:ctx.auditRevision,
+   sessionLockEpoch:ctx.sessionLockEpoch
+  });
+  if(!lease||typeof lease.release!=='function')return false;
+  ctx.guard.lease=lease;
+  return current(ctx)===true;
+ }
  const adapters=Object.freeze({
   async authorizeMutation(tuple){
    const ctx=scope.getStore();
-   return matchesScope(tuple)&&current(ctx)===true;
+   if(!matchesScope(tuple)||!current(ctx))return false;
+   if(ctx.operation==='revoke'&&ctx.guard.lease===null)
+     return takeCommitFence(ctx);
+   // For binds/migrations, initial authorization is pre-native; later
+   // authorization MUST still be fenced by the verified native proof.
+   return !ctx.guard.nativeVerified||ctx.guard.lease!==null;
   },
   async verifyNativeOwnership(tuple){
    const ctx=scope.getStore();
-   if(!matchesScope(tuple)||ctx.operation==='revoke'||!current(ctx))
+   if(!matchesScope(tuple)||ctx.operation==='revoke'||!current(ctx)||
+      ctx.guard.nativeVerified||ctx.guard.lease!==null)
     return false;
    let verified;
    try{verified=(await verifyNativeOwnership(tuple))===true;}
    catch{return false;}
-   // Recheck session, admin lock and fresh paid seats after native await.
-   return verified&&current(ctx)===true;
+   if(!verified||!current(ctx))return false;
+   // No external calls inside the fence. The identity store performs only
+   // one final awaited local authority callback + synchronous SQLite commit.
+   if(!takeCommitFence(ctx))return false;
+   ctx.guard.nativeVerified=true;
+   return true;
   }
  });
 
@@ -165,6 +190,7 @@ export function createWorkspaceNativeLinkProvisioner({
      !Number.isSafeInteger(revision.sessionLockEpoch)||
      revision.sessionLockEpoch<=0)deny();
   const ctx=Object.freeze({
+   guard:{nativeVerified:false,lease:null,closed:false},
    operation,auditRevision:revision.organizationAuditRevision,
    sessionLockEpoch:revision.sessionLockEpoch,
    sessionId:request.sessionId,actorId:parent.subject,
@@ -176,6 +202,7 @@ export function createWorkspaceNativeLinkProvisioner({
   });
   if(!current(ctx))deny();
   return scope.run(ctx,async()=>{
+   try{
    let result;
    const base={actorId:ctx.actorId,userId:ctx.userId,appId:ctx.appId,
     workspaceOrganizationId:ctx.workspaceOrganizationId};
@@ -194,6 +221,15 @@ export function createWorkspaceNativeLinkProvisioner({
        result.link.loginEnabled!==false||result.link.linkOnly!==true))
      deny();
    return result;
+   }finally{
+    // Also releases on SQLite conflict, failed final authorization,
+    // native timeout, failed revoke or unexpected identity errors.
+    const lease=ctx.guard.lease;
+    ctx.guard.lease=null;
+    ctx.guard.nativeVerified=false;
+    ctx.guard.closed=true;
+    if(lease)lease.release();
+   }
   });
  }
  return Object.freeze({

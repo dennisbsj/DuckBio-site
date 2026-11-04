@@ -1152,6 +1152,62 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     // member, permission, role, seat, invitation and billing mutations all
     // advance AUTOINCREMENT id even if the effective policy is later restored.
     // This is deliberately NOT a paid seat, app grant or SSO decision.
+    // Strict PRIVATE opt-in write fence for the tiny *final* native identity
+    // SQLite commit section only. NEVER acquire this around remote native
+    // verification, Stripe calls, browser work, or other awaited I/O.
+    //
+    // SQLite BEGIN IMMEDIATE on a SEPARATE handle serializes writers to
+    // this exact organization SQLite file, including other processes.
+    // Existing org-store connection remains readable in WAL mode so caller
+    // can validate session/admin/paid-seat state while the lock is held.
+    //
+    // The returned lease has ONLY an idempotent release method. This is not
+    // a distributed lock across hosts/filesystems, a cross-DB atomic commit
+    // or a native application access grant.
+    nativeProvisioningAcquireCommitFence({organizationId,accountId,
+      sessionId,organizationAuditRevision,sessionLockEpoch}={}){
+      if(!nativeProvisioningSessionEpochs||
+         !Number.isSafeInteger(organizationAuditRevision)||
+         !Number.isSafeInteger(sessionLockEpoch)||
+         organizationAuditRevision<=0||sessionLockEpoch<=0)
+        return null;
+      const expected={organizationAuditRevision,sessionLockEpoch};
+      const select={organizationId,accountId,sessionId};
+      const same=revision=>revision!==null&&
+        revision.organizationAuditRevision===expected.organizationAuditRevision&&
+        revision.sessionLockEpoch===expected.sessionLockEpoch;
+      if(!same(this.nativeProvisioningAuditRevision(select)))return null;
+      let fence,locked=false;
+      try{
+        fence=new DatabaseSync(databasePath);
+        // Never block the Node event loop on another writer. Callers must
+        // explicitly retry from a fresh signed native proof if busy.
+        fence.exec('PRAGMA busy_timeout=0');
+        fence.exec('BEGIN IMMEDIATE');
+        locked=true;
+        // A different process might have committed AFTER initial check but
+        // BEFORE this BEGIN IMMEDIATE. A fresh read under the lock is vital.
+        if(!same(this.nativeProvisioningAuditRevision(select))){
+          fence.exec('ROLLBACK');
+          fence.close();
+          return null;
+        }
+        let released=false;
+        return Object.freeze({
+          release(){
+            if(released)return;
+            released=true;
+            try{fence.exec('ROLLBACK');}finally{fence.close();}
+          }
+        });
+      }catch{
+        if(fence){
+          if(locked)try{fence.exec('ROLLBACK');}catch{}
+          try{fence.close();}catch{}
+        }
+        return null;
+      }
+    },
     nativeProvisioningAuditRevision({organizationId,accountId,sessionId}={}){
       if(!nativeProvisioningSessionEpochs||!safeId(organizationId)||
          !safeId(accountId)||!safeId(sessionId))return null;

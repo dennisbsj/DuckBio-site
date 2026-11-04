@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
+import {DatabaseSync} from 'node:sqlite';
+import {spawnSync} from 'node:child_process';
 import {randomUUID,generateKeyPairSync,sign} from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,7 +16,7 @@ const START=1800000000000;
 const PAID_THROUGH=1800000060; // verified term ends 60 seconds after START
 const PASSWORD='only-private-isolated-synthetic-provisioning-password';
 const appId='goflo';
-async function fixture(t,{historicalOnly=false}={}){
+async function fixture(t,{historicalOnly=false,fenceProbe=null}={}){
  const root=mkdtempSync(path.join(os.tmpdir(),'workspace-operator-provision-'));
  let now=START, duringNative=null,nativeVerified=true,nativeRequests=0;
  const userIds=Object.freeze({ownerA:randomUUID(),ownerB:randomUUID(),
@@ -41,14 +43,25 @@ async function fixture(t,{historicalOnly=false}={}){
    });
   }
  });
+ const organizationDatabasePath=path.join(root,'private','org.sqlite');
  const org=createOrganizationStore({
-  databasePath:path.join(root,'private','org.sqlite'),
+  databasePath:organizationDatabasePath,
   clock:()=>now,verifyLiveSubscriptionEvidence:value=>value,
   nativeProvisioningSessionEpochs:true
  });
  let identity;
+ // Synthetic test observer only. The actual organization store still owns
+ // and acquires the real SQLite write lock on its private DB path.
+ const fencedOrg=fenceProbe?Object.freeze({
+  ...org,
+  nativeProvisioningAcquireCommitFence(args){
+   const lease=org.nativeProvisioningAcquireCommitFence(args);
+   if(lease)fenceProbe({lease,organizationDatabasePath,args});
+   return lease;
+  }
+ }):org;
  const controller=createWorkspaceNativeLinkProvisioner({
-  getIdentityStore:()=>identity,organizationStore:org,
+  getIdentityStore:()=>identity,organizationStore:fencedOrg,
   verifyNativeOwnership:signed.verifyNativeOwnership,clock:()=>now
  });
  identity=createIdentityStore({
@@ -97,7 +110,7 @@ async function fixture(t,{historicalOnly=false}={}){
   nativeUserId:'native-user-'+organizationId,
   nativeOrganizationId:'native-tenant-'+organizationId
  });
- return {identity,org,controller,userIds,adminSessionA,adminSessionB,
+ return {identity,org,controller,organizationDatabasePath,userIds,adminSessionA,adminSessionB,
   memberSession,input,now:()=>now,setNow:x=>{now=x},
   duringNative:fn=>{duringNative=fn},
   setNativeVerified:x=>{nativeVerified=x},
@@ -491,4 +504,179 @@ test('ABA: switch tenant A to B and back during native proof always denies origi
  assert.equal(f.identity.getOrganizationNativeLink({
   userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
  }),null);
+});
+
+
+test('real SQLite write fence denies a competing organization writer DURING native identity commit',async t=>{
+ let probed=0;
+ const f=await fixture(t,{fenceProbe:({organizationDatabasePath})=>{
+  probed++;
+  const other=new DatabaseSync(organizationDatabasePath);
+  try{
+   other.exec('PRAGMA busy_timeout=0');
+   assert.throws(()=>other.exec('BEGIN IMMEDIATE'),
+    /database is locked/,
+    'other processes must not be able to change paid seats while the identity commit is fenced');
+  }finally{other.close();}
+ }});
+ const linked=await f.controller.bind(f.input());
+ assert.equal(linked.applied,true);
+ assert.equal(probed,1,'lock starts only after a successful native signature');
+ assert.equal(f.nativeRequests(),1);
+ assert.equal(linked.link.accessGranted,false);
+ const external=new DatabaseSync(f.organizationDatabasePath);
+ try{
+  external.exec('PRAGMA busy_timeout=0');
+  external.exec('BEGIN IMMEDIATE');
+  external.exec('ROLLBACK');
+ }finally{external.close();}
+ assert.equal(f.identity.orgNativeLinkAudit({
+  appId,workspaceOrganizationId:'alpha'
+ }).length,1);
+});
+
+test('a currently busy independent organization writer fails native binding closed; fresh signed retry succeeds',async t=>{
+ const f=await fixture(t);
+ const concurrent=new DatabaseSync(f.organizationDatabasePath);
+ concurrent.exec('PRAGMA busy_timeout=0');
+ concurrent.exec('BEGIN IMMEDIATE');
+ try{
+  await assert.rejects(f.controller.bind(f.input()),
+   /native_ownership_unverified/);
+  assert.equal(f.nativeRequests(),1);
+  assert.equal(f.identity.getOrganizationNativeLink({
+   userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
+  }),null);
+  assert.deepEqual(f.identity.orgNativeLinkAudit({
+   appId,workspaceOrganizationId:'alpha'
+  }),[]);
+ }finally{
+  concurrent.exec('ROLLBACK');
+  concurrent.close();
+ }
+ const retried=await f.controller.bind(f.input());
+ assert.equal(retried.applied,true,'new proof and fresh organization fence');
+ assert.equal(f.nativeRequests(),2);
+});
+
+test('SQLite identity conflict cannot leak the organization write lock',async t=>{
+ let entered=0;
+ const f=await fixture(t,{fenceProbe:({organizationDatabasePath})=>{
+  entered++;
+  const competing=new DatabaseSync(organizationDatabasePath);
+  try{
+   competing.exec('PRAGMA busy_timeout=0');
+   assert.throws(()=>competing.exec('BEGIN IMMEDIATE'),/database is locked/);
+  }finally{competing.close();}
+ }});
+ assert.equal((await f.controller.bind(f.input('alpha'))).applied,true);
+ // Second organization must not claim an identical native account ID.
+ await assert.rejects(f.controller.bind({
+  ...f.input('beta'),nativeUserId:'native-user-alpha'
+ }),/org_native_link_conflict/);
+ assert.equal(entered,2,'failed second commit was also fenced');
+ const independent=new DatabaseSync(f.organizationDatabasePath);
+ try{
+  independent.exec('PRAGMA busy_timeout=0');
+  independent.exec('BEGIN IMMEDIATE');
+  independent.exec('ROLLBACK');
+ }finally{independent.close();}
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.userIds.member,appId,workspaceOrganizationId:'beta'
+ }),null);
+});
+
+test('native deprovisioning is fenced even after paid-seat expiry and has no native network await',async t=>{
+ let probes=0;
+ const f=await fixture(t,{fenceProbe:({organizationDatabasePath})=>{
+  probes++;
+  const competing=new DatabaseSync(organizationDatabasePath);
+  try{
+   competing.exec('PRAGMA busy_timeout=0');
+   assert.throws(()=>competing.exec('BEGIN IMMEDIATE'),/database is locked/);
+  }finally{competing.close();}
+ }});
+ assert.equal((await f.controller.bind(f.input())).applied,true);
+ f.setNow(START+70_000);
+ f.org.setMemberActive({organizationId:'alpha',actorId:f.userIds.ownerA,
+  accountId:f.userIds.member,active:false});
+ const before=f.nativeRequests();
+ const removed=await f.controller.revoke({
+  sessionId:f.adminSessionA.id,userId:f.userIds.member,appId,
+  workspaceOrganizationId:'alpha'
+ });
+ assert.equal(removed.applied,true);
+ assert.equal(probes,2,'both bind and revoke held a real SQLite write fence');
+ assert.equal(f.nativeRequests(),before,'revoke must not depend on an available native endpoint');
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
+ }),null);
+});
+
+
+test('detached child tasks cannot reuse AsyncLocalStorage operator authority AFTER the final fenced commit',async t=>{
+ const f=await fixture(t);
+ const tuple={actorId:f.userIds.ownerA,userId:f.userIds.member,
+  appId,workspaceOrganizationId:'alpha',
+  nativeUserId:'native-user-alpha',
+  nativeOrganizationId:'native-tenant-alpha',operation:'bind'};
+ let releaseChild,childPromise;
+ const afterCommit=new Promise(resolve=>{releaseChild=resolve;});
+ f.duringNative(()=>{
+  // The .then callback is ATTACHED from inside native verification and
+  // inherits the real private async operator context. It is deliberately
+  // resumed only after the outer bind has committed and released the fence.
+  childPromise=afterCommit.then(async()=>({
+   authorized:await f.controller.adapters.authorizeMutation(tuple),
+   signed:await f.controller.adapters.verifyNativeOwnership(tuple)
+  }));
+ });
+ const linked=await f.controller.bind(f.input());
+ assert.equal(linked.applied,true);
+ assert.equal(linked.link.accessGranted,false);
+ releaseChild();
+ assert.deepEqual(await childPromise,{authorized:false,signed:false});
+ assert.equal(f.nativeRequests(),1,
+  'a detached post-commit callback must not request another signed proof');
+});
+
+
+test('actual separate Node process cannot BEGIN IMMEDIATE while Workspace holds the fenced native commit',async t=>{
+ const contenderProgram=[
+  "const {DatabaseSync}=require('node:sqlite');",
+  "let db;",
+  "try{",
+  " db=new DatabaseSync(process.argv[1]);",
+  " db.exec('PRAGMA busy_timeout=0');",
+  " db.exec('BEGIN IMMEDIATE');",
+  " db.exec('ROLLBACK');",
+  " process.exitCode=0;",
+  "}catch(error){",
+  " process.exitCode=/database is locked/i.test(error?.message??'')?3:4;",
+  " if(process.exitCode===4)process.stderr.write(String(error));",
+  "}finally{try{db?.close();}catch{}}"
+ ].join('\n');
+ const attempt=databasePath=>{
+  const result=spawnSync(process.execPath,
+   ['--no-warnings','--input-type=commonjs','-e',contenderProgram,databasePath],
+   {encoding:'utf8',timeout:5000});
+  assert.equal(result.error,undefined,
+   'synthetic competing Node process must execute successfully');
+  return result;
+ };
+ let seen=0;
+ const f=await fixture(t,{fenceProbe:({organizationDatabasePath})=>{
+  seen++;
+  const blocked=attempt(organizationDatabasePath);
+  assert.equal(blocked.status,3,
+   'real separate process cannot write organization SQLite during canonical identity commit: '+blocked.stderr);
+ }});
+ assert.equal((await f.controller.bind(f.input())).applied,true);
+ assert.equal(seen,1);
+ const afterwards=attempt(f.organizationDatabasePath);
+ assert.equal(afterwards.status,0,
+  'other process must be allowed to write immediately after commit-fence release: '+afterwards.stderr);
+ assert.equal(f.identity.orgNativeLinkAudit({
+  appId,workspaceOrganizationId:'alpha'
+ }).length,1);
 });
