@@ -48,7 +48,7 @@ const fail=(checks,id,code)=>Object.freeze({
 const positive=(checks,id)=>checks.push({id,ok:true,code:'ok'});
 export function validateSixNativeCookieBundle(config,lock,proofBundle,cookieBundle){
  if(!validateSixNativeProofBundle(config,lock,proofBundle).ok||
-    !['current','post-pkce'].includes(validateSixNativeStagingSnapshot(lock).kind))
+    !['current','post-pkce','ownership-mtls'].includes(validateSixNativeStagingSnapshot(lock).kind))
   return {ok:false,code:'central_native_proofs_not_preverified'};
  if(!okKeys(cookieBundle,EXACT)||cookieBundle.version!==1||
     cookieBundle.scope!=='synthetic-six-native-http-session-cookies'||
@@ -184,15 +184,15 @@ if(direct){
  const a=process.argv.slice(2);
  const oldArgs=a.length===9&&a[8]==='--confirm-readonly-synthetic-sessions-only';
  const postPkce=a.length===11&&a[8]==='--snapshot'&&
-  a[9]==='post-pkce'&&a[10]==='--confirm-readonly-synthetic-sessions-only';
+  ['post-pkce','ownership-mtls'].includes(a[9])&&a[10]==='--confirm-readonly-synthetic-sessions-only';
  if((!oldArgs&&!postPkce)||a[0]!=='--config'||a[2]!=='--sources-root'||
     a[4]!=='--broker-proofs'||a[6]!=='--native-cookies'){
-  console.error('Usage: node staging-six-native-http-sessions-audit.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS --broker-proofs PRIVATE_SYNTHETIC_BROKER_PROOFS_JSON --native-cookies PRIVATE_SYNTHETIC_NATIVE_COOKIES_JSON [--snapshot post-pkce] --confirm-readonly-synthetic-sessions-only');
+  console.error('Usage: node staging-six-native-http-sessions-audit.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS --broker-proofs PRIVATE_SYNTHETIC_BROKER_PROOFS_JSON --native-cookies PRIVATE_SYNTHETIC_NATIVE_COOKIES_JSON [--snapshot post-pkce|ownership-mtls] --confirm-readonly-synthetic-sessions-only');
   process.exitCode=2;
  }else try{
   const config=readPrivateConfiguration(a[1]);
   const lock=JSON.parse(readFileSync(new URL(
-   './'+stagingSnapshotFile(postPkce?'post-pkce':'current'),import.meta.url),'utf8'));
+   './'+stagingSnapshotFile(postPkce?a[9]:'current'),import.meta.url),'utf8'));
   const report=await auditSixNativeHttpSessions({
    config,lock,sourcesRoot:a[3],
    proofBundle:readPrivateSixNativeProofBundle(a[5]),
