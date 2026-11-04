@@ -732,6 +732,29 @@ html:not([data-theme="dark"]) .settings-panel button:hover{background:#e5f6fa}
 .app img.sprite.s6 {background-image:url("assets/icons/duckbio-20261103/duckman-448.webp") !important;background-size:100% 100% !important;background-position:center !important;}
 .app img.sprite.s3 {background-image:url("assets/icons/duckbio-20261103/ducktrain-448.webp") !important;background-size:100% 100% !important;background-position:center !important;}
 .app img.sprite.s4 {background-image:url("assets/icons/duckbio-20261103/duckpipe-448.webp") !important;background-size:100% 100% !important;background-position:center !important;}
+
+/* DuckBio app catalogue groups: Core, Process, Science — 2026-11-04 */
+.duckbio-workspace-groups{display:grid;gap:20px}
+.duckbio-workspace-group{min-width:0}
+.duckbio-workspace-group-header{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 14px;border-bottom:1px solid #76bbce66;margin:0 0 10px;padding:0 2px 7px}
+.duckbio-workspace-group-header h2{font-size:16px;line-height:1.25;color:#34a7ba;margin:0;font-weight:850}
+.duckbio-workspace-group-header p{font-size:11px;color:#547c8d;margin:0;line-height:1.4}
+.duckbio-workspace-group .grid.duckbio-workspace-group-cards{display:grid;gap:12px;align-items:stretch}
+.duckbio-workspace-group--core .grid.duckbio-workspace-group-cards{grid-template-columns:repeat(4,minmax(0,1fr))}
+.duckbio-workspace-group--process .grid.duckbio-workspace-group-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+.duckbio-workspace-group--science .grid.duckbio-workspace-group-cards{grid-template-columns:minmax(0,1fr);max-width:430px}
+.duckbio-workspace-group .app{min-width:0}
+html[data-theme="dark"] .duckbio-workspace-group-header h2{color:#86edf2}
+html[data-theme="dark"] .duckbio-workspace-group-header p{color:#b5dee9}
+@media(max-width:1050px){
+ .duckbio-workspace-group--core .grid.duckbio-workspace-group-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:550px){
+ .duckbio-workspace-group--core .grid.duckbio-workspace-group-cards,
+ .duckbio-workspace-group--process .grid.duckbio-workspace-group-cards,
+ .duckbio-workspace-group--science .grid.duckbio-workspace-group-cards{grid-template-columns:minmax(0,1fr);max-width:none}
+}
+
 </style>
 <link rel="stylesheet" href="assets/workspace-admin.css?v=20261101-1">
 </head>
@@ -744,14 +767,29 @@ html:not([data-theme="dark"]) .settings-panel button:hover{background:#e5f6fa}
 <div class="shell">
 <main>
 <div class="main-title"><div><span class="kicker">MY APPS</span><h1>Your DuckBio workspace</h1><p>Click or tap a card below to open that app’s product page.</p></div><span class="count" id="workspace-app-count" aria-live="polite" aria-label="Preview: seven public product cards, not actual purchases or access entitlements" title="Preview only: seven product cards are shown. Purchases and DataDuck integration are not connected.">7 apps</span></div>
-<div class="grid">
-<a class="app" href="labduck.html" target="_top" aria-label="Open LabDuck product page"><img class="icon duckbio-app-glyph" src="assets/icons/app-glyphs-20261104/labduck.svg" width="128" height="128" alt="" loading="eager"><span class="launcher-app-category"><b>LAB</b>ORATORY INFORMATION MANAGEMENT SYSTEM</span><strong class="launcher-app-name"><b>Lab</b>Duck</strong><small>Track samples, inventory, batches and laboratory results with role-based review.</small><span class="action">Learn more ↗</span></a>
-<a class="app" href="cytoduck.html" target="_top" aria-label="Open CytoDuck product page"><img class="icon duckbio-app-glyph" src="assets/icons/app-glyphs-20261104/cytoduck.svg" width="128" height="128" alt="" loading="eager"><span class="launcher-app-category">FLOW <b>CYTO</b>METRY ANALYSIS</span><strong class="launcher-app-name"><b>Cyto</b>Duck</strong><small>Explore FCS data with flexible plots, gating and analysis reports.</small><span class="action">Learn more ↗</span></a>
-<a class="app" href="duckpipe.html" target="_top" aria-label="Open DuckPipe product page"><img class="icon duckbio-app-glyph" src="assets/icons/app-glyphs-20261104/duckpipe-approved-gradient-512.webp" width="128" height="128" alt="" loading="eager"><span class="launcher-app-category">METHOD VALIDATION <b>PIPE</b>LINE MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Pipe</b></strong><small>Organise methods, validation activities and review access.</small><span class="action">Learn more ↗</span></a>
+<div class="duckbio-workspace-groups">
+<section class="duckbio-workspace-group duckbio-workspace-group--core" aria-labelledby="workspace-core-heading">
+ <div class="duckbio-workspace-group-header"><h2 id="workspace-core-heading">Core</h2><p>DuckNote · LabDuck · DataDuck · DuckMan</p></div>
+ <div class="grid duckbio-workspace-group-cards">
 <a class="app" href="eel.html" target="_top" aria-label="Open DuckNote product page"><img class="icon duckbio-app-glyph" src="assets/icons/app-glyphs-20261104/ducknote.svg" width="128" height="128" alt="" loading="eager"><span class="launcher-app-category">ELECTRONIC LAB <b>NOTE</b>BOOK</span><strong class="launcher-app-name">Duck<b>Note</b></strong><small>Record experiments, revisit versions and organise scientific documentation.</small><span class="action">Learn more ↗</span></a>
-<a class="app" href="duckman.html" target="_top" aria-label="Open DuckMan product page"><img class="icon duckbio-app-glyph" src="assets/icons/app-glyphs-20261104/duckman.svg" width="128" height="128" alt="" loading="eager"><span class="launcher-app-category"><b>DUCK</b>UMENT MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Man</b></strong><small>Control document versions, reviews, approvals and release histories.</small><span class="action">Learn more ↗</span></a>
-<a class="app" href="mantrain.html" target="_top" aria-label="Open DuckTrain product page"><img class="icon duckbio-app-glyph" src="assets/icons/app-glyphs-20261104/ducktrain.svg" width="128" height="128" alt="" loading="eager"><span class="launcher-app-category"><b>TRAIN</b>ING &amp; QUALIFICATION MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Train</b></strong><small>Assign training, track qualifications and maintain competency records.</small><span class="action">Learn more ↗</span></a>
+<a class="app" href="labduck.html" target="_top" aria-label="Open LabDuck product page"><img class="icon duckbio-app-glyph" src="assets/icons/app-glyphs-20261104/labduck.svg" width="128" height="128" alt="" loading="eager"><span class="launcher-app-category"><b>LAB</b>ORATORY INFORMATION MANAGEMENT SYSTEM</span><strong class="launcher-app-name"><b>Lab</b>Duck</strong><small>Track samples, inventory, batches and laboratory results with role-based review.</small><span class="action">Learn more ↗</span></a>
 <a class="app" href="dataduck.html" target="_top" aria-label="Open DataDuck product page (integration preview)"><img class="icon duckbio-app-glyph" src="assets/icons/app-glyphs-20261104/dataduck.svg" width="128" height="128" alt="" loading="eager"><span class="launcher-app-category">SCIENTIFIC <b>DATA</b> ANALYSIS</span><strong class="launcher-app-name"><b>Data</b>Duck</strong><small>Explore datasets, charts and results in a dedicated analysis workspace. Integration in progress.</small><span class="action">Learn more ↗</span></a>
+<a class="app" href="duckman.html" target="_top" aria-label="Open DuckMan product page"><img class="icon duckbio-app-glyph" src="assets/icons/app-glyphs-20261104/duckman.svg" width="128" height="128" alt="" loading="eager"><span class="launcher-app-category"><b>DUCK</b>UMENT MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Man</b></strong><small>Control document versions, reviews, approvals and release histories.</small><span class="action">Learn more ↗</span></a>
+ </div>
+</section>
+<section class="duckbio-workspace-group duckbio-workspace-group--process" aria-labelledby="workspace-process-heading">
+ <div class="duckbio-workspace-group-header"><h2 id="workspace-process-heading">Process</h2><p>DuckPipe · DuckTrain</p></div>
+ <div class="grid duckbio-workspace-group-cards">
+<a class="app" href="duckpipe.html" target="_top" aria-label="Open DuckPipe product page"><img class="icon duckbio-app-glyph" src="assets/icons/app-glyphs-20261104/duckpipe-approved-gradient-512.webp" width="128" height="128" alt="" loading="eager"><span class="launcher-app-category">METHOD VALIDATION <b>PIPE</b>LINE MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Pipe</b></strong><small>Organise methods, validation activities and review access.</small><span class="action">Learn more ↗</span></a>
+<a class="app" href="mantrain.html" target="_top" aria-label="Open DuckTrain product page"><img class="icon duckbio-app-glyph" src="assets/icons/app-glyphs-20261104/ducktrain.svg" width="128" height="128" alt="" loading="eager"><span class="launcher-app-category"><b>TRAIN</b>ING &amp; QUALIFICATION MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Train</b></strong><small>Assign training, track qualifications and maintain competency records.</small><span class="action">Learn more ↗</span></a>
+ </div>
+</section>
+<section class="duckbio-workspace-group duckbio-workspace-group--science" aria-labelledby="workspace-science-heading">
+ <div class="duckbio-workspace-group-header"><h2 id="workspace-science-heading">Science</h2><p>CytoDuck</p></div>
+ <div class="grid duckbio-workspace-group-cards">
+<a class="app" href="cytoduck.html" target="_top" aria-label="Open CytoDuck product page"><img class="icon duckbio-app-glyph" src="assets/icons/app-glyphs-20261104/cytoduck.svg" width="128" height="128" alt="" loading="eager"><span class="launcher-app-category">FLOW <b>CYTO</b>METRY ANALYSIS</span><strong class="launcher-app-name"><b>Cyto</b>Duck</strong><small>Explore FCS data with flexible plots, gating and analysis reports.</small><span class="action">Learn more ↗</span></a>
+ </div>
+</section>
 </div>
 <div class="notice">Preview only. These links open public product pages, not authenticated apps. Access controls, billing and workspace accounts will be connected separately when implemented.</div>
 </main></div>
