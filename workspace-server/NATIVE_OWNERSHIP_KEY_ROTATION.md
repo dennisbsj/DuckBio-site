@@ -56,7 +56,7 @@ These are **illustrative field names, not valid production secrets or a deployab
 - Workspace selects the pinned public key **only** by the exact configured app ID + exact signed `keyId`.
 - The selected key must be valid when the Workspace request begins **and** when verification completes; `issuedAt` must be within the configured key window and `expiresAt` must not exceed its retirement time. A signing key expiring during the network response fails closed.
 - When **all** configured keys are inactive, Workspace makes **zero** native requests and returns false. A native app signing with a retired key during overlap fails even if another key is valid.
-- A signing key is unique to one `keyId` for the app. Separate native apps must manage independent private keys and credentials; their server-side authorization/tenant checks remain independent.
+- A signing key is unique to one `keyId` **and one registered native app**. Workspace rejects an identical Ed25519 public key pinned to two different apps, regardless of registration order. Separate native apps must manage independent private keys and credentials; their server-side authorization/tenant checks remain independent.
 - The existing legacy single key continues to be accepted under its original configuration. **Production operators must explicitly migrate legacy configs to time-bounded `signingKeys` before they can enforce automatic retirement.**
 
 ## Recommended staging rollout
