@@ -1,6 +1,6 @@
 import {createHmac,createHash,timingSafeEqual} from 'node:crypto';
 import {STRIPE_LIVE_EVENT_PREFIXES,stripeLiveReviewCategory,
- stripeLiveReviewObjectType} from './stripe-live-review-event-catalog.mjs';
+ stripeLiveReviewObjectType,stripeLiveEventIdMatches} from './stripe-live-review-event-catalog.mjs';
 
 // PRIVATE Stripe LIVE signature verification, intentionally detached from billing state.
 // Never treat a signed event or Checkout completion as proof that an invoice was paid.
@@ -44,7 +44,7 @@ export function createStripeLiveWebhookVerifier({webhookSecret,clock=Date.now}={
       !event.data||typeof event.data!=='object'||Array.isArray(event.data)||
       !event.data.object||typeof event.data.object!=='object'||
       Array.isArray(event.data.object)||event.data.object.livemode!==true||
-      !objectId(event.data.object.id,STRIPE_LIVE_EVENT_PREFIXES[event.type])||
+      !stripeLiveEventIdMatches(event.type,event.data.object.id)||
       (stripeLiveReviewObjectType(event.type)!==null&&
        event.data.object.object!==stripeLiveReviewObjectType(event.type)))
     throw Error('Unsupported Stripe LIVE webhook event');
