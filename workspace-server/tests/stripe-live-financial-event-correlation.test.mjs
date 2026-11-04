@@ -253,3 +253,49 @@ test('pin revision changes during a Stripe await invalidate the entire correlati
  assert.equal(out.linksVerifiedForReview,false);
  assert.equal(f.purchased(),0);
 });
+
+test('oversize, broken UTF-8, HTTP errors and incomplete provider data all fail closed',async t=>{
+ const f=fixture(t);
+ const eventId=f.put('refund');
+ const source='charges/'+ids.charge;
+ const original=f.snap[source];
+ for(const reply of [
+  new Response('x'.repeat(131073),{
+   headers:{'content-type':'application/json'}
+  }),
+  new Response(new Uint8Array([123,34,120,34,58,34,195,40,34,125]),{
+   headers:{'content-type':'application/json'}
+  }),
+  new Response('Stripe unavailable',{
+   status:503,headers:{'content-type':'application/json'}
+  }),
+  new Response('{}',{headers:{'content-type':'text/html'}}),
+  new Response('{"object":"charge"',{
+   headers:{'content-type':'application/json'}
+  })
+ ]){
+  f.snap[source]=reply;
+  const out=await inspect(f,'refund',eventId);
+  assert.equal(out.linksVerifiedForReview,false);
+  assert.equal(out.licensesGranted,false);
+  assert.equal(out.authorizesSeatChanges,false);
+  assert.equal(out.paymentEvidenceAuthoritative,false);
+ }
+ f.snap[source]=original;
+ assert.equal(f.purchased(),0);
+});
+test('denied historical invoice hint and missing event never expose private provider IDs',async t=>{
+ const f=fixture(t);
+ const eventId=f.put('refund');
+ for(const args of [
+  {organizationId:ids.org,subscriptionId:ids.sub,eventId},
+  {organizationId:'../other',subscriptionId:ids.sub,eventId,invoiceId:ids.invoice},
+  {organizationId:ids.org,subscriptionId:ids.sub,eventId:'evt_fake?',invoiceId:ids.invoice}
+ ]){
+  const out=await f.correlate.inspect(args);
+  assert.equal(out.linksVerifiedForReview,false);
+  assert(!JSON.stringify(out).includes(ids.customer));
+  assert(!JSON.stringify(out).includes(ids.invoice));
+ }
+ assert.equal(f.purchased(),0);
+});
