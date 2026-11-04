@@ -37,6 +37,23 @@ const POST_PKCE_APPROVED=Object.freeze({
  mantrain:Object.freeze({sha:'7fd90350965d0c2d0b4df6a73bb9088fe826ccd7',
   runId:41786905381,workflowId:406042373})
 });
+// New exact merged-main native ownership mTLS evidence. This is an OPT-IN
+// UNINSTALLED staging source candidate, NOT central role/seat enforcement.
+const OWNERSHIP_MTLS_APPROVED=Object.freeze({
+ goflo:Object.freeze({sha:'ba22006b75b75d6b1fbe680c3d59116768806798',
+  runId:41823086283,workflowId:406043715}),
+ eel:Object.freeze({sha:'c64da055b82e0f8a499c5dd6ef47eaaa089be13f',
+  runId:41825543890,workflowId:406043818}),
+ methpipe:Object.freeze({sha:'cd5369134c230c5afcbd0fc4a4bf9a136d5211b7',
+  runId:41825060709,workflowId:406043868}),
+ mantrain:Object.freeze({sha:'f25eabfbb0cb9ebac45c77948a14b217fa458733',
+  runId:41825092520,workflowId:406042373}),
+ duckman:Object.freeze({sha:'f8a86c10db6b6ec86b6224a8c81b90cebcf652d2',
+  runId:41825150001,workflowId:406043909}),
+ limsman:Object.freeze({sha:'48a2ee834f1bcc6eb3f910ad5399cc4883acb2bd',
+  runId:41825121913,workflowId:406043938})
+});
+
 function reviewedSnapshot(lock,approved){
  return lock.central.runId===CURRENT_APPROVED.central.runId&&
   lock.central.workflowId===CURRENT_APPROVED.central.workflowId&&
@@ -54,6 +71,8 @@ export function validateSixNativeStagingSnapshot(lock){
   return Object.freeze({ok:true,kind:'current'});
  if(current.ok&&reviewedSnapshot(lock,POST_PKCE_APPROVED))
   return Object.freeze({ok:true,kind:'post-pkce'});
+ if(current.ok&&reviewedSnapshot(lock,OWNERSHIP_MTLS_APPROVED))
+  return Object.freeze({ok:true,kind:'ownership-mtls'});
  return Object.freeze({ok:false,kind:null});
 }
 
@@ -63,5 +82,6 @@ export function stagingSnapshotFile(choice='historical'){
  if(choice==='historical')return 'six-app-source-qa-lock.json';
  if(choice==='current')return 'six-native-current-compat-lock.json';
  if(choice==='post-pkce')return 'six-native-post-pkce-compat-lock.json';
+ if(choice==='ownership-mtls')return 'six-native-ownership-mtls-compat-lock.json';
  throw Error('unsupported_staging_snapshot');
 }
