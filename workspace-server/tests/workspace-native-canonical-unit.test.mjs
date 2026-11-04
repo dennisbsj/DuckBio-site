@@ -163,3 +163,91 @@ test('missing private trust adapters cannot accidentally yield usable access',as
   organizationStore:{currentSessionOrganization(){},verifiedNativePermissionCandidate(){}}}),
  /trusted_native_mapping_verifier_required/);
 });
+
+test('permission revoke/regrant ABA inside native await is denied even if role, permission and paid term return unchanged',async t=>{
+ const f=fixture(t);
+ const request={organizationId:'alpha',accountId:'alice',appId:'goflo',
+  permission:'workspace.view'};
+ const before=f.store.verifiedNativePermissionCandidate(request);
+ assert(before&&Number.isSafeInteger(before.authorizationAuditRevision));
+ const check=f.create(async()=>{
+  f.store.setPermission({organizationId:'alpha',actorId:'admin-alpha',
+   accountId:'alice',appId:'goflo',permission:'workspace.view',enabled:false});
+  f.store.setPermission({organizationId:'alpha',actorId:'admin-alpha',
+   accountId:'alice',appId:'goflo',permission:'workspace.view',enabled:true});
+  const restored=f.store.verifiedNativePermissionCandidate(request);
+  assert(restored);
+  assert.equal(restored.role,before.role);
+  assert.equal(restored.verifiedPaidThroughMs,before.verifiedPaidThroughMs);
+  assert(restored.authorizationAuditRevision>before.authorizationAuditRevision);
+  return true;
+ });
+ assert.equal((await check.inspect(f.input)).reason,'access_changed_during_verification');
+ assert.equal((await f.create().inspect(f.input)).candidateReady,true);
+});
+
+test('role-policy revoke/restore ABA with the same role name is denied',async t=>{
+ const f=fixture(t);
+ const original=f.store.listRoles({organizationId:'alpha',actorId:'admin-alpha',
+  appId:'goflo'}).roles.find(x=>x.name==='Analyst').permissions;
+ const check=f.create(async()=>{
+  f.store.saveRole({organizationId:'alpha',actorId:'admin-alpha',
+   appId:'goflo',role:'Analyst',
+   permissions:original.filter(x=>x!=='workspace.view')});
+  f.store.saveRole({organizationId:'alpha',actorId:'admin-alpha',
+   appId:'goflo',role:'Analyst',permissions:original});
+  return true;
+ });
+ assert.equal((await check.inspect(f.input)).reason,'access_changed_during_verification');
+ assert.equal((await f.create().inspect(f.input)).candidateReady,true);
+});
+
+test('verified LIVE billing renewal with unchanged paid term and seats changes the preflight epoch',async t=>{
+ const f=fixture(t);
+ const initial=f.store.verifiedNativePermissionCandidate({
+  organizationId:'alpha',accountId:'alice',appId:'goflo',permission:'workspace.view'});
+ const check=f.create(async()=>{
+  f.store.applyVerifiedSubscriptionTransition({
+   eventKey:'evt-live-renewal-same-term',source:'stripe_live',
+   organizationId:'alpha',subscriptionId:'sub-alpha',revision:2,
+   plan:'Single',apps:['goflo'],seats:3,status:'active',paidThrough:1900000000
+  });
+  const next=f.store.verifiedNativePermissionCandidate({
+   organizationId:'alpha',accountId:'alice',appId:'goflo',permission:'workspace.view'});
+  assert(next);
+  assert.equal(next.verifiedPaidThroughMs,initial.verifiedPaidThroughMs);
+  assert.equal(next.role,initial.role);
+  assert(next.authorizationAuditRevision>initial.authorizationAuditRevision);
+  return true;
+ });
+ assert.equal((await check.inspect(f.input)).reason,'access_changed_during_verification');
+ assert.equal((await f.create().inspect(f.input)).candidateReady,true);
+});
+
+test('an unrelated organization audit update does not change the chosen tenant preflight epoch',async t=>{
+ const f=fixture(t);
+ const inspector=f.create(async()=>{
+  f.store.saveRole({organizationId:'beta',actorId:'admin-beta',
+   appId:'goflo',role:'Beta Scientist',permissions:['workspace.view']});
+  return true;
+ });
+ assert.equal((await inspector.inspect(f.input)).candidateReady,true);
+});
+
+test('missing or fabricated organization audit cursor cannot become a native candidate',async t=>{
+ const f=fixture(t);
+ for(const revision of [undefined,null,0,-1,'100',1.5,Number.MAX_SAFE_INTEGER+1]){
+  const organizationStore={
+   currentSessionOrganization:input=>f.store.currentSessionOrganization(input),
+   verifiedNativePermissionCandidate:input=>{
+    const original=f.store.verifiedNativePermissionCandidate(input);
+    return original?{...original,authorizationAuditRevision:revision}:null;
+   }
+  };
+  const inspector=createInspector({identityStore:f.identity,organizationStore,
+   verifyNativeMapping:async()=>true,clock:()=>1800000000000});
+  const result=await inspector.inspect(f.input);
+  assert.equal(result.candidateReady,false);
+  assert.equal(result.reason,'central_session_role_seat_or_link_missing');
+ }
+});
