@@ -42,7 +42,7 @@ A swapped or reused client registration (same `clientId`, client secret, local n
 
 **Compatibility:** Existing child proofs from earlier builds do not include `appId` and are intentionally treated as inactive after updating to this version. Users with old child sessions must reauthenticate to the native apps. Prior PKCE codes without a native identity snapshot were already denied by this branch. These changes are draft-only: review coordinated session cutover, communication and rollback before any production deployment.
 
-The new tests retain one disposable SQLite auth DB while swapping trusted registered-app configuration for each of the six clients, and check code exchange, HTTP introspection, direct native backend proof validation, old stored proof rows and parent-session identity mismatches. No application native backend or customer app server is contacted.
+The new tests retain one disposable SQLite auth DB while swapping trusted registered-app configuration for each of the six clients, and check code exchange, HTTP introspection, direct native backend proof validation, old stored proof rows parent-session identity mismatches, and rejected cross-app global logout while preserving a valid same-app revoke. No application native backend or customer app server is contacted.
 
 ## Release boundary
 
