@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import {DatabaseSync} from 'node:sqlite';
 import path from 'node:path';
 import os from 'node:os';
 import {mkdtempSync,rmSync,writeFileSync} from 'node:fs';
@@ -139,4 +140,77 @@ test('org-mode local identity adapter rejects all legacy grants even with curren
   'legacy mapping must not advertise an organization app as enabled');
  assert.equal(f.store.getAccess(f.user.id,'goflo')?.localIdentity.userId,nativeUser,
   'legacy standalone mapping remains stored but cannot authorize org mode');
+});
+
+test('global grant generation persists across fresh SQLite handles and same-tuple revoke/rebind',async t=>{
+ const f=await serverFixture(t);
+ const peer=createIdentityStore({databasePath:path.join(f.root,'identity.sqlite'),clock:()=>NOW});
+ t.after(()=>peer.close());
+ const before=f.store.getAccessWithRevision(f.user.id,'goflo');
+ assert.match(before.bindingRevision,/^legacy-global:[1-9][0-9]*$/);
+ peer.revokeAppAccess(f.user.id,'goflo');
+ assert.equal(f.store.getAccessWithRevision(f.user.id,'goflo'),null);
+ peer.grantAppAccess({userId:f.user.id,appId:'goflo',
+  localUserId:nativeUser,organizationId:nativeOrg});
+ const latest=f.store.getAccessWithRevision(f.user.id,'goflo');
+ assert.deepEqual(latest.localIdentity,before.localIdentity);
+ assert.notEqual(latest.bindingRevision,before.bindingRevision);
+ const reopened=createIdentityStore({databasePath:path.join(f.root,'identity.sqlite'),clock:()=>NOW});
+ t.after(()=>reopened.close());
+ assert.equal(reopened.getAccessWithRevision(f.user.id,'goflo').bindingRevision,
+  latest.bindingRevision,'a fresh Workspace connection must never reseed an established version');
+ assert.deepEqual(f.store.getAccess(f.user.id,'goflo'),{
+  localIdentity:{userId:nativeUser,organizationId:nativeOrg}
+ },'direct standalone mapping shape stays unchanged');
+});
+
+test('one-time legacy DB migration seeds existing grants atomically, and subsequent opens preserve revisions',async t=>{
+ const dir=mkdtempSync(path.join(os.tmpdir(),'duckbio-legacy-migration-'));
+ const dbPath=path.join(dir,'identity.sqlite');
+ t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ let store=createIdentityStore({databasePath:dbPath,clock:()=>NOW});
+ const user=await store.createUser({email:'old-legacy@example.test',displayName:'Old',
+  password});
+ store.grantAppAccess({userId:user.id,appId:'eel',localUserId:'old-native',organizationId:'old-org'});
+ store.close();
+ // Simulate pre-migration v1 schema by dropping only the newly introduced
+ // version table. Never do this on a deployed/modern database.
+ let db=new DatabaseSync(dbPath);
+ try{db.exec('DROP TABLE suite_identity_grant_versions');}finally{db.close();}
+ store=createIdentityStore({databasePath:dbPath,clock:()=>NOW});
+ assert.equal(store.getAccessWithRevision(user.id,'eel').bindingRevision,'legacy-global:1');
+ store.revokeAppAccess(user.id,'eel');
+ store.grantAppAccess({userId:user.id,appId:'eel',localUserId:'old-native',organizationId:'old-org'});
+ assert.equal(store.getAccessWithRevision(user.id,'eel').bindingRevision,'legacy-global:3');
+ store.close();
+ store=createIdentityStore({databasePath:dbPath,clock:()=>NOW});
+ try{assert.equal(store.getAccessWithRevision(user.id,'eel').bindingRevision,'legacy-global:3');}
+ finally{store.close();}
+});
+
+test('established-but-corrupted grant version denies and refuses silent reset',async t=>{
+ const f=await serverFixture(t);
+ const db=new DatabaseSync(path.join(f.root,'identity.sqlite'));
+ try{db.prepare('DELETE FROM suite_identity_grant_versions WHERE user_id=? AND app_id=?')
+  .run(f.user.id,'goflo');}finally{db.close();}
+ assert.equal(f.store.getAccessWithRevision(f.user.id,'goflo'),null);
+ assert.throws(()=>f.store.revokeAppAccess(f.user.id,'goflo'),/invalid_grant_revision/);
+ assert.throws(()=>f.store.grantAppAccess({userId:f.user.id,appId:'goflo',
+  localUserId:nativeUser,organizationId:nativeOrg}),/invalid_grant_revision/);
+ const reopened=createIdentityStore({databasePath:path.join(f.root,'identity.sqlite'),clock:()=>NOW});
+ try{assert.equal(reopened.getAccessWithRevision(f.user.id,'goflo'),null);}
+ finally{reopened.close();}
+});
+
+test('legacy grant revision overflow rolls back without deleting an existing mapping',async t=>{
+ const f=await serverFixture(t);
+ let db=new DatabaseSync(path.join(f.root,'identity.sqlite'));
+ try{db.prepare('UPDATE suite_identity_grant_versions SET revision=? WHERE user_id=? AND app_id=?')
+  .run(Number.MAX_SAFE_INTEGER,f.user.id,'goflo');}finally{db.close();}
+ assert.equal(f.store.getAccessWithRevision(f.user.id,'goflo').bindingRevision,
+  'legacy-global:'+Number.MAX_SAFE_INTEGER);
+ assert.throws(()=>f.store.revokeAppAccess(f.user.id,'goflo'));
+ assert.equal(f.store.getAccessWithRevision(f.user.id,'goflo')?.localIdentity.userId,nativeUser);
+ assert.equal(f.store.getAccessWithRevision(f.user.id,'goflo').bindingRevision,
+  'legacy-global:'+Number.MAX_SAFE_INTEGER);
 });
