@@ -611,3 +611,30 @@ test('native deprovisioning is fenced even after paid-seat expiry and has no nat
   userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
  }),null);
 });
+
+
+test('detached child tasks cannot reuse AsyncLocalStorage operator authority AFTER the final fenced commit',async t=>{
+ const f=await fixture(t);
+ const tuple={actorId:f.userIds.ownerA,userId:f.userIds.member,
+  appId,workspaceOrganizationId:'alpha',
+  nativeUserId:'native-user-alpha',
+  nativeOrganizationId:'native-tenant-alpha',operation:'bind'};
+ let releaseChild,childPromise;
+ const afterCommit=new Promise(resolve=>{releaseChild=resolve;});
+ f.duringNative(()=>{
+  // The .then callback is ATTACHED from inside native verification and
+  // inherits the real private async operator context. It is deliberately
+  // resumed only after the outer bind has committed and released the fence.
+  childPromise=afterCommit.then(async()=>({
+   authorized:await f.controller.adapters.authorizeMutation(tuple),
+   signed:await f.controller.adapters.verifyNativeOwnership(tuple)
+  }));
+ });
+ const linked=await f.controller.bind(f.input());
+ assert.equal(linked.applied,true);
+ assert.equal(linked.link.accessGranted,false);
+ releaseChild();
+ assert.deepEqual(await childPromise,{authorized:false,signed:false});
+ assert.equal(f.nativeRequests(),1,
+  'a detached post-commit callback must not request another signed proof');
+});
