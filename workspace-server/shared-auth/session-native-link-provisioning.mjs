@@ -40,7 +40,8 @@ export function createWorkspaceNativeLinkProvisioner({
  getIdentityStore,organizationStore,verifyNativeOwnership,clock=Date.now
 }={}){
  if(typeof getIdentityStore!=='function'||!organizationStore||
-    ['currentSessionOrganization','verifiedNativePermissionCandidate']
+    ['currentSessionOrganization','verifiedNativePermissionCandidate',
+     'nativeProvisioningAuditRevision']
       .some(k=>typeof organizationStore[k]!=='function')||
     typeof verifyNativeOwnership!=='function'||typeof clock!=='function')
    throw Error('trusted_native_operator_dependencies_required');
@@ -72,6 +73,15 @@ export function createWorkspaceNativeLinkProvisioner({
    });
    if(!selected||selected.id!==ctx.workspaceOrganizationId||
       selected.admin!==true)return false;
+   // A short-lived native proof may run across admin demote/re-add,
+   // role disable/enable, seat cancellation/recovery, etc. Checking only
+   // final boolean permissions would miss an ABA policy change.
+   const revision=organizationStore.nativeProvisioningAuditRevision({
+    organizationId:ctx.workspaceOrganizationId,
+    accountId:ctx.actorId,sessionId:ctx.sessionId
+   });
+   if(!Number.isSafeInteger(revision)||revision!==ctx.auditRevision)
+     return false;
 
    // Deprovision even if target member was suspended, seat expired, or
    // license removed, but require a CURRENT authenticated org admin.
@@ -141,8 +151,15 @@ export function createWorkspaceNativeLinkProvisioner({
   // ActorId is derived from a real central parent, never from request JSON.
   const parent=store.getParentSession(request.sessionId);
   if(!parent||!validUuid(parent.subject))deny();
+  // Read the durable monotonic audit generation BEFORE creating the
+  // trusted per-request scope. Every callback compares it after native IO.
+  const auditRevision=organizationStore.nativeProvisioningAuditRevision({
+   organizationId:request.workspaceOrganizationId,
+   accountId:parent.subject,sessionId:request.sessionId
+  });
+  if(!Number.isSafeInteger(auditRevision)||auditRevision<=0)deny();
   const ctx=Object.freeze({
-   operation,sessionId:request.sessionId,actorId:parent.subject,
+   operation,auditRevision,sessionId:request.sessionId,actorId:parent.subject,
    userId:request.userId,appId:request.appId,
    workspaceOrganizationId:request.workspaceOrganizationId,
    ...(operation!=='revoke'?{
