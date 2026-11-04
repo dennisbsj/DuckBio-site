@@ -25,6 +25,7 @@ const REQUEST_KEYS=Object.freeze([
  'appId','workspaceAccountId','workspaceOrganizationId',
  'nativeUserId','nativeOrganizationId'
 ]);
+const MAX_KEYS_PER_APP=3;
 const MAX_BYTES=8192;
 const MAX_PROOF_AGE_MS=30000;
 const FUTURE_SKEW_MS=5000;
@@ -32,6 +33,53 @@ const isId=x=>typeof x==='string'&&SAFE_ID.test(x);
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 const isExact=(o,keys)=>o!==null&&typeof o==='object'&&!Array.isArray(o)&&
  Object.keys(o).length===keys.length&&keys.every(k=>own(o,k));
+
+/**
+ * Private, app-specific Ed25519 key pinning.
+ * Legacy: exactly one {keyId,publicKeyPem}, retained for source compatibility.
+ * Rotation: {signingKeys:[{keyId,publicKeyPem,notBefore,notAfter}, ...]}.
+ * All timestamps are integer epoch milliseconds, [notBefore,notAfter).
+ * The two configurations MUST NOT be mixed. No auto-discovered JWKS/alg.
+ */
+function pinnedNativeKeys(raw){
+ const rotating=own(raw,'signingKeys');
+ const legacy=own(raw,'keyId')||own(raw,'publicKeyPem');
+ if(rotating===legacy)throw Error('invalid_private_native_client');
+ const specs=rotating?raw.signingKeys:[{
+  keyId:raw.keyId,publicKeyPem:raw.publicKeyPem,
+  notBefore:null,notAfter:null
+ }];
+ if(!Array.isArray(specs)||specs.length<1||
+    specs.length>MAX_KEYS_PER_APP)throw Error('invalid_private_native_client');
+ const seenMaterial=new Set();
+ const keys=new Map();
+ for(const item of specs){
+  if(!isExact(item,['keyId','publicKeyPem','notBefore','notAfter'])||
+     !SAFE_KEY.test(item.keyId??'')||
+     typeof item.publicKeyPem!=='string'||
+     keys.has(item.keyId)||
+     (rotating&&(!Number.isSafeInteger(item.notBefore)||
+       !Number.isSafeInteger(item.notAfter)||
+       item.notBefore<=0||item.notAfter<=item.notBefore)))
+    throw Error('invalid_private_native_client');
+  let key;
+  try{key=createPublicKey(item.publicKeyPem);}
+  catch{throw Error('invalid_private_native_client');}
+  if(key.asymmetricKeyType!=='ed25519')
+   throw Error('invalid_private_native_client');
+  const material=key.export({format:'der',type:'spki'}).toString('base64url');
+  if(seenMaterial.has(material))throw Error('invalid_private_native_client');
+  seenMaterial.add(material);
+  keys.set(item.keyId,Object.freeze({
+   key,notBefore:item.notBefore,notAfter:item.notAfter
+  }));
+ }
+ return keys;
+}
+function keyIsCurrent(record,now){
+ return (record.notBefore===null||now>=record.notBefore)&&
+  (record.notAfter===null||now<record.notAfter);
+}
 
 /**
  * Signature bytes are Ed25519 over UTF-8 JSON.stringify of this EXACT
@@ -95,22 +143,19 @@ export function createSignedNativeOwnershipVerifier({
  for(const [appId,raw] of Object.entries(clients)){
   if(!APPS.has(appId)||registered.has(appId)||!raw||
      typeof raw!=='object'||Array.isArray(raw)||
-     !SAFE_KEY.test(raw.keyId??'')||
      !SAFE_TOKEN.test(raw.token??'')||
-     typeof raw.endpoint!=='string'||
-     typeof raw.publicKeyPem!=='string')
+     typeof raw.endpoint!=='string')
     throw Error('invalid_private_native_client');
-  let endpoint,key;
-  try{
-   endpoint=new URL(raw.endpoint);
-   key=createPublicKey(raw.publicKeyPem);
-  }catch{throw Error('invalid_private_native_client');}
+  let endpoint;
+  try{endpoint=new URL(raw.endpoint);}
+  catch{throw Error('invalid_private_native_client');}
   if(endpoint.protocol!=='https:'||endpoint.username||endpoint.password||
      endpoint.hash||endpoint.search||!endpoint.hostname||
-     endpoint.href!==raw.endpoint||key.asymmetricKeyType!=='ed25519')
+     endpoint.href!==raw.endpoint)
     throw Error('invalid_private_native_client');
+  const keys=pinnedNativeKeys(raw);
   registered.set(appId,Object.freeze({
-   endpoint:endpoint.href,keyId:raw.keyId,key,token:raw.token
+   endpoint:endpoint.href,keys,token:raw.token
   }));
  }
  if(!registered.size)throw Error('private_native_clients_required');
@@ -122,7 +167,9 @@ export function createSignedNativeOwnershipVerifier({
   const client=registered.get(fields.appId);
   if(!client)return false;
   const start=clock();
-  if(!Number.isSafeInteger(start)||start<=0)return false;
+  if(!Number.isSafeInteger(start)||start<=0||
+     ![...client.keys.values()].some(key=>keyIsCurrent(key,start)))
+   return false;
   const nonce=randomBytes(32).toString('base64url');
   const body={version:VERSION,purpose,nonce,...fields};
   let result;
@@ -147,7 +194,8 @@ export function createSignedNativeOwnershipVerifier({
      !/^[A-Za-z0-9_-]{86}$/.test(result.signature))
    return false;
   const proof=result.payload;
-  if(proof.version!==VERSION||proof.keyId!==client.keyId||
+  const signingKey=client.keys.get(proof.keyId);
+  if(!signingKey||proof.version!==VERSION||
      proof.purpose!==purpose||proof.nonce!==nonce||
      proof.active!==true||proof.ownershipVerified!==true||
      REQUEST_KEYS.some(k=>proof[k]!==fields[k])||
@@ -156,6 +204,12 @@ export function createSignedNativeOwnershipVerifier({
     return false;
   const finish=clock();
   if(!Number.isSafeInteger(finish)||finish<start||
+     !keyIsCurrent(signingKey,start)||
+     !keyIsCurrent(signingKey,finish)||
+     (signingKey.notBefore!==null&&
+       proof.issuedAt<signingKey.notBefore)||
+     (signingKey.notAfter!==null&&
+       proof.expiresAt>signingKey.notAfter)||
      proof.issuedAt<start-MAX_PROOF_AGE_MS||
      proof.issuedAt>finish+FUTURE_SKEW_MS||
      proof.expiresAt<=finish||
@@ -167,7 +221,7 @@ export function createSignedNativeOwnershipVerifier({
    return false;
   try{
    return verifySignature(null,canonicalNativeOwnershipProofBytes(proof),
-    client.key,signature)===true;
+    signingKey.key,signature)===true;
   }catch{return false;}
  }
  return Object.freeze({
