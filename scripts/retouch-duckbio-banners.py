@@ -15,7 +15,7 @@ ROOT=Path(__file__).resolve().parents[1] / "docs" / "assets" if __file__.startsw
 FNS={
  'home':'duckbio-home-correct-logo-20261103.webp',
  'support':'duckbio-support-correct-logo-20261103.webp',
- 'pricing':'duckbio-pricing-correct-logo-20261103.webp',
+ 'pricing':'duckbio-pricing-no-headphones-20261103.webp',
 }
 OUT={
  'home':'duckbio-home-printed-core-20261104.webp',
