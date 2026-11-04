@@ -322,3 +322,100 @@ test('target workspace.view permission revoked DURING signed ownership verificat
   appId,workspaceOrganizationId:'alpha'
  }),[]);
 });
+
+
+test('ABA: organization admin demotion and restoration DURING a signed proof denies even when final admin is true',async t=>{
+ const f=await fixture(t);
+ f.org.saveMember({organizationId:'alpha',actorId:f.userIds.ownerA,
+  member:{accountId:f.userIds.ownerB,name:'ownerB',nickname:'ownerB',
+   email:'ownerB@example.test',admin:true,roles:{}}});
+ f.duringNative(request=>{
+  assert.equal(request.purpose,'bind');
+  f.org.saveMember({organizationId:'alpha',actorId:f.userIds.ownerB,
+   member:{accountId:f.userIds.ownerA,name:'ownerA',nickname:'ownerA',
+    email:'ownerA@example.test',admin:false,roles:{}}});
+  f.org.saveMember({organizationId:'alpha',actorId:f.userIds.ownerB,
+   member:{accountId:f.userIds.ownerA,name:'ownerA',nickname:'ownerA',
+    email:'ownerA@example.test',admin:true,roles:{}}});
+ });
+ await assert.rejects(f.controller.bind(f.input()),
+  /native_ownership_unverified/);
+ assert.equal(f.org.currentSessionOrganization({
+  sessionId:f.adminSessionA.id,accountId:f.userIds.ownerA
+ }).admin,true,'end state restored deliberately');
+ assert.equal(f.nativeRequests(),1,'the signed response was awaited');
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
+ }),null);
+ assert.deepEqual(f.identity.orgNativeLinkAudit({
+  appId,workspaceOrganizationId:'alpha'
+ }),[]);
+});
+
+test('ABA: revoke and restore the SAME target workspace.view permission before signature cannot create native mapping',async t=>{
+ const f=await fixture(t);
+ f.duringNative(()=>{
+  const params={organizationId:'alpha',actorId:f.userIds.ownerA,
+   accountId:f.userIds.member,appId,permission:'workspace.view'};
+  f.org.setPermission({...params,enabled:false});
+  f.org.setPermission({...params,enabled:true});
+ });
+ await assert.rejects(f.controller.bind(f.input()),
+  /native_ownership_unverified/);
+ assert(f.org.effectivePermissions({organizationId:'alpha',
+  accountId:f.userIds.member,appId}).includes('workspace.view'),
+  'effective permission was intentionally restored');
+ assert.equal(f.nativeRequests(),1);
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
+ }),null);
+ assert.deepEqual(f.identity.orgNativeLinkAudit({
+  appId,workspaceOrganizationId:'alpha'
+ }),[]);
+});
+
+test('ABA: issue then revoke a pending app-seat invitation during proof is denied even when paid coverage recovers',async t=>{
+ const f=await fixture(t);
+ f.duringNative(()=>{
+  const request={organizationId:'alpha',actorId:f.userIds.ownerA,
+   email:'synthetic-aba-invited@example.test'};
+  f.org.issueInvitation({...request,name:'New User',nickname:'New',
+   roles:{goflo:'Analyst'}});
+  f.org.revokeInvitation(request);
+ });
+ await assert.rejects(f.controller.bind(f.input()),
+  /native_ownership_unverified/);
+ assert.equal(f.org.listPendingInvitations('alpha',f.userIds.ownerA).length,0);
+ assert(f.org.verifiedNativePermissionCandidate({
+  organizationId:'alpha',accountId:f.userIds.member,
+  appId,permission:'workspace.view'
+ }),'paid entitlement is valid again, but history changed');
+ assert.equal(f.nativeRequests(),1);
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
+ }),null);
+});
+
+test('audit generation persists on reopen and is not based on wall-clock time',async t=>{
+ const f=await fixture(t);
+ const args={organizationId:'alpha',accountId:f.userIds.ownerA,
+  sessionId:f.adminSessionA.id};
+ const original=f.org.nativeProvisioningAuditRevision(args);
+ assert(Number.isSafeInteger(original));
+ const roleArgs={organizationId:'alpha',actorId:f.userIds.ownerA,
+  accountId:f.userIds.member,appId,permission:'workspace.view'};
+ f.org.setPermission({...roleArgs,enabled:false});
+ const revoked=f.org.nativeProvisioningAuditRevision(args);
+ f.org.setPermission({...roleArgs,enabled:true});
+ const restored=f.org.nativeProvisioningAuditRevision(args);
+ assert(revoked>original);
+ assert(restored>revoked);
+ assert.equal(f.now(),START,
+  'all revisions must differ even when mocked timestamp is identical');
+ assert.equal(f.org.nativeProvisioningAuditRevision({
+  ...args,organizationId:'beta'
+ }),null,'foreign session-tenant mismatch cannot read a revision');
+ assert.equal(f.org.nativeProvisioningAuditRevision({
+  ...args,sessionId:randomUUID()
+ }),null);
+});
