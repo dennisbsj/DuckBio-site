@@ -133,6 +133,28 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       .run(Number(result.lastInsertRowid),category,at);
     return result;
   };
+  // A private read-only, tenant/app/account-scoped authorization generation.
+  // The AUDIT id (AUTOINCREMENT) captures temporary revocation and regrant
+  // even if role, permission list, native IDs and timestamps return to the
+  // same values. Subscription changes conservatively invalidate the entire
+  // organization; unrelated account/app role edits do not.
+  // THIS IS NOT A PERMISSION OR PAYMENT DECISION.
+  function nativeAuthorityAuditRevision(organizationId,accountId,appId){
+    const row=db.prepare(`SELECT MAX(id) AS revision FROM organization_audit
+      WHERE org=? AND (
+        (action IN ('member.added','member.updated','member.removed',
+          'member.deactivated','member.reactivated','invitation.accepted')
+          AND subject=?)
+        OR (action='permission.updated' AND subject=?
+          AND json_extract(details,'$.appId')=?)
+        OR (action IN ('role.defaults.updated','role.custom.created',
+          'role.custom.updated','role.custom.deleted')
+          AND json_extract(details,'$.appId')=?)
+        OR action='subscription.entitlement.transition'
+      )`).get(organizationId,accountId,accountId,appId,appId);
+    return Number.isSafeInteger(row?.revision)&&row.revision>0
+      ?row.revision:null;
+  }
   // Test-only diagnostic freshness; Stripe's last snapshot is never a durable license.
   // A later in-flight check immediately invalidates older positive diagnostics.
   const TEST_CHECK_MAX_AGE_MS=24*60*60*1000;
@@ -1114,8 +1136,13 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       if(coveredSeats<assigned+reserved)return null;
       if(!this.effectivePermissions({organizationId,accountId,appId}).includes(permission))
         return null;
+      const authorityAuditRevision=nativeAuthorityAuditRevision(
+        organizationId,accountId,appId);
+      if(authorityAuditRevision===null)return null;
       return Object.freeze({organizationId,accountId,appId,
         role:member.role,permission,verifiedPaidThroughMs:earliestPaidThrough*1000,
+        // Private diagnostic epoch only; never by itself authorizes native login.
+        authorityAuditRevision,
         source:'verified_live_subscription_ledger',nativeEnforcementRequired:true,
         accessGranted:false,licensesGranted:false});
     },
