@@ -111,7 +111,7 @@ export function createWorkspaceNativeLinkProvisioner({
 
  function matchesScope(tuple){
   const ctx=scope.getStore();
-  if(!ctx||!tuple||typeof tuple!=='object')return false;
+  if(!ctx||ctx.guard.closed||!tuple||typeof tuple!=='object')return false;
   if(tuple.operation!==ctx.operation||
      tuple.actorId!==ctx.actorId||tuple.userId!==ctx.userId||
      tuple.appId!==ctx.appId||
@@ -190,7 +190,7 @@ export function createWorkspaceNativeLinkProvisioner({
      !Number.isSafeInteger(revision.sessionLockEpoch)||
      revision.sessionLockEpoch<=0)deny();
   const ctx=Object.freeze({
-   guard:{nativeVerified:false,lease:null},
+   guard:{nativeVerified:false,lease:null,closed:false},
    operation,auditRevision:revision.organizationAuditRevision,
    sessionLockEpoch:revision.sessionLockEpoch,
    sessionId:request.sessionId,actorId:parent.subject,
@@ -227,6 +227,7 @@ export function createWorkspaceNativeLinkProvisioner({
     const lease=ctx.guard.lease;
     ctx.guard.lease=null;
     ctx.guard.nativeVerified=false;
+    ctx.guard.closed=true;
     if(lease)lease.release();
    }
   });
