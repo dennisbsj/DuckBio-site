@@ -185,9 +185,8 @@ if(direct){
  const oldArgs=a.length===9&&a[8]==='--confirm-readonly-synthetic-sessions-only';
  const postPkce=a.length===11&&a[8]==='--snapshot'&&
   a[9]==='post-pkce'&&a[10]==='--confirm-readonly-synthetic-sessions-only';
- if(!oldArgs&&!postPkce||a[0]!=='--config'||a[2]!=='--sources-root'||
-    a[4]!=='--broker-proofs'||a[6]!=='--native-cookies'||
-    false){
+ if((!oldArgs&&!postPkce)||a[0]!=='--config'||a[2]!=='--sources-root'||
+    a[4]!=='--broker-proofs'||a[6]!=='--native-cookies'){
   console.error('Usage: node staging-six-native-http-sessions-audit.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS --broker-proofs PRIVATE_SYNTHETIC_BROKER_PROOFS_JSON --native-cookies PRIVATE_SYNTHETIC_NATIVE_COOKIES_JSON [--snapshot post-pkce] --confirm-readonly-synthetic-sessions-only');
   process.exitCode=2;
  }else try{
