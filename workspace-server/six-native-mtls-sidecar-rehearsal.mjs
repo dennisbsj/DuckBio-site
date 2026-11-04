@@ -70,9 +70,11 @@ function privateMtlFetch({endpoints,serverCert,clientCert,clientKey}){
     ca:serverCert,cert:clientCert,key:clientKey,
     rejectUnauthorized:true,minVersion:'TLSv1.3',agent:false,
     signal:init.signal,
-    lookup:(name,_opts,callback)=>{
+    lookup:(name,opts,callback)=>{
      if(name!==expected.hostname)
       callback(Error('unapproved_native_host'));
+     else if(opts?.all)
+      callback(null,[{address:'127.0.0.1',family:4}]);
      else callback(null,'127.0.0.1',4);
     }
    },response=>{
