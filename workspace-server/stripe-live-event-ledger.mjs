@@ -1,26 +1,21 @@
+import {STRIPE_LIVE_EVENT_PREFIXES,stripeLiveReviewCategory} from './stripe-live-review-event-catalog.mjs';
 // Private, metadata-only persistence for events already checked by the
 // detached cryptographic Stripe LIVE webhook verifier.
 // Not a payment attestation or entitlement source.
-const types=new Map([
- ['invoice.paid','in_'],
- ['invoice.payment_succeeded','in_'],
- ['invoice.payment_failed','in_'],
- ['invoice.finalization_failed','in_'],
- ['customer.subscription.created','sub_'],
- ['customer.subscription.updated','sub_'],
- ['customer.subscription.deleted','sub_'],
- ['checkout.session.completed','cs_live_']
-]);
+
 const fail=code=>{throw Error(code);};
 export function createStripeLiveEventLedger({db,clock=Date.now}={}){
  if(typeof db?.prepare!=='function'||typeof clock!=='function')
   fail('invalid_stripe_live_event_ledger');
  return Object.freeze({
   record(event){
-   const prefix=types.get(event?.type);
+   const prefix=Object.hasOwn(STRIPE_LIVE_EVENT_PREFIXES,event?.type)
+     ?STRIPE_LIVE_EVENT_PREFIXES[event.type]:null;
+   const reviewRequired=stripeLiveReviewCategory(event?.type)!==null;
    if(!event||typeof event!=='object'||Array.isArray(event)||
       event.mode!=='live'||event.licensesGranted!==false||
       event.authorizesSeatChanges!==false||
+      event.financialReviewRequired!==reviewRequired||
       typeof event.id!=='string'||!/^evt_[A-Za-z0-9_]{4,128}$/.test(event.id)||
       !prefix||typeof event.objectId!=='string'||
       !event.objectId.startsWith(prefix)||
@@ -45,7 +40,9 @@ export function createStripeLiveEventLedger({db,clock=Date.now}={}){
    if(!Number.isSafeInteger(limit)||limit<1||limit>101)fail('invalid_stripe_live_event_limit');
    return db.prepare('SELECT event_type,event_created,received_at FROM stripe_live_event_log ORDER BY received_at DESC,event_id DESC LIMIT ?')
      .all(limit).map(x=>({type:x.event_type,occurredAt:x.event_created*1000,
-       receivedAt:x.received_at,linkage:'unassigned',licensesGranted:false}));
+       receivedAt:x.received_at,linkage:'unassigned',licensesGranted:false,
+       financialReviewRequired:stripeLiveReviewCategory(x.event_type)!==null,
+       reviewCategory:stripeLiveReviewCategory(x.event_type)}));
   }
  });
 }
