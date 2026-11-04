@@ -1119,6 +1119,23 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         source:'verified_live_subscription_ledger',nativeEnforcementRequired:true,
         accessGranted:false,licensesGranted:false});
     },
+    // PRIVATE read-only, revision-stamped organization policy snapshot for
+    // optional native-link provisioning. Existing organization's audited
+    // member, permission, role, seat, invitation and billing mutations all
+    // advance AUTOINCREMENT id even if the effective policy is later restored.
+    // This is deliberately NOT a paid seat, app grant or SSO decision.
+    nativeProvisioningAuditRevision({organizationId,accountId,sessionId}={}){
+      if(!safeId(organizationId)||!safeId(accountId)||!safeId(sessionId))
+        return null;
+      const selected=db.prepare(
+        'SELECT org FROM session_organizations WHERE session_id=? AND account=?'
+      ).get(sessionId,accountId);
+      if(!selected||selected.org!==organizationId)return null;
+      const revision=db.prepare(
+        'SELECT MAX(id) AS revision FROM organization_audit WHERE org=?'
+      ).get(organizationId)?.revision;
+      return Number.isSafeInteger(revision)&&revision>0?revision:null;
+    },
     accessFor({organizationId,accountId,appId}){
       if(!safeId(organizationId)||!safeId(accountId)||!byId.has(appId))return null;
       const grant=db.prepare('SELECT a.role FROM assignments a JOIN members m ON m.org=a.org AND m.account=a.account WHERE a.org=? AND a.account=? AND a.app=? AND m.active=1').get(organizationId,accountId,appId);
