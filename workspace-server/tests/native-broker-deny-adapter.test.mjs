@@ -258,9 +258,13 @@ test('forged accessGranted=true preflight can never activate the broker',async t
 
 test('construction refuses missing trust adapters and unregistered apps',()=>{
  const identity={getSession(){},authenticate(){},getParentSession(){},logout(){}};
- const org={currentSessionOrganization(){}};
+ const org={currentSessionOrganization(){},nativeProvisioningAuditRevision(){return null}};
  const inspector={inspect(){}};
  assert.throws(()=>createWorkspaceNativeBrokerDenyAdapter(),/trusted_parent/);
+ assert.throws(()=>createWorkspaceNativeBrokerDenyAdapter({
+  identity,organizationStore:{currentSessionOrganization(){}},inspector,
+  permissions:{goflo:'workspace.view'}
+ }),/trusted_private_native_inspector_required/);
  assert.throws(()=>createWorkspaceNativeBrokerDenyAdapter({
   identity,organizationStore:org,inspector,permissions:{dataduck:'workspace.view'}
  }),/explicit_six_app_permission/);
