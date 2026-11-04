@@ -221,3 +221,18 @@ test('Stripe LIVE rejects misleading Content-Length and cancels oversized stream
  assert.equal(pulls,3);
  assert.equal(canceled,true);
 });
+
+test('UTF-8 bytes and truncated or malformed upstream data fail closed',async()=>{
+ const body=JSON.stringify({...subscription(),padding:'🦆'.repeat(32769)});
+ assert(body.length<131072);
+ assert(Buffer.byteLength(body)>131072);
+ const values=[body,new Uint8Array([123,34,120,34,58,34,195,40,34,125]),
+  '', '{"livemode":true'];
+ for(const value of values){
+  const f=fixture({responseChange:()=>new Response(value,{
+   headers:{'content-type':'application/json'}
+  })});
+  await assert.rejects(()=>f.reader.inspect(binding()),/exceeds safe limit|Malformed/);
+  assert.equal(f.calls.length,1);
+ }
+});
