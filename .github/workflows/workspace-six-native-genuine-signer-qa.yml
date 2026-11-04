@@ -1,17 +1,17 @@
-name: Workspace six-native genuine Ed25519 source interoperability (offline)
+name: Workspace six-native genuine Ed25519 source interoperability (operator-only)
 on:
-  pull_request:
-    paths:
-      - 'workspace-server/six-native-*.mjs'
-      - 'workspace-server/shared-auth/signed-native-ownership-verifier.mjs'
-      - 'workspace-server/tests/fixtures/native-ownership-v1-known-answer.json'
-      - '.github/workflows/workspace-six-native-genuine-signer-qa.yml'
+  workflow_dispatch:
+    inputs:
+      confirm_read_only_source_audit:
+        description: 'I authorize an offline, read-only check of six exact private native source commits; NO deployment or credentials in test code'
+        required: true
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
   genuine-six-signer-source-interop:
-    # Untrusted fork PRs must never get a path to private credentials or checkout.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: inputs.confirm_read_only_source_audit == true
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -21,21 +21,39 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.16.0'
-      - name: Clone only the six exact previously reviewed public source commits
+      - name: Verify a separately scoped read-only native source token is available
         shell: bash
+        env:
+          NATIVE_READ_TOKEN: ${{ secrets.DUCKBIO_NATIVE_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NATIVE_READ_TOKEN}" ]]; then
+            echo "::error::BLOCKED: configure a read-only token restricted to the six private native repositories before running operator QA"
+            exit 1
+          fi
+          echo "Read-only private source token is configured (value not printed)"
+      - name: Read only the six exact reviewed private source commits
+        shell: bash
+        env:
+          NATIVE_READ_TOKEN: ${{ secrets.DUCKBIO_NATIVE_READ_TOKEN }}
         run: |
           set -euo pipefail
           umask 077
           root="${RUNNER_TEMP}/duckbio-native-reviewed-source"
           mkdir -m 700 "$root"
+          # Credential exists ONLY in this checkout step. Never store it in
+          # remote URLs, Git config, output artifacts, or the native test step.
+          header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$NATIVE_READ_TOKEN" | base64 -w0)"
           while read -r app sha; do
             if [[ -z "${app}" ]]; then continue; fi
             url="https://github.com/dennisbsj/${app}.git"
             target="${root}/${app}"
-            git clone --quiet --no-checkout --filter=blob:none --depth 1 "$url" "$target"
+            git -c "http.https://github.com/.extraheader=$header" clone \
+              --quiet --no-checkout --filter=blob:none --depth 1 "$url" "$target"
             git -C "$target" sparse-checkout init --cone
             git -C "$target" sparse-checkout set server
-            git -C "$target" fetch --quiet --depth 1 origin "$sha"
+            git -C "$target" -c "http.https://github.com/.extraheader=$header" fetch \
+              --quiet --depth 1 origin "$sha"
             git -C "$target" -c advice.detachedHead=false checkout --quiet --detach "$sha"
             test "$(git -C "$target" rev-parse --verify HEAD)" = "$sha"
           done <<'REVIEWED_NATIVE_COMMITS'
@@ -46,13 +64,14 @@ jobs:
           DuckMan f8a86c10db6b6ec86b6224a8c81b90cebcf652d2
           LabDuck 48a2ee834f1bcc6eb3f910ad5399cc4883acb2bd
           REVIEWED_NATIVE_COMMITS
+          unset header NATIVE_READ_TOKEN
           test "$(find "$root" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
-      - name: Recheck exact native Git remotes, clean source blobs, signer canonical bytes and signatures
+      - name: Recheck six private Git remotes, source SHA, signer/lookup/mTLS blobs and real signed bytes
         shell: bash
         run: |
           set -euo pipefail
           node workspace-server/six-native-known-answer-audit.mjs \
             --sources-root "${RUNNER_TEMP}/duckbio-native-reviewed-source" \
             --confirm-private-six-native-known-answer-only
-      - name: Assert this is not staging or release approval
-        run: echo "OFFLINE SOURCE CONTRACT ONLY — NO NATIVE SERVICES, CREDENTIALS, LICENSES, DATA OR DEPLOYMENT"
+      - name: Declare no staging or production authorization
+        run: echo "SOURCE-ONLY AUDIT — no live app service, Stripe payment, license, user data or deployment"
