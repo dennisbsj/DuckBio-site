@@ -127,3 +127,125 @@ test('stale versions and same-revision mutations are rejected after newer bindin
  assert.equal(f.purchased('eel'),0);
  assert.equal(f.purchased('goflo'),0);
 });
+
+test('rejects TEST evidence, invalid plans, DataDuck and untrusted JSON claims',t=>{
+ const f=fixture(t);
+ const invalid=[
+  {...base(),source:'stripe_test'},
+  {...base(),eventKey:'bad event'},
+  {...base(),organizationId:'nonexistent'},
+  {...base(),subscriptionId:'cs_live_checkout1234'},
+  {...base(),customerId:'cus_test-insecure'},
+  {...base(),priceId:'bad-price'},
+  {...base(),plan:'Bundle',apps:['eel']},
+  {...base(),plan:'Mixed',apps:['eel']},
+  {...base(),apps:['dataduck']},
+  {...base(),apps:['eel','eel']},
+  {...base(),seats:0},
+  {...base(),revision:0},
+  {...base(),licensesGranted:true}
+ ];
+ for(const record of invalid){
+  assert.throws(()=>f.pin(record),
+   /stripe_live_binding_rejected|organization_not_found/);
+ }
+ assert.equal(f.purchased('eel'),0);
+ assert.equal(f.store.ownerSnapshot().totals.activeVerifiedSubscriptions,0);
+});
+test('private reader can inspect only an existing tenant-pinned subscription',async t=>{
+ const f=fixture(t);
+ f.pin(base());
+ let requests=0;
+ const sub={
+  object:'subscription',id:base().subscriptionId,livemode:true,
+  customer:base().customerId,
+  metadata:{organization_id:base().organizationId},
+  status:'active',cancel_at_period_end:false,cancel_at:null,
+  pause_collection:null,pending_update:null,latest_invoice:null,
+  items:{has_more:false,data:[{
+   quantity:base().seats,current_period_end:1900000000,
+   price:{id:base().priceId,livemode:true,recurring:{usage_type:'licensed'}}
+  }]}
+ };
+ const liveReader=createStripeLiveBillingReader({
+  secretKey:'sk_live_private_synthetic_fixture_123456789',
+  clock:()=>NOW,
+  fetchImpl:async(url,init)=>{
+   requests++;
+   assert.equal(url,'https://api.stripe.com/v1/subscriptions/'+base().subscriptionId);
+   assert.equal(init.method,'GET');
+   return new Response(JSON.stringify(sub),{
+    headers:{'content-type':'application/json'}
+   });
+  }
+ });
+ const observer=createPinnedStripeLiveObserver({
+  organizationStore:f.store,liveReader
+ });
+ for(const query of [
+  {organizationId:'org-beta',subscriptionId:base().subscriptionId},
+  {organizationId:'org-alpha',subscriptionId:'sub_live_NOTPINNED'},
+  {organizationId:'org-alpha',subscriptionId:'sub_test-injection'}
+ ]){
+  const denied=await observer.inspect(query);
+  assert.equal(denied.state,'unavailable');
+  assert.equal(denied.licensesGranted,false);
+ }
+ assert.equal(requests,0);
+ const result=await observer.inspect({
+  organizationId:'org-alpha',subscriptionId:base().subscriptionId
+ });
+ assert.equal(requests,1);
+ assert.equal(result.reason,'invoice_unavailable');
+ assert.equal(result.state,'manual_review');
+ assert.equal(result.bindingRevision,1);
+ assert.equal(result.licensesGranted,false);
+ assert.equal(result.authorizesSeatChanges,false);
+ assert.equal(f.purchased('eel'),0);
+});
+test('private Stripe lookup cannot reuse observation after pinned price revision changed midflight',async t=>{
+ const f=fixture(t);
+ f.pin(base());
+ let resume;
+ const gate=new Promise(resolve=>{resume=resolve;});
+ const observer=createPinnedStripeLiveObserver({
+  organizationStore:f.store,
+  liveReader:{inspect:async()=>{
+   await gate;
+   return {state:'candidate_for_manual_review',
+    licensesGranted:false,authorizesSeatChanges:false};
+  }}
+ });
+ const pending=observer.inspect({
+  organizationId:'org-alpha',subscriptionId:base().subscriptionId
+ });
+ f.pin({...base(),revision:2,eventKey:'evt_live_change0002',
+  priceId:'price_live_NEWPRICE12345'});
+ resume();
+ const result=await pending;
+ assert.equal(result.state,'unavailable');
+ assert.equal(result.reason,'pinned_live_binding_changed_during_lookup');
+ assert.equal(result.licensesGranted,false);
+ assert.equal(f.purchased('eel'),0);
+});
+test('source failures or forged LIVE reader grants deny without creating licenses',async t=>{
+ const f=fixture(t);
+ f.pin(base());
+ const query={organizationId:'org-alpha',subscriptionId:base().subscriptionId};
+ for(const reader of [
+  {inspect:async()=>{throw Error('Stripe unavailable');}},
+  {inspect:async()=>({state:'candidate_for_manual_review',
+   licensesGranted:true,authorizesSeatChanges:false})},
+  {inspect:async()=>({state:'active',
+   licensesGranted:false,authorizesSeatChanges:false})}
+ ]){
+  const observer=createPinnedStripeLiveObserver({
+   organizationStore:f.store,liveReader:reader
+  });
+  const result=await observer.inspect(query);
+  assert.equal(result.state,'unavailable');
+  assert.equal(result.licensesGranted,false);
+  assert.equal(result.authorizesSeatChanges,false);
+ }
+ assert.equal(f.purchased('eel'),0);
+});
