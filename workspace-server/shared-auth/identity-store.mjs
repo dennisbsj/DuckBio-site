@@ -153,6 +153,14 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
     const versionTableExists=Boolean(db.prepare(
       "SELECT 1 FROM sqlite_master WHERE type='table' AND name='suite_identity_grant_versions'"
     ).get());
+    // The identity DB header is a durable schema-migration tombstone.
+    // An established generation table must never silently be re-created
+    // at revision 1 if its table was lost or a partial backup was restored.
+    const migrationVersion=db.prepare('PRAGMA user_version').get()?.user_version;
+    if(!Number.isSafeInteger(migrationVersion)||migrationVersion<0)
+      fail('invalid_grant_revision');
+    if(!versionTableExists&&migrationVersion!==0)
+      fail('invalid_grant_revision');
     if(!versionTableExists) {
       db.exec(`CREATE TABLE suite_identity_grant_versions (
         user_id TEXT NOT NULL,
@@ -163,6 +171,8 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
       db.prepare(`INSERT INTO suite_identity_grant_versions(user_id,app_id,revision)
         SELECT user_id,app_id,1 FROM suite_identity_grants`).run();
     }
+    // Commit the schema marker with the initial version rows.
+    if(migrationVersion===0)db.exec('PRAGMA user_version=1');
     db.exec('COMMIT');
   } catch(error) {
     db.exec('ROLLBACK');
