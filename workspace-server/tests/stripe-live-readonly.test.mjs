@@ -199,3 +199,25 @@ test('Stripe LIVE reader accepts exactly 131072 UTF-8 bytes without seat authori
  assert.equal(out.licensesGranted,false);
  assert.equal(out.authorizesSeatChanges,false);
 });
+
+test('Stripe LIVE rejects misleading Content-Length and cancels oversized stream promptly',async()=>{
+ for(const length of ['131073','000123','-1','NaN','18446744073709551616']){
+  const g=fixture({responseChange:()=>new Response(JSON.stringify(subscription()),{
+   headers:{'content-type':'application/json','content-length':length}
+  })});
+  await assert.rejects(()=>g.reader.inspect(binding()),/exceeds safe limit/);
+  assert.equal(g.calls.length,1);
+ }
+ let pulls=0,canceled=false;
+ const stream=new ReadableStream({
+  pull(controller){pulls++;controller.enqueue(new Uint8Array(65536));},
+  cancel(){canceled=true;}
+ },{highWaterMark:0});
+ const g=fixture({responseChange:()=>new Response(stream,{
+  headers:{'content-type':'application/json','content-length':'2'}
+ })});
+ await assert.rejects(()=>g.reader.inspect(binding()),/exceeds safe limit/);
+ assert.equal(g.calls.length,1);
+ assert.equal(pulls,3);
+ assert.equal(canceled,true);
+});
