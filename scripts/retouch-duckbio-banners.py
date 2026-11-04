@@ -15,7 +15,7 @@ ROOT=Path(__file__).resolve().parents[1] / "docs" / "assets" if __file__.startsw
 FNS={
  'home':'duckbio-home-correct-logo-20261103.webp',
  'support':'duckbio-support-correct-logo-20261103.webp',
- 'pricing':'duckbio-pricing-no-headphones-20261103.webp',
+ 'pricing':'duckbio-pricing-correct-logo-20261103.webp',
 }
 OUT={
  'home':'duckbio-home-printed-core-20261104.webp',
@@ -26,18 +26,18 @@ OUT={
 # existing photographs.  Coordinates in original 2172x724 asset space.
 PRINT_REGIONS={
  'home':[
-  ((1088,484,1292,570),'metal',0.75), # laptop lid
-  ((854,527,937,591),'ceramic',0.77), # upright coffee cup
-  ((1668,468,1767,539),'fabric',0.73), # embroidered coat
+  ((1088,484,1292,570),'metal',0.58), # laptop lid
+  ((864,527,935,591),'ceramic',0.69), # upright coffee cup
+  ((1675,475,1759,535),'fabric',0.62), # embroidered coat
  ],
  'support':[
-  ((814,382,1029,453),'metal',0.73),
-  ((1533,426,1618,509),'fabric',0.72),
-  ((1855,437,1955,505),'ceramic',0.75),
+  ((815,386,1025,451),'metal',0.56),
+  ((1539,441,1615,503),'fabric',0.60),
+  ((1867,442,1948,497),'ceramic',0.66),
  ],
  'pricing':[
-  ((1819,435,1920,505),'fabric',0.70),
-  ((1939,523,2019,584),'ceramic',0.75),
+  ((1823,438,1910,497),'fabric',0.60),
+  ((1942,525,2016,581),'ceramic',0.67),
  ],
 }
 
@@ -60,13 +60,13 @@ def retouch_printed_logo(im, box, material, opacity):
     elif material=='ceramic':
         # Dark and blue print on off-white glazed porcelain.
         saturated=(B>R+18)&(G>R+8)&(B>110)
-        dark=(lum<131)&(B>R*0.75)
+        dark=(lum<115)&((B-R)>12)&(R<150)
         mask=(saturated|dark).astype('uint8')*255
     else:
         # Navy and cyan thread on illuminated white fabric.  Avoid lighting
         # gradients and use only the actual darker chromatic lettering.
-        cool=(B>R+12)&(G>R+3)&(B>100)
-        navy=(lum<102)&(B>R*0.80)
+        cool=(B>R+19)&(G>R+6)&(B>100)&(R<180)
+        navy=(lum<94)&((B-R)>13)&(R<160)
         mask=(cool|navy).astype('uint8')*255
     # Limit optical effect to logo strokes; smooth edges without a rectangular patch.
     kernel=cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
@@ -88,6 +88,11 @@ def retouch_printed_logo(im, box, material, opacity):
         theta=(np.arange(w)[None,:]-w*.5)/(w*.5)
         printed*=np.clip(1-.065*theta**2,.90,1)[...,None]
     alpha=cv2.GaussianBlur(mask.astype('float32')/255,(0,0),sigmaX=.75)[...,None]
+    # Feather any logo mask contacting the region border to avoid rectangular patches.
+    xx=np.minimum(np.arange(w),np.arange(w)[::-1])[None,:]
+    yy=np.minimum(np.arange(h),np.arange(h)[::-1])[:,None]
+    edge=np.clip(np.minimum(xx,yy).astype('float32')/8,0,1)
+    alpha*=edge[:,:,None]
     a[y0:y1,x0:x1]=np.clip(source*(1-alpha)+printed*alpha,0,255).astype('uint8')
     return Image.fromarray(a,'RGB')
 
@@ -131,14 +136,14 @@ def repair_holograms_home(im):
     # entire office scene remain sourced from original pixels.
     a=np.asarray(im.convert('RGB')).copy()
     h,w=a.shape[:2]
-    # Old floating panels and their glow are inside this coarse mask.
-    # Inpainting is intentionally bounded to windows above the laptop.
+    # The old overlapping cyan flow-cytometry UI needs to be removed in full,
+    # including residual glow at the right and bottom edges of the old panels.
+    # This region includes only background glass, not the duck or laptop.
     mask=np.zeros((h,w),dtype=np.uint8)
-    for (x0,y0,x1,y1) in [(948,62,1188,267),(1196,123,1393,285),(939,260,1295,414)]:
-        cv2.rectangle(mask,(x0,y0),(x1,y1),255,-1)
+    cv2.rectangle(mask,(925,54),(1437,414),255,-1)
     # Restore window glass/window mullions and atmosphere from bordering area,
     # then blur subtly to match depth of field behind the holograms.
-    area=(925,50,1403,421)
+    area=(918,48,1445,422)
     x0,y0,x1,y1=area
     roi=a[y0:y1,x0:x1].copy(); sm=mask[y0:y1,x0:x1].copy()
     restored=cv2.inpaint(roi,sm,20,cv2.INPAINT_TELEA)
@@ -188,8 +193,13 @@ def run():
         text=page.read_text(encoding='utf-8')
         before='assets/'+FNS[key]
         after='assets/'+OUT[key]
-        if text.count(before)!=1:
-            raise ValueError(f'Expected exactly one existing banner reference in {page}: {before}, got {text.count(before)}')
-        page.write_text(text.replace(before,after),encoding='utf-8')
+        desired=after+'?v=coreprint2'
+        if text.count(before)==1:
+            text=text.replace(before,desired)
+        elif text.count(after)==1:
+            text=text.replace(after,desired)
+        else:
+            raise ValueError(f'Could not identify current banner reference in {page}: {before} or {after}')
+        page.write_text(text,encoding='utf-8')
         print(f'Updated website banner reference: {page}')
 if __name__=='__main__':run()
