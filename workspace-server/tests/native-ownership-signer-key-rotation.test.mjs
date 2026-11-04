@@ -153,6 +153,23 @@ test('pinned Ed25519 keys must not be reused as a different key ID or native app
  assert.equal(await verifier.verifyNativeMapping(f.input('eel')),false);
 });
 
+test('public Ed25519 signing material cannot be pinned to two different native applications',()=>{
+ const f=fixture();
+ const eel={...f.clients.eel,signingKeys:[
+  {...f.clients.eel.signingKeys[0],
+   publicKeyPem:f.clients.goflo.signingKeys[0].publicKeyPem},
+  f.clients.eel.signingKeys[1]
+ ]};
+ assert.throws(()=>createSignedNativeOwnershipVerifier({
+  clients:{goflo:f.clients.goflo,eel}
+ }),/invalid_private_native_client/,
+ 'a leaked or shared signing key must never cross app trust boundaries');
+ assert.throws(()=>createSignedNativeOwnershipVerifier({
+  clients:{eel,goflo:f.clients.goflo}
+ }),/invalid_private_native_client/,
+ 'registration order must not bypass cross-app key isolation');
+});
+
 test('rotation config rejects missing, duplicated, mixed, reversed, unbounded and wrong-type signing schedules',()=>{
  const f=fixture();
  const valid=f.clients.goflo,old=valid.signingKeys[0],next=valid.signingKeys[1];
