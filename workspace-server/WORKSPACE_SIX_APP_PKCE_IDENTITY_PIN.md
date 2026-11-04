@@ -23,7 +23,7 @@ This protection is complementary to — not a substitute for — revocation-gene
 - DuckMan (`duckman`)
 - CytoDuck (`goflo`)
 
-It exercises native user switches in legacy mode, tenant switches despite stable revisions, unchanged strict revisions, malformed old code rows lacking identity snapshots, and withdrawn grants. Synthetic identity adapters are used only for test inputs; native backend ownership, HTTPS production topology and genuine paid-seat verification are not claimed.
+It exercises native user switches in legacy mode, tenant switches despite stable revisions, unchanged strict revisions, malformed old code rows lacking identity snapshots, withdrawn grants, and the legacy one-field user identity model (including rejecting a newly introduced tenant during code exchange). Synthetic identity adapters are used only for test inputs; native backend ownership, HTTPS production topology and genuine paid-seat verification are not claimed.
 
 From `workspace-server`:
 
