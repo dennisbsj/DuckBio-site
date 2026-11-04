@@ -8,6 +8,7 @@ import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {auditSixRealNativeMtlsFiles,NATIVE_MTLS_FILES}
  from '../six-native-mtls-sidecar-source-gate.mjs';
+import {auditSevenLocalSources} from '../staging-seven-source-gate.mjs';
 import {validateSixNativeStagingSnapshot}
  from '../staging-six-native-snapshot.mjs';
 
@@ -75,7 +76,11 @@ test('exact mTLS contract source inventory matches six distinct native apps',()=
 });
 
 test('exact reviewed six private sidecar blobs pass only source-level gate',t=>{
- const f=fixture(t),result=auditSixRealNativeMtlsFiles({
+ const f=fixture(t);
+ const preflight=auditSevenLocalSources({sourcesRoot:f.root,
+  workspaceBuildSha:lock.central.sha,lock,runGit:f.git});
+ assert.equal(preflight.ok,true,JSON.stringify(preflight));
+ const result=auditSixRealNativeMtlsFiles({
   lock,sourcesRoot:f.root,runGit:f.git
  });
  assert.deepEqual(result,{
