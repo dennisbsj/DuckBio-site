@@ -12,9 +12,12 @@ const TIMEOUT=20*60*1000;
 
 export function parseLocalQaArgs(argv){
  const allowed=new Set(['--browser','--json','--allow-dirty','--help']);
- if(argv.some(arg=>!allowed.has(arg)))throw Error('unknown_argument');
+ const pins=argv.filter(arg=>arg.startsWith('--expect-head='));
+ if(pins.length>1||argv.some(arg=>!allowed.has(arg)&&
+    !/^--expect-head=[0-9a-f]{40}$/i.test(arg)))throw Error('unknown_argument');
  return {browser:argv.includes('--browser'),json:argv.includes('--json'),
-  allowDirty:argv.includes('--allow-dirty'),help:argv.includes('--help')};
+  allowDirty:argv.includes('--allow-dirty'),help:argv.includes('--help'),
+  expectHead:pins.length?pins[0].slice('--expect-head='.length).toLowerCase():null};
 }
 function run(command,args,{cwd=projectDir,timeout=TIMEOUT}={}){
  const result=spawnSync(command,args,{cwd,encoding:'utf8',timeout,
@@ -43,14 +46,14 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
 }={}){
  const options=parseLocalQaArgs(argv);
  if(options.help){
-  return {exitCode:0,help:'Usage: npm run qa:local -- [--browser] [--json] [--allow-dirty]'};
+  return {exitCode:0,help:'Usage: npm run qa:local -- [--browser] [--json] [--expect-head=<40-hex-SHA>] [--allow-dirty]'};
  }
  const head=execute('git',['rev-parse','--verify','HEAD'],{cwd,timeout:10000});
  const status=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
  const sha=head.stdout.trim();
  const clean=Boolean(head.ok&&/^[0-9a-f]{40}$/.test(sha)&&status.ok&&!status.stdout.trim());
  const report={schema:'duckbio.workspace.local-qa.v1',sha:head.ok?sha:null,
-  exactHead:clean,allowDirty:options.allowDirty,stages:[],
+  exactHead:clean,expectedHead:options.expectHead,allowDirty:options.allowDirty,stages:[],
   outcome:'blocked',nodeVersion};
  if(!validQaNodeVersion(nodeVersion)){
   log('Workspace QA requires Node 22.16+ or Node 24.');
@@ -58,6 +61,10 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  }
  if(!head.ok||!status.ok||!(/^[0-9a-f]{40}$/.test(sha))){
   log('Cannot resolve an exact git HEAD and working-tree status.');
+  return {exitCode:2,report};
+ }
+ if(options.expectHead&&sha!==options.expectHead){
+  log('Checked-out Git HEAD does not match the pinned expected SHA.');
   return {exitCode:2,report};
  }
  if(!clean&&!options.allowDirty){

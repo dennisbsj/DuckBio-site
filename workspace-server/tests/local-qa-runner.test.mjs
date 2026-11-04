@@ -22,7 +22,7 @@ function fake({dirty='',failName=null,playwright=true}={}){
  return {calls,execute};
 }
 test('flag parsing rejects unknown arguments and preserves opt-in browser behavior',()=>{
- assert.deepEqual(parseLocalQaArgs([]),{browser:false,json:false,allowDirty:false,help:false});
+ assert.deepEqual(parseLocalQaArgs([]),{browser:false,json:false,allowDirty:false,help:false,expectHead:null});
  assert.equal(parseLocalQaArgs(['--browser']).browser,true);
  assert.throws(()=>parseLocalQaArgs(['--deploy']),/unknown_argument/);
 });
@@ -75,5 +75,16 @@ test('QA restricts release-grade proof to Node 22.16+ or Node 24',()=>{
  const r=runLocalWorkspaceQa([],{execute:f.execute,log:()=>{},nodeVersion:'22.15.0'});
  assert.equal(r.exitCode,2);
  assert.equal(r.report.outcome,'blocked');
+ assert.equal(f.calls.filter(x=>x[0]!=='git').length,0);
+});
+
+test('pinned exact SHA mismatches block before executing any code checks',()=>{
+ const f=fake();
+ const other='b'.repeat(40);
+ assert.equal(parseLocalQaArgs(['--expect-head='+SHA]).expectHead,SHA);
+ assert.throws(()=>parseLocalQaArgs(['--expect-head=nope']),/unknown_argument/);
+ assert.throws(()=>parseLocalQaArgs(['--expect-head='+SHA,'--expect-head='+SHA]),/unknown_argument/);
+ const r=runLocalWorkspaceQa(['--expect-head='+other],{execute:f.execute,log:()=>{}});
+ assert.equal(r.exitCode,2);assert.equal(r.report.expectedHead,other);
  assert.equal(f.calls.filter(x=>x[0]!=='git').length,0);
 });
