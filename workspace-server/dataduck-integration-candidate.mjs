@@ -95,3 +95,39 @@ export function inspectDataDuckNativeEntitlement({entitlement,localIdentity}={})
  return Object.freeze({ready:true,reason:'source-contract-only',
   accessGranted:false});
 }
+
+/**
+ * Future commercial selection grammar for a SEVEN-APP catalog only.
+ * Deliberately separate from the six-app LIVE allocation engine:
+ * caller-supplied plan strings and proposed seats cannot create a purchase,
+ * migrate a grandfathered Bundle, mutate Stripe or grant an app.
+ *
+ * This is not a second entitlement authority and must not be called by
+ * active Workspace purchase/SSO code until reviewed live billing is ready.
+ */
+export function inspectFutureSevenAppPlanCandidate({plan,apps,seats}={}){
+ const fail=reason=>Object.freeze({
+  ok:false,reason,proposalOnly:true,purchaseAuthorized:false,
+  migrationAuthorized:false,licensesGranted:false,accessGranted:false
+ });
+ const all=[...EXISTING_DUCKBIO_APP_IDS,DATADUCK_APP.id];
+ if(!['Single','Mixed','Bundle'].includes(plan)||
+    !Array.isArray(apps)||!Number.isSafeInteger(seats)||
+    seats<1||seats>10000||new Set(apps).size!==apps.length||
+    apps.some(id=>typeof id!=='string'||!all.includes(id)))
+  return fail('invalid_future_subscription');
+ if((plan==='Single'&&apps.length!==1)||
+    (plan==='Mixed'&&(apps.length<2||apps.length>6))||
+    (plan==='Bundle'&&(apps.length!==7||!all.every(id=>apps.includes(id)))))
+  return fail('invalid_future_plan_selection');
+ const selected=[...apps].sort();
+ return Object.freeze({
+  ok:true,
+  plan,apps:Object.freeze(selected),seatsPerApp:seats,
+  dataduckIncluded:selected.includes(DATADUCK_APP.id),
+  legacySixAppBundleAutomaticallyUpgraded:false,
+  grandfatheredSixAppSubscriptionChanges:false,
+  proposalOnly:true,purchaseAuthorized:false,
+  migrationAuthorized:false,licensesGranted:false,accessGranted:false
+ });
+}
