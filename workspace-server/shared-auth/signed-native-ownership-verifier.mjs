@@ -165,7 +165,13 @@ export function createSignedNativeOwnershipVerifier({
  }
  if(!registered.size)throw Error('private_native_clients_required');
 
+ // Never allow malformed private callback inputs or a failing injected
+ // clock to escape as an exception into a Workspace request pipeline.
  async function verify(fields,purpose){
+  try{return await verifyRequest(fields,purpose);}
+  catch{return false;}
+ }
+ async function verifyRequest(fields,purpose){
   if(!PURPOSES.has(purpose)||!fields||typeof fields!=='object'||
      !isExact(fields,REQUEST_KEYS)||
      REQUEST_KEYS.some(k=>!isId(fields[k])))return false;
@@ -237,12 +243,14 @@ export function createSignedNativeOwnershipVerifier({
   // Private opt-in PR #141 link/migration ownership adapter. Actor authority
   // is still separately verified via orgNativeLinks.authorizeMutation().
   verifyNativeOwnership(input={}){
-   const {actorId,userId,appId,workspaceOrganizationId,nativeUserId,
-    nativeOrganizationId,operation}=input;
-   if(!isId(actorId)||!isId(userId)||
-      !['bind','migrate'].includes(operation))return Promise.resolve(false);
-   return verify({appId,workspaceAccountId:userId,workspaceOrganizationId,
-    nativeUserId,nativeOrganizationId},operation);
+   try{
+    const {actorId,userId,appId,workspaceOrganizationId,nativeUserId,
+     nativeOrganizationId,operation}=input??{};
+    if(!isId(actorId)||!isId(userId)||
+       !['bind','migrate'].includes(operation))return Promise.resolve(false);
+    return verify({appId,workspaceAccountId:userId,workspaceOrganizationId,
+     nativeUserId,nativeOrganizationId},operation);
+   }catch{return Promise.resolve(false);}
   }
  });
 }
