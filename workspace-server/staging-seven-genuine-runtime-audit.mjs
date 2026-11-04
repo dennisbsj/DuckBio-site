@@ -184,9 +184,8 @@ if(isCLI){
  const oldArgs=args.length===5&&args[4]==='--confirm-installed-synthetic-staging-readonly';
  const postPkce=args.length===7&&args[4]==='--snapshot'&&
   args[5]==='post-pkce'&&args[6]==='--confirm-installed-synthetic-staging-readonly';
- if(!oldArgs&&!postPkce||args[0]!=='--config'||
-    args[2]!=='--sources-root'||
-    false){
+ if((!oldArgs&&!postPkce)||args[0]!=='--config'||
+    args[2]!=='--sources-root'){
   console.error('Usage: node staging-seven-genuine-runtime-audit.mjs --config PRIVATE_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS [--snapshot post-pkce] --confirm-installed-synthetic-staging-readonly');
   process.exitCode=2;
  }else{
