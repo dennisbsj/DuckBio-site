@@ -23,11 +23,13 @@ const current=JSON.parse(readFileSync(new URL(
  '../six-native-current-compat-lock.json',import.meta.url),'utf8'));
 const historical=JSON.parse(readFileSync(new URL(
  '../six-app-source-qa-lock.json',import.meta.url),'utf8'));
+const postPkce=JSON.parse(readFileSync(new URL(
+ '../six-native-post-pkce-compat-lock.json',import.meta.url),'utf8'));
 const key=()=>randomBytes(32).toString('base64url');
 const info=id=>id==='eel'||id==='duckman'?
  'DUCKBIO_WORKSPACE_ORGANIZATION_ID':'DUCKBIO_WORKSPACE_ORG_ID';
 
-function fixture(t){
+function fixture(t,reviewed=current){
  const home=mkdtempSync(join(tmpdir(),'duckbio-current-six-plan-'));
  chmodSync(home,0o700);
  t.after(()=>rmSync(home,{recursive:true,force:true}));
@@ -38,10 +40,10 @@ function fixture(t){
  }
  const {source,data,central,proxy,units}=roots;
  const config=createSyntheticStagingConfig({
-  baseDomain:'duckbio.net',privateRoot:central,buildSha:current.central.sha
+  baseDomain:'duckbio.net',privateRoot:central,buildSha:reviewed.central.sha
  });
  const clients=new Map(JSON.parse(config.SUITE_CLIENTS).map(c=>[c.id,c]));
- const repos=[current.central,...current.apps];
+ const repos=[reviewed.central,...reviewed.apps];
  const sourceByDir=new Map();
  for(const row of repos){
   const repoName=row.repo.split('/')[1],dir=join(source,repoName);
@@ -75,11 +77,11 @@ function fixture(t){
    return 'name: synthetic immutable workflow metadata only\nsteps:\n'+
     '  - uses: actions/checkout@v4\n'+
     '    with:\n      repository: dennisbsj/DuckBio-site\n'+
-    '      ref: '+current.central.sha+'\n';
+    '      ref: '+reviewed.central.sha+'\n';
   throw Error('unrecognized Git command '+command);
  }
  const envs=new Map();
- for(const row of current.apps){
+ for(const row of reviewed.apps){
   const id=row.id,c=clients.get(id),dir=join(data,id);
   mkdirSync(dir,{mode:0o700});
   const env={
@@ -115,7 +117,7 @@ function fixture(t){
   envs.set(id,{path,env});
  }
  return {home,...roots,config,gitCalls,runGit,envs,
-  lock:current};
+  lock:reviewed};
 }
 function plans(f){
  return {
@@ -167,6 +169,49 @@ test('historical and current six-app source snapshots both remain individually s
  const wrongWorkflow=structuredClone(current);
  wrongWorkflow.apps[1].workflowId+=1;
  assert.equal(validateSixNativeStagingSnapshot(wrongWorkflow).ok,false);
+});
+test('post-PKCE lock is separate, reviewed, non-promotable and preserves the two historic baselines',()=>{
+ assert.deepEqual(validateSixNativeStagingSnapshot(postPkce),
+  {ok:true,kind:'post-pkce'});
+ assert.deepEqual(validateSixNativeStagingSnapshot(current),
+  {ok:true,kind:'current'});
+ assert.deepEqual(validateSixNativeStagingSnapshot(historical),
+  {ok:true,kind:'historical'});
+ assert.equal(stagingSnapshotFile('post-pkce'),
+  'six-native-post-pkce-compat-lock.json');
+ assert.equal(postPkce.apps.length,6);
+ assert.equal(postPkce.central.sha,current.central.sha);
+ const changed=postPkce.apps.filter((row,i)=>row.sha!==current.apps[i].sha);
+ assert.deepEqual(changed.map(x=>x.id),['goflo','methpipe','mantrain']);
+ assert.deepEqual(changed.map(x=>x.runId),
+  [41786859215,41786886411,41786905381]);
+ for(const mutation of [
+  b=>b.apps[0].sha='f'.repeat(40),
+  b=>b.apps[0].runId+=1,
+  b=>b.apps[2].workflowId+=1,
+  b=>b.apps[4].sha='f'.repeat(40),
+  b=>b.apps.push({...b.apps[0],id:'dataduck'}),
+  b=>b.central.sha='f'.repeat(40)
+ ]){
+  const bad=structuredClone(postPkce);mutation(bad);
+  assert.equal(validateSixNativeStagingSnapshot(bad).ok,false);
+ }
+});
+test('new post-PKCE six-app lock generates coherent seven-route Caddy and six native service plans and passes source audits', {timeout:120000},t=>{
+ const f=fixture(t,postPkce),p=plans(f);
+ assert.equal(p.proxy.manifest.routeCount,7);
+ assert.equal(p.native.manifest.serviceCount,6);
+ assert.equal(p.proxy.manifest.sourceQaWorkspaceSha,postPkce.central.sha);
+ assert.equal(p.native.manifest.jointlyVerifiedWorkspaceSha,postPkce.central.sha);
+ assert.equal(p.native.manifest.routesSha256,p.proxy.manifest.caddySha256);
+ assert.deepEqual(p.native.manifest.services.map(x=>x.appId),postPkce.apps.map(x=>x.id));
+ writePlans(f);
+ assert.equal(prestart(f).ok,true);
+ const mixed=prestart(f,{lock:current});
+ assert.equal(mixed.ok,false,'older source QA cannot attest newer native checkouts');
+ assert(mixed.checks.some(x=>x.ok===false));
+ const fake=structuredClone(postPkce);fake.apps[1].runId=999999999;
+ assert.equal(prestart(f,{lock:fake}).ok,false);
 });
 test('current exact six-app source can build six native service units and seven host Caddy without running services',
  {timeout:120000},t=>{
