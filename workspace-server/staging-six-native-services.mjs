@@ -198,16 +198,16 @@ if(invoked){
  const args=process.argv.slice(2);
  const historical=args.length===9&&args[8]==='--confirm-uninstalled-only';
  const current=args.length===11&&args[8]==='--snapshot'&&
-  args[9]==='current'&&args[10]==='--confirm-uninstalled-only';
+  ['current','post-pkce'].includes(args[9])&&args[10]==='--confirm-uninstalled-only';
  if((!historical&&!current)||args[0]!=='--config'||
     args[2]!=='--sources-root'||args[4]!=='--private-data-root'||
     args[6]!=='--private-output-root'){
-  console.error('Usage: node staging-six-native-services.mjs --config PRIVATE_JSON --sources-root PRIVATE_CHECKOUTS --private-data-root PRIVATE_ROOT --private-output-root PRIVATE_PLAN_ROOT [--snapshot current] --confirm-uninstalled-only');
+  console.error('Usage: node staging-six-native-services.mjs --config PRIVATE_JSON --sources-root PRIVATE_CHECKOUTS --private-data-root PRIVATE_ROOT --private-output-root PRIVATE_PLAN_ROOT [--snapshot current|post-pkce] --confirm-uninstalled-only');
   process.exitCode=2;
  }else{
   try{
    const config=readPrivateConfiguration(args[1]);
-   const filename=stagingSnapshotFile(current?'current':'historical');
+   const filename=stagingSnapshotFile(current?args[9]:'historical');
    const lock=JSON.parse(readFileSync(
     new URL('./'+filename,import.meta.url),'utf8'));
    writeSixNativeServicePlan({

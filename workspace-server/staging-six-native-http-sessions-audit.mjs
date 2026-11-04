@@ -8,7 +8,7 @@ import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readPrivateConfiguration} from './staging-preflight.mjs';
 import {EXPECTED_NATIVE} from './six-native-current-compat-audit.mjs';
-import {validateSixNativeStagingSnapshot}
+import {validateSixNativeStagingSnapshot,stagingSnapshotFile}
  from './staging-six-native-snapshot.mjs';
 import {validateSixNativeProofBundle,readPrivateSixNativeProofBundle,
  auditSixNativeAuthenticatedStaging}
@@ -48,7 +48,7 @@ const fail=(checks,id,code)=>Object.freeze({
 const positive=(checks,id)=>checks.push({id,ok:true,code:'ok'});
 export function validateSixNativeCookieBundle(config,lock,proofBundle,cookieBundle){
  if(!validateSixNativeProofBundle(config,lock,proofBundle).ok||
-    validateSixNativeStagingSnapshot(lock).kind!=='current')
+    !['current','post-pkce'].includes(validateSixNativeStagingSnapshot(lock).kind))
   return {ok:false,code:'central_native_proofs_not_preverified'};
  if(!okKeys(cookieBundle,EXACT)||cookieBundle.version!==1||
     cookieBundle.scope!=='synthetic-six-native-http-session-cookies'||
@@ -182,15 +182,17 @@ const direct=process.argv[1]&&resolve(process.argv[1])===
  fileURLToPath(import.meta.url);
 if(direct){
  const a=process.argv.slice(2);
- if(a.length!==9||a[0]!=='--config'||a[2]!=='--sources-root'||
-    a[4]!=='--broker-proofs'||a[6]!=='--native-cookies'||
-    a[8]!=='--confirm-readonly-synthetic-sessions-only'){
-  console.error('Usage: node staging-six-native-http-sessions-audit.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS --broker-proofs PRIVATE_SYNTHETIC_BROKER_PROOFS_JSON --native-cookies PRIVATE_SYNTHETIC_NATIVE_COOKIES_JSON --confirm-readonly-synthetic-sessions-only');
+ const oldArgs=a.length===9&&a[8]==='--confirm-readonly-synthetic-sessions-only';
+ const postPkce=a.length===11&&a[8]==='--snapshot'&&
+  a[9]==='post-pkce'&&a[10]==='--confirm-readonly-synthetic-sessions-only';
+ if((!oldArgs&&!postPkce)||a[0]!=='--config'||a[2]!=='--sources-root'||
+    a[4]!=='--broker-proofs'||a[6]!=='--native-cookies'){
+  console.error('Usage: node staging-six-native-http-sessions-audit.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS --broker-proofs PRIVATE_SYNTHETIC_BROKER_PROOFS_JSON --native-cookies PRIVATE_SYNTHETIC_NATIVE_COOKIES_JSON [--snapshot post-pkce] --confirm-readonly-synthetic-sessions-only');
   process.exitCode=2;
  }else try{
   const config=readPrivateConfiguration(a[1]);
   const lock=JSON.parse(readFileSync(new URL(
-   './six-native-current-compat-lock.json',import.meta.url),'utf8'));
+   './'+stagingSnapshotFile(postPkce?'post-pkce':'current'),import.meta.url),'utf8'));
   const report=await auditSixNativeHttpSessions({
    config,lock,sourcesRoot:a[3],
    proofBundle:readPrivateSixNativeProofBundle(a[5]),

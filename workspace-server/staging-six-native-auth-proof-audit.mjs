@@ -10,7 +10,7 @@ import {approvedPrivateRoot} from './staging-generate-config.mjs';
 import {readPrivateConfiguration,validateWorkspaceStagingConfig}
  from './staging-preflight.mjs';
 import {EXPECTED_NATIVE} from './six-native-current-compat-audit.mjs';
-import {validateSixNativeStagingSnapshot}
+import {validateSixNativeStagingSnapshot,stagingSnapshotFile}
  from './staging-six-native-snapshot.mjs';
 import {auditSevenGenuineStaging}
  from './staging-seven-genuine-runtime-audit.mjs';
@@ -36,7 +36,7 @@ const ownKeys=(value,names)=>value!==null&&typeof value==='object'&&
 // production subject is stored in the proof bundle.
 export function validateSixNativeProofBundle(config,lock,bundle){
  if(!validateWorkspaceStagingConfig(config).ok||
-    validateSixNativeStagingSnapshot(lock).kind!=='current'||
+    !['current','post-pkce'].includes(validateSixNativeStagingSnapshot(lock).kind)||
     config.SUITE_BUILD_SHA!==lock.central.sha)
   return {ok:false,code:'unverified_six_native_staging'};
  if(!ownKeys(bundle,['version','scope','workspaceSha','assertions'])||
@@ -182,14 +182,17 @@ const invoked=process.argv[1]&&resolve(process.argv[1])===
  fileURLToPath(import.meta.url);
 if(invoked){
  const a=process.argv.slice(2);
- if(a.length!==7||a[0]!=='--config'||a[2]!=='--sources-root'||
-    a[4]!=='--proofs'||a[6]!=='--confirm-synthetic-auth-proof-inspection-only'){
-  console.error('Usage: node staging-six-native-auth-proof-audit.mjs --config PRIVATE_JSON --sources-root PRIVATE_SEVEN_GIT_SOURCES --proofs PRIVATE_SYNTHETIC_PROOFS_JSON --confirm-synthetic-auth-proof-inspection-only');
+ const oldArgs=a.length===7&&a[6]==='--confirm-synthetic-auth-proof-inspection-only';
+ const postPkce=a.length===9&&a[6]==='--snapshot'&&
+  a[7]==='post-pkce'&&a[8]==='--confirm-synthetic-auth-proof-inspection-only';
+ if((!oldArgs&&!postPkce)||a[0]!=='--config'||a[2]!=='--sources-root'||
+    a[4]!=='--proofs'){
+  console.error('Usage: node staging-six-native-auth-proof-audit.mjs --config PRIVATE_JSON --sources-root PRIVATE_SEVEN_GIT_SOURCES --proofs PRIVATE_SYNTHETIC_PROOFS_JSON [--snapshot post-pkce] --confirm-synthetic-auth-proof-inspection-only');
   process.exitCode=2;
  }else{
   try{
    const lock=JSON.parse(readFileSync(new URL(
-    './six-native-current-compat-lock.json',import.meta.url),'utf8'));
+    './'+stagingSnapshotFile(postPkce?'post-pkce':'current'),import.meta.url),'utf8'));
    const result=await auditSixNativeAuthenticatedStaging({
     config:readPrivateConfiguration(a[1]),sourcesRoot:a[3],lock,
     bundle:readPrivateSixNativeProofBundle(a[5])

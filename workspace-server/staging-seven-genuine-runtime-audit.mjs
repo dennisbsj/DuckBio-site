@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
 import {readPrivateConfiguration,validateWorkspaceStagingConfig}
  from './staging-preflight.mjs';
 import {EXPECTED_NATIVE} from './six-native-current-compat-audit.mjs';
-import {validateSixNativeStagingSnapshot}
+import {validateSixNativeStagingSnapshot,stagingSnapshotFile}
  from './staging-six-native-snapshot.mjs';
 import {auditSevenLocalSources} from './staging-seven-source-gate.mjs';
 import {runWorkspaceStagingReadOnlySmoke}
@@ -112,7 +112,7 @@ export async function auditSevenGenuineStaging({
 }={}){
  const checks=[];
  if(!config||!lock||!validateWorkspaceStagingConfig(config).ok||
-    validateSixNativeStagingSnapshot(lock).kind!=='current'||
+    !['current','post-pkce'].includes(validateSixNativeStagingSnapshot(lock).kind)||
     config.SUITE_BUILD_SHA!==lock.central.sha)
   return stop(checks,'configuration','invalid_source_locked_staging');
  if(process.platform!=='linux')
@@ -181,16 +181,18 @@ const isCLI=process.argv[1]&&resolve(process.argv[1])===
  fileURLToPath(import.meta.url);
 if(isCLI){
  const args=process.argv.slice(2);
- if(args.length!==5||args[0]!=='--config'||
-    args[2]!=='--sources-root'||
-    args[4]!=='--confirm-installed-synthetic-staging-readonly'){
-  console.error('Usage: node staging-seven-genuine-runtime-audit.mjs --config PRIVATE_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS --confirm-installed-synthetic-staging-readonly');
+ const oldArgs=args.length===5&&args[4]==='--confirm-installed-synthetic-staging-readonly';
+ const postPkce=args.length===7&&args[4]==='--snapshot'&&
+  args[5]==='post-pkce'&&args[6]==='--confirm-installed-synthetic-staging-readonly';
+ if((!oldArgs&&!postPkce)||args[0]!=='--config'||
+    args[2]!=='--sources-root'){
+  console.error('Usage: node staging-seven-genuine-runtime-audit.mjs --config PRIVATE_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS [--snapshot post-pkce] --confirm-installed-synthetic-staging-readonly');
   process.exitCode=2;
  }else{
   try{
    const config=readPrivateConfiguration(args[1]);
    const lock=JSON.parse(readFileSync(new URL(
-    './six-native-current-compat-lock.json',import.meta.url),'utf8'));
+    './'+stagingSnapshotFile(postPkce?'post-pkce':'current'),import.meta.url),'utf8'));
    const result=await auditSevenGenuineStaging({
     config,lock,sourcesRoot:args[3]
    });

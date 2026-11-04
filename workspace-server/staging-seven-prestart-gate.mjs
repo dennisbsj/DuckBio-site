@@ -115,12 +115,12 @@ if(invoked){
   '--proxy-plan-root','--native-plan-root'];
  const historical=args.length===11&&args[10]==='--confirm-offline-prestart-only';
  const current=args.length===13&&args[10]==='--snapshot'&&
-  args[11]==='current'&&args[12]==='--confirm-offline-prestart-only';
+  ['current','post-pkce'].includes(args[11])&&args[12]==='--confirm-offline-prestart-only';
  if((!historical&&!current)||!expected.every((key,i)=>args[2*i]===key)){
-  console.error('Usage: node staging-seven-prestart-gate.mjs --config PRIVATE_JSON --sources-root PRIVATE_GIT_ROOT --private-data-root PRIVATE_NATIVE_ROOT --proxy-plan-root PRIVATE_PROXY_ROOT --native-plan-root PRIVATE_UNIT_ROOT [--snapshot current] --confirm-offline-prestart-only');
+  console.error('Usage: node staging-seven-prestart-gate.mjs --config PRIVATE_JSON --sources-root PRIVATE_GIT_ROOT --private-data-root PRIVATE_NATIVE_ROOT --proxy-plan-root PRIVATE_PROXY_ROOT --native-plan-root PRIVATE_UNIT_ROOT [--snapshot current|post-pkce] --confirm-offline-prestart-only');
   process.exitCode=2;
  }else try{
-  const filename=stagingSnapshotFile(current?'current':'historical');
+  const filename=stagingSnapshotFile(current?args[11]:'historical');
   const lock=JSON.parse(readFileSync(new URL(
    './'+filename,import.meta.url),'utf8'));
   const result=auditSevenServicePrestart({

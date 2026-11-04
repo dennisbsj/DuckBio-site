@@ -98,16 +98,16 @@ if(invoked){
  const args=process.argv.slice(2);
  const historical=args.length===5&&args[4]==='--confirm-offline-sources';
  const current=args.length===7&&args[4]==='--snapshot'&&
-  args[5]==='current'&&args[6]==='--confirm-offline-sources';
+  ['current','post-pkce'].includes(args[5])&&args[6]==='--confirm-offline-sources';
  if((!historical&&!current)||args[0]!=='--config'||
     args[2]!=='--sources-root'){
-  console.error('Usage: node staging-seven-source-gate.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS [--snapshot current] --confirm-offline-sources');
+  console.error('Usage: node staging-seven-source-gate.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS [--snapshot current|post-pkce] --confirm-offline-sources');
   process.exitCode=2;
  }else{
   try{
    const config=readPrivateConfiguration(args[1]);
    if(!validateWorkspaceStagingConfig(config).ok)throw Error('invalid_config');
-   const filename=stagingSnapshotFile(current?'current':'historical');
+   const filename=stagingSnapshotFile(current?args[5]:'historical');
    const lock=JSON.parse(await import('node:fs').then(
     fs=>fs.readFileSync(new URL('./'+filename,import.meta.url),'utf8')));
    const report=auditSevenLocalSources({sourcesRoot:args[3],
