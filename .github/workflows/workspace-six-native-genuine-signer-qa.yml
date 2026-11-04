@@ -1,0 +1,58 @@
+name: Workspace six-native genuine Ed25519 source interoperability (offline)
+on:
+  pull_request:
+    paths:
+      - 'workspace-server/six-native-*.mjs'
+      - 'workspace-server/shared-auth/signed-native-ownership-verifier.mjs'
+      - 'workspace-server/tests/fixtures/native-ownership-v1-known-answer.json'
+      - '.github/workflows/workspace-six-native-genuine-signer-qa.yml'
+permissions:
+  contents: read
+jobs:
+  genuine-six-signer-source-interop:
+    # Untrusted fork PRs must never get a path to private credentials or checkout.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Clone only the six exact previously reviewed public source commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          root="${RUNNER_TEMP}/duckbio-native-reviewed-source"
+          mkdir -m 700 "$root"
+          while read -r app sha; do
+            if [[ -z "${app}" ]]; then continue; fi
+            url="https://github.com/dennisbsj/${app}.git"
+            target="${root}/${app}"
+            git clone --quiet --no-checkout --filter=blob:none --depth 1 "$url" "$target"
+            git -C "$target" sparse-checkout init --cone
+            git -C "$target" sparse-checkout set server
+            git -C "$target" fetch --quiet --depth 1 origin "$sha"
+            git -C "$target" -c advice.detachedHead=false checkout --quiet --detach "$sha"
+            test "$(git -C "$target" rev-parse --verify HEAD)" = "$sha"
+          done <<'REVIEWED_NATIVE_COMMITS'
+          CytoDuck ba22006b75b75d6b1fbe680c3d59116768806798
+          DuckNote c64da055b82e0f8a499c5dd6ef47eaaa089be13f
+          DuckPipe cd5369134c230c5afcbd0fc4a4bf9a136d5211b7
+          DuckTrain f25eabfbb0cb9ebac45c77948a14b217fa458733
+          DuckMan f8a86c10db6b6ec86b6224a8c81b90cebcf652d2
+          LabDuck 48a2ee834f1bcc6eb3f910ad5399cc4883acb2bd
+          REVIEWED_NATIVE_COMMITS
+          test "$(find "$root" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
+      - name: Recheck exact native Git remotes, clean source blobs, signer canonical bytes and signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          node workspace-server/six-native-known-answer-audit.mjs \
+            --sources-root "${RUNNER_TEMP}/duckbio-native-reviewed-source" \
+            --confirm-private-six-native-known-answer-only
+      - name: Assert this is not staging or release approval
+        run: echo "OFFLINE SOURCE CONTRACT ONLY — NO NATIVE SERVICES, CREDENTIALS, LICENSES, DATA OR DEPLOYMENT"
