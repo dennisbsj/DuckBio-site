@@ -20,6 +20,8 @@ import {SIX_NATIVE_SIGNER_CHECKOUTS,verifySixNativeSignerSources,
  from './six-native-signer-interoperability.mjs';
 import {rehearseSixNativeOwnershipOverRealTls}
  from './six-native-real-https-rehearsal.mjs';
+import {rehearseSixNativeMtlSidecars}
+ from './six-native-mtls-sidecar-rehearsal.mjs';
 
 export const SIX_NATIVE_LOOKUP_MODULES=Object.freeze([
  Object.freeze({id:'goflo',file:'server/workspace-native-ownership-lookup.cjs',
@@ -34,6 +36,20 @@ export const SIX_NATIVE_LOOKUP_MODULES=Object.freeze([
   factory:'createDuckManAuthoritativeOwnershipLookup'}),
  Object.freeze({id:'limsman',file:'server/workspace-native-ownership-lookup.cjs',
   factory:'createLabDuckAuthoritativeOwnershipLookup'})
+]);
+export const SIX_NATIVE_MTLS_SIDECAR_MODULES=Object.freeze([
+ Object.freeze({id:'goflo',file:'server/workspace-native-ownership-https.cjs',
+  factory:'createCytoDuckOwnershipHttpsSidecar'}),
+ Object.freeze({id:'eel',file:'server/workspace-native-ownership-https.js',
+  factory:'createDuckNoteOwnershipHttpsSidecar'}),
+ Object.freeze({id:'methpipe',file:'server/workspace-native-ownership-https.cjs',
+  factory:'createDuckPipeOwnershipHttpsSidecar'}),
+ Object.freeze({id:'mantrain',file:'server/workspace-native-ownership-https.cjs',
+  factory:'createDuckTrainOwnershipHttpsSidecar'}),
+ Object.freeze({id:'duckman',file:'server/workspace-native-ownership-https.cjs',
+  factory:'createDuckManOwnershipHttpsSidecar'}),
+ Object.freeze({id:'limsman',file:'server/workspace-native-ownership-https.cjs',
+  factory:'createLabDuckOwnershipHttpsSidecar'})
 ]);
 const NOW=1_800_000_000_000;
 const ACCOUNT='synthetic-workspace-account';
@@ -80,6 +96,32 @@ export function verifySixNativeLookupSources(root,{runGit=git}={}){
   }catch{return result(false,'unverified_'+row.id+'_native_lookup',checks)}
  }
  return result(true,'six_private_native_lookup_sources_pinned',checks);
+}
+
+/** Native mTLS sidecars are independently audited Git blobs. The full
+ * native repo HEAD, remotes, cleanliness, signer and lookup are checked first.
+ */
+export function verifySixNativeMtlSidecarSources(root,{runGit=git}={}){
+ const base=verifySixNativeLookupSources(root,{runGit});
+ if(!base.ok)return result(false,'native_signer_or_lookup_source_unverified');
+ const checks=[];
+ for(let i=0;i<SIX_NATIVE_MTLS_SIDECAR_MODULES.length;i++){
+  const sidecar=SIX_NATIVE_MTLS_SIDECAR_MODULES[i];
+  const repo=SIX_NATIVE_SIGNER_CHECKOUTS[i];
+  if(sidecar.id!==repo.id)return result(false,'native_app_matrix_mismatch');
+  const dir=join(root,repo.repo),filename=join(dir,sidecar.file);
+  try{
+   const stat=lstatSync(filename);
+   if(!stat.isFile()||stat.isSymbolicLink()||
+      realpathSync(filename)!==filename||
+      !/^[a-f0-9]{40}$/.test(runGit(dir,['rev-parse','HEAD:'+sidecar.file]))||
+      runGit(dir,['rev-parse','HEAD:'+sidecar.file])!==
+       runGit(dir,['hash-object','--',sidecar.file]))
+    throw Error('not_pinned');
+   checks.push({id:sidecar.id,ok:true});
+  }catch{return result(false,'unverified_'+sidecar.id+'_native_mtls_sidecar',checks)}
+ }
+ return result(true,'six_private_mtls_native_sidecar_sources_pinned',checks);
 }
 
 // Real native SQLite lookup SQL runs inside independent, isolated temporary
@@ -293,13 +335,16 @@ export async function rehearseSixNativeLookupFactories({
 /** Operators with all SIX reviewed private native repo clones may invoke
  * this explicitly; no automatic cloning, Git remote access or token export.
  */
-export async function auditSixGenuineNativeLookups({sourcesRoot,realTls=false}={}){
- if(typeof realTls!=='boolean')return result(false,'invalid_offline_transport_mode');
- const before=verifySixNativeLookupSources(sourcesRoot);
+export async function auditSixGenuineNativeLookups({sourcesRoot,realTls=false,realMtl=false}={}){
+ if(typeof realTls!=='boolean'||typeof realMtl!=='boolean'||
+    (realTls&&realMtl))return result(false,'invalid_offline_transport_mode');
+ const checkSources=realMtl?verifySixNativeMtlSidecarSources:
+  verifySixNativeLookupSources;
+ const before=checkSources(sourcesRoot);
  if(!before.ok)return before;
- let factories,signerFactories;
+ let factories,signerFactories,sidecarFactories;
  try{
-  factories=new Map();signerFactories=new Map();
+  factories=new Map();signerFactories=new Map();sidecarFactories=new Map();
   for(let i=0;i<SIX_NATIVE_LOOKUP_MODULES.length;i++){
    const row=SIX_NATIVE_LOOKUP_MODULES[i];
    const repo=SIX_NATIVE_SIGNER_CHECKOUTS[i];
@@ -316,12 +361,26 @@ export async function auditSixGenuineNativeLookups({sourcesRoot,realTls=false}={
    if(typeof signerFactory!=='function')
     return result(false,'missing_'+row.id+'_native_signer_export');
    signerFactories.set(row.id,signerFactory);
+   if(realMtl){
+    const sidecar=SIX_NATIVE_MTLS_SIDECAR_MODULES[i];
+    const sidecarModule=await import(pathToFileURL(join(
+      sourcesRoot,repo.repo,sidecar.file)).href);
+    const nativeSidecar=sidecarModule[sidecar.factory]??
+     sidecarModule.default?.[sidecar.factory];
+    if(typeof nativeSidecar!=='function')
+     return result(false,'missing_'+row.id+'_native_mtls_export');
+    sidecarFactories.set(row.id,nativeSidecar);
+   }
   }
  }catch{return result(false,'native_lookup_import_failed')}
  const output=await rehearseSixNativeLookupFactories({
   factories,
-  onVerifiedLookups:(lookups,controls)=>realTls?
-   rehearseSixNativeOwnershipOverRealTls({
+  onVerifiedLookups:(lookups,controls)=>realMtl?
+   rehearseSixNativeMtlSidecars({
+    sidecarFactories,signerFactories,
+    nativeLookups:lookups,syntheticControls:controls
+   }):
+   realTls?rehearseSixNativeOwnershipOverRealTls({
     signerFactories,nativeLookups:lookups,syntheticControls:controls
    }):
    rehearseSixNativeSignerFactories({
@@ -329,10 +388,11 @@ export async function auditSixGenuineNativeLookups({sourcesRoot,realTls=false}={
    })
  });
  if(!output.ok)return output;
- const after=verifySixNativeLookupSources(sourcesRoot);
+ const after=checkSources(sourcesRoot);
  if(!after.ok)return result(false,'native_lookup_sources_changed');
  return Object.freeze({...output,
-  reason:realTls?
+  reason:realMtl?
+   'six_genuine_native_modules_real_mutual_tls_verified':realTls?
    'six_genuine_native_modules_real_loopback_tls_verified':
    'six_real_native_signer_and_lookup_chain_offline_verified',
   sourcesPinned:true,deploymentAuthorized:false});
@@ -343,18 +403,21 @@ if(process.argv[1]&&resolve(process.argv[1])===
  const args=process.argv.slice(2);
  const tls=args.length===3&&
   args[2]==='--confirm-offline-six-native-real-https-only';
+ const mtls=args.length===3&&
+  args[2]==='--confirm-offline-six-native-mtls-only';
  if(args.length!==3||args[0]!=='--sources-root'||
-    (!tls&&args[2]!=='--confirm-offline-native-lookup-only')){
-  console.error('Usage: node six-native-ownership-lookup-interoperability.mjs --sources-root PRIVATE_SIX_NATIVE_REPO_ROOT (--confirm-offline-native-lookup-only | --confirm-offline-six-native-real-https-only)');
+    (!tls&&!mtls&&args[2]!=='--confirm-offline-native-lookup-only')){
+  console.error('Usage: node six-native-ownership-lookup-interoperability.mjs --sources-root PRIVATE_SIX_NATIVE_REPO_ROOT (--confirm-offline-native-lookup-only | --confirm-offline-six-native-real-https-only | --confirm-offline-six-native-mtls-only)');
   process.exitCode=2;
  }else{
-  const output=await auditSixGenuineNativeLookups({sourcesRoot:args[1],realTls:tls});
+  const output=await auditSixGenuineNativeLookups({sourcesRoot:args[1],realTls:tls,realMtl:mtls});
   for(const row of output.checks??[])
    console.log((row.ok?'PASS ':'FAIL ')+row.id);
   if(!output.ok){
    console.error('BLOCKED offline native lookup: '+output.reason);
    process.exitCode=1;
-  }else console.log(tls?
+  }else console.log(mtls?
+   'PASS six pinned real native lookup+signer+mTLS sidecar modules over mutual TLS with disposable native records; NO production service, live SSO, real PostgreSQL or deployment':tls?
    'PASS six pinned real native lookup+signer modules using disposable native records and six real loopback HTTPS/TLS endpoints; no active native app, live SSO, genuine Postgres, or deployment':
    'PASS six real native signer+lookup modules against Workspace Ed25519 with synthetic data; five real SQLite DBs, one mocked DuckNote PostgreSQL query; NO native service, live SSO or deployment');
  }
