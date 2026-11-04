@@ -11,6 +11,8 @@ import {auditSevenServicePrestart}
  from './staging-seven-prestart-gate.mjs';
 import {auditSeventhWorkspaceUnit}
  from './staging-workspace-seventh-unit-audit.mjs';
+import {auditSevenLocalSources}
+ from './staging-seven-source-gate.mjs';
 import {validateSixNativeStagingSnapshot}
  from './staging-six-native-snapshot.mjs';
 
@@ -23,7 +25,8 @@ export function auditSevenCompleteUninstalledPrestart({
  config,lock,sourcesRoot,dataRoot,proxyOutputRoot,nativeOutputRoot,
  nodeBinary=process.execPath,runGit,
  sixGate=auditSevenServicePrestart,
- workspaceGate=auditSeventhWorkspaceUnit
+ workspaceGate=auditSeventhWorkspaceUnit,
+ sourceGate=auditSevenLocalSources
 }={}){
  const checks=[];
  if(validateSixNativeStagingSnapshot(lock).kind!=='current')
@@ -50,6 +53,24 @@ export function auditSevenCompleteUninstalledPrestart({
     workspace.unitVerified!==true||workspace.uiVerified!==true)
   return stop('seventh-workspace-service-unit',checks);
  checks.push({name:'seventh-workspace-service-unit',ok:true});
+ // The native prestart checked pristine Git trees BEFORE the seventh unit
+ // read them. Close the source verification window: re-check all seven
+ // immutable checkouts after reading the private Workspace UI and unit.
+ // Otherwise a source file swapped between the first Git check and the UI
+ // comparison could be accepted along with a forged private UI manifest.
+ let source;
+ try{
+  source=sourceGate({
+   sourcesRoot,workspaceBuildSha:lock.central.sha,lock,
+   ...(runGit?{runGit}:{})
+  });
+ }catch{
+  return stop('seven-final-source-recheck',checks);
+ }
+ if(source?.ok!==true||source.verified!==7||
+    !Array.isArray(source.errors)||source.errors.length!==0)
+  return stop('seven-final-source-recheck',checks);
+ checks.push({name:'seven-final-source-recheck',ok:true});
  return Object.freeze({
   ok:true,checks,category:'offline-exact-seven-private-uninstalled-plans-only',
   deploymentAuthorized:false
