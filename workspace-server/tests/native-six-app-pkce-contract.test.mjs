@@ -26,7 +26,7 @@ const apps=Object.freeze([
 const secret=()=>randomBytes(32).toString('base64url');
 const pkce=()=>{const verifier=secret(),state=secret();
  return {verifier,state,codeChallenge:createHash('sha256').update(verifier).digest('base64url')}};
-async function fixture(t){
+async function fixture(t,{organizationMode=false}={}){
  const dir=mkdtempSync(join(tmpdir(),'duckbio-six-native-contract-'));
  const identity=createIdentityStore({databasePath:join(dir,'identity.sqlite')});
  const auth=createSqliteAuthStores({databasePath:join(dir,'auth.sqlite')});
@@ -79,7 +79,10 @@ async function fixture(t){
  });
  service=createAccountService({
   origin,issuer:'https://identity.example.test',clients,
-  identityStore:identity,authStore:auth.brokerStore,organizationStore:org,
+  identityStore:identity,authStore:auth.brokerStore,
+  // Standalone native login still receives the generation-pinned grants;
+  // organization-mode authority explicitly refuses global legacy grants.
+  organizationStore:organizationMode?org:null,
   communicationsStore:messages,ownerAccountId:owner.id,assetRoot:dir,
   getClientAddress:req=>req.socket.remoteAddress
  });
@@ -132,15 +135,16 @@ async function fixture(t){
   async handoff(appId){return handoff(clients.find(app=>app.id===appId))}};
 }
 
-test('six separate first-party native clients exchange only their own PKCE codes and proofs',{timeout:60000},async t=>{
+test('all six standalone native clients bind codes/proofs to app, parent and monotonic global grant generation',{timeout:60000},async t=>{
  const f=await fixture(t);
- const proofs=new Map();
+ const proofs=new Map(),links=new Map();
  for(const app of apps){
   const client=f.clients.find(x=>x.id===app.id);
   const link=await f.handoff(app.id);
   const other=f.clients.find(x=>x.id!==app.id);
-  assert.equal((await f.native(client,'/api/suite/auth/exchange',link.exchangePayload,other)).status,401,
-   'another native app cannot redeem '+app.id+' code');
+  assert.equal((await f.native(client,'/api/suite/auth/exchange',
+    link.exchangePayload,other)).status,401,
+   'a different native app cannot redeem '+app.id+' code');
   const response=await link.exchange();
   assert.equal(response.status,200,app.id);
   const details=await response.json();
@@ -149,107 +153,129 @@ test('six separate first-party native clients exchange only their own PKCE codes
   assert.equal(details.issuer,'https://identity.example.test');
   assert.deepEqual(details.localIdentity,{
    userId:'native-'+app.id+'-worker',organizationId:'lab-a'
-  },'no email matching or cross-app role promotion');
+  });
   assert.match(details.sessionToken,/^[A-Za-z0-9_-]{32,128}$/);
   assert(!JSON.stringify(details).includes(client.secret));
   proofs.set(app.id,details.sessionToken);
-  assert.equal((await link.exchange()).status,401,'PKCE code must be single-use');
+  links.set(app.id,link);
+  assert.equal((await link.exchange()).status,401,'code is one-time');
   const own=await f.native(client,'/api/suite/auth/introspect',{
-   clientId:app.id,sessionToken:details.sessionToken});
+   clientId:app.id,sessionToken:details.sessionToken
+  });
   assert.equal(own.status,200);
   assert.equal((await own.json()).active,true);
-  // RFC-style introspection deliberately returns 200 + active:false
-  // rather than revealing whether another app's token exists.
-  const foreign=await f.native(client,'/api/suite/auth/introspect',{
-   clientId:other.id,sessionToken:details.sessionToken},other);
+  const foreign=await f.native(other,'/api/suite/auth/introspect',{
+   clientId:other.id,sessionToken:details.sessionToken
+  });
   assert.equal(foreign.status,200);
   assert.deepEqual(await foreign.json(),{active:false},
-   'a foreign app must see no identity, audience, organization or validity');
-  const unread=await f.native(client,'/api/suite/native/communications/unread',{
-   sessionToken:details.sessionToken});
-  assert.equal(unread.status,200);
-  assert.deepEqual(await unread.json(),{counts:{chat:1,mail:1,notifications:0}});
+   'foreign app must not see token or actor details');
  }
  assert.equal(proofs.size,6);
+
  const goflo=f.clients.find(x=>x.id==='goflo');
- const eel=f.clients.find(x=>x.id==='eel');
+ const mantrain=f.clients.find(x=>x.id==='mantrain');
+ const methpipe=f.clients.find(x=>x.id==='methpipe');
  const duckman=f.clients.find(x=>x.id==='duckman');
- // Revoking ONE app role does not revoke six independent parent entitlements.
- const roles=Object.fromEntries(apps.filter(x=>x.id!=='eel').map(x=>[x.id,x.role]));
- f.org.saveMember({organizationId:'lab-a',actorId:f.owner.id,member:f.member(roles)});
- assert.equal((await f.native(eel,'/api/suite/native/communications/unread',
-  {sessionToken:proofs.get('eel')})).status,403);
- assert.equal((await f.native(goflo,'/api/suite/native/communications/unread',
-  {sessionToken:proofs.get('goflo')})).status,200);
- // A valid proof mapped to the WRONG organization cannot borrow Lab A's seats.
+
+ // Central org-side role edits are not standalone app permission authority:
+ // changing a separate organization policy never creates a new native proof.
+ f.org.saveMember({organizationId:'lab-a',actorId:f.owner.id,
+  member:f.member({})});
+ assert.equal((await f.native(goflo,'/api/suite/auth/introspect',{
+  clientId:'goflo',sessionToken:proofs.get('goflo')
+ })).status,200);
+
+ // Revoking & rebinding the IDENTICAL native tuple may not resurrect old
+ // proof; the parent login is still valid and a fresh grant can reauthorize.
+ f.identity.revokeAppAccess(f.worker.id,'goflo');
+ f.identity.grantAppAccess({userId:f.worker.id,appId:'goflo',
+  localUserId:'native-goflo-worker',organizationId:'lab-a'});
+ assert.deepEqual(await (await f.native(goflo,'/api/suite/auth/introspect',{
+  clientId:'goflo',sessionToken:proofs.get('goflo')
+ })).json(),{active:false},'ABA must not resurrect child proof');
+ const fresh=await f.handoff('goflo');
+ const freshReply=await fresh.exchange();
+ assert.equal(freshReply.status,200);
+ assert.equal((await (await f.native(goflo,'/api/suite/auth/introspect',{
+  clientId:'goflo',sessionToken:(await freshReply.json()).sessionToken
+ })).json()).active,true);
+
+ // A different organization's native identity replaces old native user/tenant
+ // but cannot revive an existing app proof.
  f.identity.grantAppAccess({userId:f.worker.id,appId:'duckman',
   localUserId:'native-duckman-worker',organizationId:'lab-b'});
- assert.equal((await f.native(duckman,'/api/suite/native/communications/unread',
-  {sessionToken:proofs.get('duckman')})).status,401,
-  'changing the registered native organization invalidates the old broker proof');
- assert.equal((await f.native(goflo,'/api/suite/native/communications/unread',
-  {sessionToken:proofs.get('goflo')})).status,200);
- f.identity.revokeAppAccess(f.worker.id,'goflo');
- assert.equal((await f.native(goflo,'/api/suite/native/communications/unread',
-  {sessionToken:proofs.get('goflo')})).status,401);
- // Retaining a central login cookie never reinstates revoked native grants.
- assert.equal((await f.native(eel,'/api/suite/native/communications/unread',
-  {sessionToken:proofs.get('eel')})).status,403);
-
- // Cross-app child-only disconnect must be idempotent, local to the native
- // audience and independent of the worker's central Workspace login.
- const methpipe=f.clients.find(x=>x.id==='methpipe');
- const mantrain=f.clients.find(x=>x.id==='mantrain');
+ assert.deepEqual(await (await f.native(duckman,'/api/suite/auth/introspect',{
+  clientId:'duckman',sessionToken:proofs.get('duckman')
+ })).json(),{active:false});
  const methpipeToken=proofs.get('methpipe');
  const foreignRevoke=await f.native(mantrain,'/api/suite/auth/revoke',{
-  clientId:'mantrain',sessionToken:methpipeToken,childOnly:true});
- assert.equal(foreignRevoke.status,204,
-  'foreign child-only revoke does not reveal whether a different app has a grant');
- const untouched=await f.native(methpipe,'/api/suite/auth/introspect',{
-  clientId:'methpipe',sessionToken:methpipeToken});
- assert.equal((await untouched.json()).active,true,
-  'foreign app cannot revoke another app native proof');
- const disconnect=()=>f.native(methpipe,'/api/suite/auth/revoke',{
-  clientId:'methpipe',sessionToken:methpipeToken,childOnly:true});
- assert.equal((await disconnect()).status,204);
- assert.equal((await disconnect()).status,204,'repeated child-only logout stays safe');
- const revoked=await f.native(methpipe,'/api/suite/auth/introspect',{
-  clientId:'methpipe',sessionToken:methpipeToken});
- assert.deepEqual(await revoked.json(),{active:false},
-  'native app cannot revive its own disconnected child grant');
- assert.equal((await f.native(methpipe,'/api/suite/native/communications/unread',
-  {sessionToken:methpipeToken})).status,401,
-  'revoked child cannot fetch Workspace messages');
- assert.equal((await f.native(mantrain,'/api/suite/native/communications/unread',
-  {sessionToken:proofs.get('mantrain')})).status,200,
-  'another registered app keeps its independent proof');
- const parent=await fetch(f.origin+'/api/suite/auth/session',{
-  headers:f.browserHeaders});
- assert.equal(parent.status,200);
- assert.equal((await parent.json()).authenticated,true,
-  'native child-only disconnect must preserve independent Workspace parent login');
+  clientId:'mantrain',sessionToken:methpipeToken,childOnly:true
+ });
+ assert.equal(foreignRevoke.status,204);
+ assert.equal((await (await f.native(methpipe,'/api/suite/auth/introspect',{
+  clientId:'methpipe',sessionToken:methpipeToken
+ })).json()).active,true,'wrong-app childOnly revoke cannot affect sibling');
+ assert.equal((await f.native(methpipe,'/api/suite/auth/revoke',{
+  clientId:'methpipe',sessionToken:methpipeToken,childOnly:true
+ })).status,204);
+ assert.deepEqual(await (await f.native(methpipe,'/api/suite/auth/introspect',{
+  clientId:'methpipe',sessionToken:methpipeToken
+ })).json(),{active:false});
+ assert.equal((await (await f.native(mantrain,'/api/suite/auth/introspect',{
+  clientId:'mantrain',sessionToken:proofs.get('mantrain')
+ })).json()).active,true,
+  'childOnly disconnect must preserve independent parent and other child');
 
- // Global Workspace parent logout invalidates every existing native child
- // proof, even for clients whose local role was not individually revoked.
+ // Parent logout invalidates every child proof regardless of active grants.
  const logout=await fetch(f.origin+'/api/suite/account/logout',{
-  method:'POST',headers:f.browserHeaders,body:'{}'});
- assert.equal(logout.status,200,'central logout succeeds with authenticated CSRF');
+  method:'POST',headers:f.browserHeaders,body:'{}'
+ });
+ assert.equal(logout.status,200);
  assert.equal((await logout.json()).loggedOut,true);
  for(const app of apps){
   const client=f.clients.find(x=>x.id===app.id);
-  const proof=proofs.get(app.id);
-  const introspection=await f.native(client,'/api/suite/auth/introspect',{
-   clientId:app.id,sessionToken:proof});
-  assert.equal(introspection.status,200,app.id+' introspection is opaque');
-  assert.deepEqual(await introspection.json(),{active:false},
-   app.id+' child cannot survive global parent logout');
-  assert.equal((await f.native(client,'/api/suite/native/communications/unread',
-   {sessionToken:proof})).status,401,
-   app.id+' stale proof cannot access communications after central logout');
+  const r=await f.native(client,'/api/suite/auth/introspect',{
+   clientId:app.id,sessionToken:proofs.get(app.id)
+  });
+  assert.equal(r.status,200);
+  assert.deepEqual(await r.json(),{active:false},app.id+' stale proof');
  }
- const signedOut=await fetch(f.origin+'/api/suite/auth/session',{
-  headers:f.browserHeaders});
- assert.equal(signedOut.status,200);
- assert.equal((await signedOut.json()).authenticated,false,
-  'replaying a stale central browser cookie must not reinstate Workspace login');
+ const parent=await fetch(f.origin+'/api/suite/auth/session',{
+  headers:f.browserHeaders
+ });
+ assert.equal((await parent.json()).authenticated,false);
+});
+
+test('all six organization-mode clients DENY legacy grants despite membership, manual seats and valid local IDs',{timeout:60000},async t=>{
+ const f=await fixture(t,{organizationMode:true});
+ const account=await fetch(f.origin+'/api/suite/account',{headers:f.browserHeaders});
+ assert.equal(account.status,200);
+ const details=await account.json();
+ assert.equal(details.apps.length,6);
+ assert(details.apps.every(app=>app.enabled===false),
+  'legacy grants may not advertise org-mode app entitlement');
+ for(const app of apps){
+  const client=f.clients.find(x=>x.id===app.id);
+  const data=pkce();
+  const url=new URL('/connect',f.origin);
+  for(const [name,value] of Object.entries({
+   appId:client.appId,redirectUri:client.redirectUris[0],
+   state:data.state,codeChallenge:data.codeChallenge
+  }))url.searchParams.set(name,value);
+  const registered=nativeConnectRequest(url.searchParams,f.clients);
+  assert(registered,'registered native callback source syntax');
+  const r=await fetch(f.origin+'/api/suite/auth/authorize',{
+   method:'POST',headers:f.browserHeaders,body:JSON.stringify(registered)
+  });
+  assert.equal(r.status,403,app.id+' must not authorize from a global grant');
+  assert.deepEqual(await r.json(),{error:'access_denied'});
+  const forgedCode=randomBytes(32).toString('base64url');
+  const attempted=await f.native(client,'/api/suite/auth/exchange',{
+   clientId:client.id,code:forgedCode,state:data.state,
+   codeVerifier:data.verifier,redirectUri:client.redirectUris[0]
+  });
+  assert.equal(attempted.status,401);
+  assert.deepEqual(await attempted.json(),{error:'invalid_grant'});
+ }
 });
