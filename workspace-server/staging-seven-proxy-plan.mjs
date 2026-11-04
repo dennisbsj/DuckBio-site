@@ -122,10 +122,10 @@ if(invoked){
  const args=process.argv.slice(2);
  const historical=args.length===5&&args[4]==='--confirm-uninstalled-only';
  const current=args.length===7&&args[4]==='--snapshot'&&
-    ['current','post-pkce'].includes(args[5])&&args[6]==='--confirm-uninstalled-only';
+    ['current','post-pkce','ownership-mtls'].includes(args[5])&&args[6]==='--confirm-uninstalled-only';
  if((!historical&&!current)||args[0]!=='--config'||
     args[2]!=='--private-output-root'){
-  console.error('Usage: node staging-seven-proxy-plan.mjs --config PRIVATE_JSON --private-output-root PRIVATE_ROOT [--snapshot current|post-pkce] --confirm-uninstalled-only');
+  console.error('Usage: node staging-seven-proxy-plan.mjs --config PRIVATE_JSON --private-output-root PRIVATE_ROOT [--snapshot current|post-pkce|ownership-mtls] --confirm-uninstalled-only');
   process.exitCode=2;
  }else{
   try{
