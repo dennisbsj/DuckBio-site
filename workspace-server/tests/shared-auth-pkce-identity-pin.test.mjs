@@ -42,12 +42,13 @@ async function fixture(t) {
     localIdentity: { userId: 'native-' + id + '-user', organizationId: 'native-org-a' },
   }]));
   let parentLookupOverride = null;
+  let logoutCalls = 0;
   const identity = {
     async getSession() { return parent; },
     async authenticate() { return parent; },
     async getParentSession(id) { return id === parent.id ? (parentLookupOverride ?? parent) : null; },
     async getAccess(_parent, appId) { return grants.get(appId) ?? null; },
-    async logout() {},
+    async logout() { logoutCalls += 1; },
   };
   let broker;
   const server = http.createServer(async (req, res) => {
@@ -120,9 +121,11 @@ async function fixture(t) {
   }, appId);
   const introspect = (appId, sessionToken) => post('introspect',
     { clientId: appId, sessionToken }, appId);
+  const revoke = (appId, sessionToken, childOnly = false) => post('revoke',
+    { clientId: appId, sessionToken, childOnly }, appId);
   return {
-    authorize, exchange, introspect, authStore,
-    codeWrites: () => proofWrites, parent, clients,
+    authorize, exchange, introspect, revoke, authStore,
+    codeWrites: () => proofWrites, logoutCalls: () => logoutCalls, parent, clients,
     // Simulate trusted client registration changing during redeploy while
     // preserving the exact same durable SQLite authentication database.
     setClientApp(clientId, appId) {
@@ -306,5 +309,24 @@ test('a sibling parent session with identical subject cannot replace the origina
   const pending = await f.authorize('goflo');
   assert.deepEqual(await f.exchange('goflo', pending), {
     status: 401, data: { error: 'invalid_grant' },
+  });
+});
+
+test('reusing a client ID for another app cannot revoke the original parent session', async t => {
+  const f = await fixture(t);
+  const sharedIdentity = { userId: 'same-native-person', organizationId: 'same-native-tenant' };
+  f.setGrant('goflo', sharedIdentity, 'strict:stable');
+  f.setGrant('eel', sharedIdentity, 'strict:stable');
+  const issued = await f.exchange('goflo', await f.authorize('goflo'));
+  assert.equal(issued.status, 200);
+  f.setClientApp('goflo', 'eel');
+  assert.equal((await f.revoke('goflo', issued.data.sessionToken)).status, 204);
+  assert.equal(f.logoutCalls(), 0, 'wrong-app token must not log out the original parent');
+  f.setClientApp('goflo', 'goflo');
+  assert.equal((await f.introspect('goflo', issued.data.sessionToken)).data.active, true);
+  assert.equal((await f.revoke('goflo', issued.data.sessionToken)).status, 204);
+  assert.equal(f.logoutCalls(), 1, 'properly registered app can still log out parent');
+  assert.deepEqual((await f.introspect('goflo', issued.data.sessionToken)).data, {
+    active: false,
   });
 });
