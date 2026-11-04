@@ -152,7 +152,7 @@ test('reopened copied central identity refuses existing parent session, legacy g
   assert.equal(await restored.authenticatePassword({
    email:'scientist@example.test',password:PASSWORD
   }),null);
-  assert.throws(()=>restored.createSession(f.scientist.id),/access_denied/);
+  assert.throws(()=>restored.createSession(f.scientist.id),/invalid_credentials/);
   assert.equal(restored.getUser(f.scientist.id).state,'disabled');
   assert.equal(restored.getUser(f.admin.id).state,'disabled');
   assert.deepEqual(restored.listGrants(f.scientist.id),[]);
