@@ -4,7 +4,7 @@
 
 ## Included sources
 
-The source for this candidate is [#141](https://github.com/dennisbsj/DuckBio-site/pull/141) → [#145](https://github.com/dennisbsj/DuckBio-site/pull/145) → [#149](https://github.com/dennisbsj/DuckBio-site/pull/149) → [#166](https://github.com/dennisbsj/DuckBio-site/pull/166) → [#187](https://github.com/dennisbsj/DuckBio-site/pull/187). Historical tests and commits remain on their original branches and PRs. The independent [#144 backup rehearsal](https://github.com/dennisbsj/DuckBio-site/pull/144), Ed25519 QA [#188](https://github.com/dennisbsj/DuckBio-site/pull/188), signed ownership verifier [#150](https://github.com/dennisbsj/DuckBio-site/pull/150), native liveness QA [#148](https://github.com/dennisbsj/DuckBio-site/pull/148) and separate Stripe billing drafts **are not included**.
+The source for this candidate is [#141](https://github.com/dennisbsj/DuckBio-site/pull/141) → [#145](https://github.com/dennisbsj/DuckBio-site/pull/145) → [#149](https://github.com/dennisbsj/DuckBio-site/pull/149) → [#166](https://github.com/dennisbsj/DuckBio-site/pull/166) → [#187](https://github.com/dennisbsj/DuckBio-site/pull/187). Historical tests and commits remain on their original branches and PRs. The isolated [#144 backup rehearsal](https://github.com/dennisbsj/DuckBio-site/pull/144) is now incorporated only as a synthetic SQLite snapshot/restore regression and documentation, with no production backup claims. Independent Ed25519 QA [#188](https://github.com/dennisbsj/DuckBio-site/pull/188), signed ownership verifier [#150](https://github.com/dennisbsj/DuckBio-site/pull/150), native liveness QA [#148](https://github.com/dennisbsj/DuckBio-site/pull/148) and separate Stripe billing drafts **are not included**.
 
 The code tree was reconciled against `main@fdc312ae44d4bacbc0a5e059860939635a392b5e` and `#187@d68ff7b5babfb075526777ca72a78de25167fc21`. Only `workspace-server/package.json` was changed on both lines of development. Integration uses current main `package.json` and retains both recent main QA script entries and the branch's additional broker/native syntax checks.
 
@@ -15,8 +15,9 @@ The code tree was reconciled against `main@fdc312ae44d4bacbc0a5e059860939635a392
 3. Prove the new native-access inspector and broker adapter stay **dormant, deny-only and fail-closed** unless explicitly wired after a separate design/security review; no source-stage synthetic result is entitlement.
 4. Review all native role, seat, organization revision, PKCE issuance and revocation constraints and denial on missing native ownership; no automatic paid seats.
 5. Reconcile independent signed Ed25519 native ownership proof and liveness QA branches separately, avoiding overwrite or changing their source/testing identities.
-6. Confirm the seven-app plan is **not** implemented by this six-native identity stack: [activation runbook PR #190](https://github.com/dennisbsj/DuckBio-site/pull/190) is documentation only; DataDuck native PR #1 remains unmerged.
-7. Require a later isolated eight-service HTTPS staging + real browser/API verification, backups/restore and explicit production go/no-go; do not deploy this branch.
+6. Review the incorporated #144 private SQLite snapshot/restore test; it is a synthetic single-database rehearsal, not coordinated live recovery of identity, organization and native databases.
+7. Confirm the seven-app plan is **not** implemented by this six-native identity stack: [activation runbook PR #190](https://github.com/dennisbsj/DuckBio-site/pull/190) is documentation only; DataDuck native PR #1 remains unmerged.
+8. Require a later isolated eight-service HTTPS staging + real browser/API verification, backups/restore and explicit production go/no-go; do not deploy this branch.
 
 ## Merge strategy and scope
 
