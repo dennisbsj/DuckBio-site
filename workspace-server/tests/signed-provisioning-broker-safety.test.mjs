@@ -116,7 +116,7 @@ async function fixture(t){
  const parentIdentity={
   async getSession(){return identity.getParentSession(currentSession.id)},
   async authenticate(_req,_res,credentials){
-   const result=identity.authenticatePassword({
+   const result=await identity.authenticatePassword({
     email:credentials.email,password:credentials.password
    });
    if(!result)return null;
