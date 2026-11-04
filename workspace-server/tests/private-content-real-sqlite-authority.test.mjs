@@ -279,3 +279,42 @@ test('paid subscription expires DURING awaited native resolver even when all epo
  assert.equal(calls,1);
  assert.equal(result,null,'expired seat must deny even with unchanged audit generations');
 });
+
+
+test('a second LIVE-paid organization cannot reuse the first organization\'s native identity',async t=>{
+ const f=await fixture(t);
+ const secondOrg='lab-two';
+ f.organization.setupOrganization({organizationId:secondOrg,name:'Second lab',
+  owner:{accountId:f.owner.id,name:'Owner',nickname:'O',email:f.owner.email}
+ });
+ f.organization.applyVerifiedSubscriptionTransition(sealed({
+  source:'stripe_live',eventKey:'evt_second_lab_synthetic_1',
+  organizationId:secondOrg,subscriptionId:'sub_second_lab_synthetic_1',
+  revision:1,plan:'Single',apps:[APP],seats:2,status:'active',
+  paidThrough:Math.floor(START/1000)+2*3600
+ }));
+ f.organization.saveMember({organizationId:secondOrg,actorId:f.owner.id,
+  member:f.memberFields({[APP]:'Analyst'})});
+ assert(f.organization.verifiedNativePermissionCandidate({
+  organizationId:secondOrg,accountId:f.member.id,appId:APP,
+  permission:'workspace.view'
+ }), 'second tenant itself has a synthetic verified paid seat and valid role');
+ f.organization.clearSessionOrganization(f.parent.id);
+ f.organization.selectSessionOrganization({
+  sessionId:f.parent.id,accountId:f.member.id,organizationId:secondOrg
+ });
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.member.id,appId:APP,workspaceOrganizationId:secondOrg
+ }),null, 'the original native user/organization link cannot cross tenants');
+ let lookups=0;
+ assert.equal(await authorizedContentDestination({
+  ...f.args(),resolveResource:async input=>{lookups++;return f.resolved(input);}
+ }),null);
+ assert.equal(lookups,0,'deny BEFORE native lookup even with second-tenant seat and role');
+ f.organization.clearSessionOrganization(f.parent.id);
+ f.organization.selectSessionOrganization({
+  sessionId:f.parent.id,accountId:f.member.id,organizationId:ORG
+ });
+ assert.equal(await authorizedContentDestination(f.args()),DESTINATION,
+  'restoring the explicitly linked first tenant allows a fresh navigation');
+});
