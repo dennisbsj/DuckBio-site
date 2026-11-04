@@ -330,6 +330,8 @@ test('six distinct real mutual TLS listeners validate Workspace client certifica
  assert.equal(attestation.ok,true,JSON.stringify(attestation));
  assert.equal(attestation.category,
   'six-real-loopback-mutual-tls-native-sidecars-only');
+ assert.equal(attestation.separateAppTlsIdentitiesVerified,true,
+  'every native app must have a distinct server CA and Workspace client certificate');
  assert.equal(attestation.deploymentAuthorized,false);
  assert.deepEqual(attestation.checks.map(x=>x.id),APPS);
 });
