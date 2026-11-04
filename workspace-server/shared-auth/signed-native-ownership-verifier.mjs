@@ -41,7 +41,7 @@ const isExact=(o,keys)=>o!==null&&typeof o==='object'&&!Array.isArray(o)&&
  * All timestamps are integer epoch milliseconds, [notBefore,notAfter).
  * The two configurations MUST NOT be mixed. No auto-discovered JWKS/alg.
  */
-function pinnedNativeKeys(raw){
+function pinnedNativeKeys(raw,globallyPinnedMaterial){
  const rotating=own(raw,'signingKeys');
  const legacy=own(raw,'keyId')||own(raw,'publicKeyPem');
  if(rotating===legacy)throw Error('invalid_private_native_client');
@@ -68,12 +68,14 @@ function pinnedNativeKeys(raw){
   if(key.asymmetricKeyType!=='ed25519')
    throw Error('invalid_private_native_client');
   const material=key.export({format:'der',type:'spki'}).toString('base64url');
-  if(seenMaterial.has(material))throw Error('invalid_private_native_client');
+  if(seenMaterial.has(material)||globallyPinnedMaterial.has(material))
+   throw Error('invalid_private_native_client');
   seenMaterial.add(material);
   keys.set(item.keyId,Object.freeze({
    key,notBefore:item.notBefore,notAfter:item.notAfter
   }));
  }
+ for(const material of seenMaterial)globallyPinnedMaterial.add(material);
  return keys;
 }
 function keyIsCurrent(record,now){
@@ -140,6 +142,9 @@ export function createSignedNativeOwnershipVerifier({
     !Number.isSafeInteger(timeoutMs)||timeoutMs<250||timeoutMs>15000)
    throw Error('private_native_verifier_config_required');
  const registered=new Map();
+ // A native app must not be able to impersonate a second native signer
+ // because an operator pinned the same Ed25519 public key in two apps.
+ const globallyPinnedMaterial=new Set();
  for(const [appId,raw] of Object.entries(clients)){
   if(!APPS.has(appId)||registered.has(appId)||!raw||
      typeof raw!=='object'||Array.isArray(raw)||
@@ -153,7 +158,7 @@ export function createSignedNativeOwnershipVerifier({
      endpoint.hash||endpoint.search||!endpoint.hostname||
      endpoint.href!==raw.endpoint)
     throw Error('invalid_private_native_client');
-  const keys=pinnedNativeKeys(raw);
+  const keys=pinnedNativeKeys(raw,globallyPinnedMaterial);
   registered.set(appId,Object.freeze({
    endpoint:endpoint.href,keys,token:raw.token
   }));
