@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#123c55"><meta name="description" content="Explore DuckBio's proposed EUR-based subscription pricing from EUR 35 per user per app with Mixed and Bundle discounts and organisation discounts."><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="strict-origin-when-cross-origin"><title>DuckBio pricing | Choose apps and save on your suite</title><script>try{document.documentElement.dataset.theme=localStorage.getItem("duckbio-theme")==="dark"?"dark":"light"}catch(e){document.documentElement.dataset.theme="light"}</script><link rel="stylesheet" href="assets/site.css?v=html-hero-20261103"><script src="assets/site.js?v=duckbio-night-20261029-2" defer></script><link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: light)" href="assets/duckbio-favicon-v2.svg"><link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: dark)" href="assets/duckbio-favicon-v2-dark.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#123c55"><meta name="description" content="Explore DuckBio pricing: Single apps from EUR 35, the EUR 134 Core bundle with free Process apps, and Core plus CytoDuck for EUR 150."><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="strict-origin-when-cross-origin"><title>DuckBio pricing | Choose apps and save on your suite</title><script>try{document.documentElement.dataset.theme=localStorage.getItem("duckbio-theme")==="dark"?"dark":"light"}catch(e){document.documentElement.dataset.theme="light"}</script><link rel="stylesheet" href="assets/site.css?v=html-hero-20261103"><script src="assets/site.js?v=duckbio-night-20261029-2" defer></script><link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: light)" href="assets/duckbio-favicon-v2.svg"><link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: dark)" href="assets/duckbio-favicon-v2-dark.svg">
 <style>
 /* Pricing page component styles; all site-wide header, navigation, logo and footer are shared. */
 .pr-hero{padding:24px 0 74px;background:radial-gradient(circle at 80% 18%,#d7f6f3,transparent 37%),linear-gradient(120deg,#f6fbfc,#eaf7f9);border-bottom:1px solid var(--line)}
@@ -343,7 +343,7 @@ html[data-theme="dark"] .pr-select-all[aria-pressed="true"]{background:#91e9e7;c
  height:100%;
  min-height:0;
 }
-/* At medium desktop/tablet widths the six apps occupy three equal rows. */
+/* Legacy medium-width tile rule; the category layout below overrides it. */
 @media (min-width:761px) and (max-width:1080px){
  .pr-select-layout > .pr-select-grid{
   grid-template-rows:repeat(3,minmax(0,1fr));
@@ -1003,6 +1003,7 @@ function renderSelection(){
  const coreButton=find("pr-select-core");
  coreButton.setAttribute("aria-pressed",String(core));
  coreButton.textContent=(core?"Remove Core bundle":"Select Core · "+formatEUR(CORE_EUR));
+ coreButton.setAttribute("aria-label",core?"Remove Core bundle":"Select Core bundle for "+formatEUR(CORE_EUR)+" per user per month");
  const allSelected=count===ALL_IDS.length;
  const selectAllButton=find("pr-select-all");
  selectAllButton.textContent=allSelected?"Deselect all apps":"Select all apps";
