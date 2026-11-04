@@ -260,3 +260,22 @@ test('missing signed native ownership or malicious resolver response never produ
  f.identity.revokeSession(f.parent.id);
  assert.equal(await authorizedContentDestination(f.args()),null);
 });
+
+
+test('paid subscription expires DURING awaited native resolver even when all epochs remain stable',async t=>{
+ const f=await fixture(t);
+ let calls=0;
+ const result=await authorizedContentDestination({
+  ...f.args(),resolveResource:async input=>{
+   calls++;
+   // No role edit, no audit mutation, no session-org selection change.
+   // The re-check must evaluate the LIVE paid period against current time.
+   f.setTime(START+3*3600*1000);
+   assert(f.identity.getParentSession(f.parent.id),
+    'parent is still live and must not substitute for paid entitlement');
+   return f.resolved(input);
+  }
+ });
+ assert.equal(calls,1);
+ assert.equal(result,null,'expired seat must deny even with unchanged audit generations');
+});
