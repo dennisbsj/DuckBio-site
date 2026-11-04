@@ -265,3 +265,126 @@ test('revoked app permission during signed inspect cannot become broker access',
  assert.equal((await f.post('authorize',f.target)).status,403);
  assert.deepEqual(f.authWrites(),{codes:0,proofs:0});
 });
+
+
+function addBeta(t,f,{member='scientist'}={}){
+ const account=member==='scientist'?f.scientist:f.admin;
+ f.org.setupOrganization({
+  organizationId:'beta',name:'Synthetic Laboratory Beta',
+  owner:{accountId:account.id,name:'Beta Owner',nickname:'Beta',
+   email:member==='scientist'?'scientist@example.test':'operator@example.test'}
+ });
+}
+
+test('signed inspect rejects same-tick A -> cleared -> A tenant-lock ABA even after native proof',async t=>{
+ const f=await fixture(t);
+ await f.provisioner.bind(f.input);
+ const before=f.org.nativeProvisioningAuditRevision({
+  organizationId:'alpha',accountId:f.scientist.id,
+  sessionId:f.scientistSession.id
+ });
+ f.duringNative(async proof=>{
+  if(proof.purpose!=='inspect')return;
+  f.org.clearSessionOrganization(f.scientistSession.id);
+  f.org.selectSessionOrganization({
+   sessionId:f.scientistSession.id,accountId:f.scientist.id,organizationId:'alpha'
+  });
+ });
+ const checked=await f.guarded.inspectCandidate(f.scientistSession,APP);
+ const after=f.org.nativeProvisioningAuditRevision({
+  organizationId:'alpha',accountId:f.scientist.id,
+  sessionId:f.scientistSession.id
+ });
+ assert(after.sessionLockEpoch>before.sessionLockEpoch);
+ assert.equal(checked.candidateReady,false);
+ assert.equal(checked.reason,'session_or_policy_changed_during_inspection');
+ assert.equal(checked.loginEnabled,false);
+ assert.equal((await f.post('authorize',f.target)).status,403);
+ assert.deepEqual(f.authWrites(),{codes:0,proofs:0});
+});
+
+test('signed inspect rejects same-tick A -> B -> A tenant ABA even though final tenant matches',async t=>{
+ const f=await fixture(t);
+ await f.provisioner.bind(f.input);
+ addBeta(t,f);
+ const before=f.org.nativeProvisioningAuditRevision({
+  organizationId:'alpha',accountId:f.scientist.id,
+  sessionId:f.scientistSession.id
+ });
+ f.duringNative(async proof=>{
+  if(proof.purpose!=='inspect')return;
+  f.org.clearSessionOrganization(f.scientistSession.id);
+  f.org.selectSessionOrganization({
+   sessionId:f.scientistSession.id,accountId:f.scientist.id,organizationId:'beta'
+  });
+  f.org.clearSessionOrganization(f.scientistSession.id);
+  f.org.selectSessionOrganization({
+   sessionId:f.scientistSession.id,accountId:f.scientist.id,organizationId:'alpha'
+  });
+ });
+ const checked=await f.guarded.inspectCandidate(f.scientistSession,APP);
+ const after=f.org.nativeProvisioningAuditRevision({
+  organizationId:'alpha',accountId:f.scientist.id,
+  sessionId:f.scientistSession.id
+ });
+ assert(after.sessionLockEpoch>before.sessionLockEpoch);
+ assert.equal(checked.candidateReady,false);
+ assert.equal(checked.reason,'session_or_policy_changed_during_inspection');
+ assert.equal(checked.accessGranted,false);
+ assert.deepEqual(f.authWrites(),{codes:0,proofs:0});
+});
+
+test('signed provisioner rejects operator A -> B -> A during bind even at identical timestamps',async t=>{
+ const f=await fixture(t);
+ addBeta(t,f,{member:'admin'});
+ const before=f.org.nativeProvisioningAuditRevision({
+  organizationId:'alpha',accountId:f.admin.id,sessionId:f.adminSession.id
+ });
+ f.duringNative(async proof=>{
+  if(proof.purpose!=='bind')return;
+  f.org.clearSessionOrganization(f.adminSession.id);
+  f.org.selectSessionOrganization({
+   sessionId:f.adminSession.id,accountId:f.admin.id,organizationId:'beta'
+  });
+  f.org.clearSessionOrganization(f.adminSession.id);
+  f.org.selectSessionOrganization({
+   sessionId:f.adminSession.id,accountId:f.admin.id,organizationId:'alpha'
+  });
+ });
+ await assert.rejects(f.provisioner.bind(f.input),/native_ownership_unverified/);
+ const after=f.org.nativeProvisioningAuditRevision({
+  organizationId:'alpha',accountId:f.admin.id,sessionId:f.adminSession.id
+ });
+ assert(after.sessionLockEpoch>before.sessionLockEpoch);
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.scientist.id,appId:APP,workspaceOrganizationId:'alpha'
+ }),null);
+ assert.deepEqual(f.authWrites(),{codes:0,proofs:0});
+});
+
+test('signed inspect rejects permission deny -> allow policy ABA after native await',async t=>{
+ const f=await fixture(t);
+ await f.provisioner.bind(f.input);
+ const before=f.org.nativeProvisioningAuditRevision({
+  organizationId:'alpha',accountId:f.scientist.id,
+  sessionId:f.scientistSession.id
+ });
+ f.duringNative(async proof=>{
+  if(proof.purpose!=='inspect')return;
+  for(const enabled of [false,true])f.org.setPermission({
+   organizationId:'alpha',actorId:f.admin.id,
+   accountId:f.scientist.id,appId:APP,
+   permission:'workspace.view',enabled
+  });
+ });
+ const checked=await f.guarded.inspectCandidate(f.scientistSession,APP);
+ const after=f.org.nativeProvisioningAuditRevision({
+  organizationId:'alpha',accountId:f.scientist.id,
+  sessionId:f.scientistSession.id
+ });
+ assert(after.organizationAuditRevision>before.organizationAuditRevision);
+ assert.equal(checked.candidateReady,false);
+ assert.equal(checked.reason,'session_or_policy_changed_during_inspection');
+ assert.equal(checked.licensesGranted,false);
+ assert.deepEqual(f.authWrites(),{codes:0,proofs:0});
+});
