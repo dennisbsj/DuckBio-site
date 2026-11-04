@@ -36,11 +36,42 @@ export function createStripeLiveBillingReader({
    });
   if(!response?.ok||!/^application\/json(?:;|$)/i.test(response.headers?.get('content-type')||''))
    throw Error('Stripe LIVE lookup unavailable');
-  const body=await response.text();
-  if(typeof body!=='string'||body.length>131072)
+  // Bound the DECODED response stream *while it arrives*. Checking the
+  // length after response.text() would already have allocated the entire
+  // untrusted body, and String.length would count UTF-16 code units, not bytes.
+  const maxBytes=131072;
+  const declared=response.headers?.get?.('content-length');
+  if(declared!==null&&declared!==undefined&&
+     (!/^(0|[1-9][0-9]*)$/.test(declared)||Number(declared)>maxBytes))
    throw Error('Stripe LIVE response exceeds safe limit');
+  if(!response.body||typeof response.body.getReader!=='function')
+   throw Error('Stripe LIVE response body unavailable');
+  const reader=response.body.getReader();
+  const chunks=[];
+  let bytes=0,oversize=false;
+  try{
+   for(;;){
+    const {done,value}=await reader.read();
+    if(done)break;
+    if(!(value instanceof Uint8Array))
+     throw Error('Malformed Stripe LIVE response');
+    bytes+=value.byteLength;
+    if(bytes>maxBytes){oversize=true;break;}
+    chunks.push(Buffer.from(value));
+   }
+  }finally{
+   if(oversize){
+    try{await reader.cancel();}catch{/* fail closed despite cancellation error */}
+   }
+   reader.releaseLock();
+  }
+  if(oversize)throw Error('Stripe LIVE response exceeds safe limit');
   let resource;
-  try{resource=JSON.parse(body);}catch{throw Error('Malformed Stripe LIVE response');}
+  try{
+   const body=new TextDecoder('utf-8',{fatal:true}).decode(
+    Buffer.concat(chunks,bytes));
+   resource=JSON.parse(body);
+  }catch{throw Error('Malformed Stripe LIVE response');}
   if(!resource||typeof resource!=='object'||Array.isArray(resource)||
      resource.livemode!==true)mismatch();
   return resource;
