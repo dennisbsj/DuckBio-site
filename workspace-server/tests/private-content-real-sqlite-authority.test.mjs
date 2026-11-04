@@ -114,7 +114,7 @@ async function fixture(t,{live=true}={}){
   identityStore:identity,organizationStore:organization,
   clients:[client],resolveResource:resolved
  });
- return {identity,organization,owner,member,parent,linkInput,
+ return {root,identity,organization,owner,member,parent,linkInput,
   args,resolved,memberFields,setTime:value=>{now=value}};
 }
 
@@ -317,4 +317,55 @@ test('a second LIVE-paid organization cannot reuse the first organization\'s nat
  });
  assert.equal(await authorizedContentDestination(f.args()),DESTINATION,
   'restoring the explicitly linked first tenant allows a fresh navigation');
+});
+
+test('separate identity SQLite connection revokes a parent during native resource lookup',async t=>{
+ const f=await fixture(t);
+ const peer=createIdentityStore({databasePath:path.join(f.root,'identity.sqlite'),clock:()=>START});
+ try{
+  const destination=await authorizedContentDestination({
+   ...f.args(),resolveResource:async input=>{
+    peer.revokeSession(f.parent.id);
+    return f.resolved(input);
+   }
+  });
+  assert.equal(destination,null,'different connection logout invalidates in-flight redirect');
+ }finally{peer.close();}
+});
+
+test('separate organization SQLite connection revokes and reassigns the same app role during native lookup',async t=>{
+ const f=await fixture(t);
+ const peer=createOrganizationStore({databasePath:path.join(f.root,'organization.sqlite'),clock:()=>START});
+ try{
+  const destination=await authorizedContentDestination({
+   ...f.args(),resolveResource:async input=>{
+    peer.saveMember({organizationId:ORG,actorId:f.owner.id,
+     member:f.memberFields({})});
+    peer.saveMember({organizationId:ORG,actorId:f.owner.id,
+     member:f.memberFields({[APP]:'Analyst'})});
+    return f.resolved(input);
+   }
+  });
+  assert.equal(destination,null,'cross-connection role ABA must invalidate in-flight redirect');
+  assert.equal(await authorizedContentDestination(f.args()),DESTINATION,
+   'fresh lookup after the cross-connection change is allowed');
+ }finally{peer.close();}
+});
+
+test('separate organization SQLite connection clear/reselect ABA invalidates an in-flight native lookup',async t=>{
+ const f=await fixture(t);
+ const peer=createOrganizationStore({databasePath:path.join(f.root,'organization.sqlite'),clock:()=>START});
+ try{
+  const destination=await authorizedContentDestination({
+   ...f.args(),resolveResource:async input=>{
+    peer.clearSessionOrganization(f.parent.id);
+    peer.selectSessionOrganization({sessionId:f.parent.id,
+     accountId:f.member.id,organizationId:ORG});
+    return f.resolved(input);
+   }
+  });
+  assert.equal(destination,null,'session-tenant epoch must change even on same-tenant reselect');
+  assert.equal(await authorizedContentDestination(f.args()),DESTINATION,
+   'new native lookup after reselect can use fresh session-tenant epoch');
+ }finally{peer.close();}
 });
