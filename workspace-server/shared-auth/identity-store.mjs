@@ -171,8 +171,7 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
       db.prepare(`INSERT INTO suite_identity_grant_versions(user_id,app_id,revision)
         SELECT user_id,app_id,1 FROM suite_identity_grants`).run();
     }
-    // This marker is committed atomically with the initial table and seed.
-    // Existing rollout databases with a valid table gain the marker in place.
+    // Commit the schema marker with the initial version rows.
     if(migrationVersion===0)db.exec('PRAGMA user_version=1');
     db.exec('COMMIT');
   } catch(error) {

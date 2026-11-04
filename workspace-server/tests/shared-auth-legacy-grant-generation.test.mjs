@@ -49,15 +49,20 @@ async function serverFixture(t,{organizationMode=false}={}){
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const origin='http://127.0.0.1:'+server.address().port;
+ // Always register cleanup BEFORE constructing the service, so even a
+ // configuration validation failure cannot leave the HTTP listener alive.
+ t.after(async()=>{server.closeAllConnections?.();
+  await new Promise(resolve=>server.close(resolve));
+  auth?.close();org?.close();store.close();rmSync(root,{recursive:true,force:true})});
  if(organizationMode){
   auth=createSqliteAuthStores({databasePath:path.join(root,'broker.sqlite'),clock:()=>NOW});
-  service=createAccountService({origin,clients:[client],identityStore:store,
+  service=createAccountService({origin,issuer:'https://sso.example.test',
+   clients:[client],identityStore:store,
    organizationStore:org,authStore:auth.brokerStore,assetRoot:root,clock:()=>NOW});
  }else broker=createAuthBroker({origin,issuer:'https://sso.example.test',
   clients:[client],identity:createLocalIdentityAdapter({store,origin}),
   store:createMemoryBrokerStore(),clock:()=>NOW});
- t.after(async()=>{await new Promise(resolve=>server.close(resolve));
-  auth?.close();org?.close();store.close();rmSync(root,{recursive:true,force:true})});
+
  const cookies=new Map();
  let csrf=null;
  const call=async(route,body,{serverAuth=false}={})=>{
@@ -69,7 +74,7 @@ async function serverFixture(t,{organizationMode=false}={}){
    if(csrf)headers['X-CSRF-Token']=csrf;
   }
   const response=await fetch(origin+'/api/suite/'+route,{
-   method:body===undefined?'GET':'POST',headers,
+   method:body===undefined?'GET':'POST',headers,signal:AbortSignal.timeout(15000),
    ...(body===undefined?{}:{body:JSON.stringify(body)})
   });
   if(!serverAuth)for(const header of response.headers.getSetCookie()){
@@ -173,7 +178,7 @@ test('one-time legacy DB migration seeds existing grants atomically, and subsequ
   password});
  store.grantAppAccess({userId:user.id,appId:'eel',localUserId:'old-native',organizationId:'old-org'});
  store.close();
- // Simulate a genuine pre-migration v1 schema and its SQLite header.
+ // Simulate a genuine pre-migration v1 schema and SQLite header.
  // Never reset a deployed/modern database's migration marker.
  let db=new DatabaseSync(dbPath);
  try{
@@ -218,7 +223,7 @@ test('legacy grant revision overflow rolls back without deleting an existing map
   'legacy-global:'+Number.MAX_SAFE_INTEGER);
 });
 
-test('a previously migrated identity DB refuses restart if the complete grant-generation table is lost',async t=>{
+test('a migrated identity DB refuses restart if the complete grant-generation table is lost',async t=>{
  const dir=mkdtempSync(path.join(os.tmpdir(),'duckbio-legacy-table-loss-'));
  const dbPath=path.join(dir,'identity.sqlite');
  t.after(()=>rmSync(dir,{recursive:true,force:true}));
