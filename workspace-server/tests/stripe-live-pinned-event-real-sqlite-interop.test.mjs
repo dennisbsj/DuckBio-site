@@ -203,3 +203,35 @@ test('live pinned revision changes while refund API is awaited reject source att
   organizationId:ids.org,subscriptionId:ids.sub}).revision,2);
  assert.equal(f.count(),0);
 });
+
+test('out-of-order signed refund messages are independently correlated using historical invoice, not latest_invoice',async t=>{
+ const f=fixture(t);
+ f.pin();
+ const delayed='evt_live_delayed0001',current='evt_live_current0001';
+ f.record(current,stamp);
+ f.record(delayed,stamp-100000);
+ for(const id of [delayed,current,delayed]){
+  const outcome=await f.inspect(id);
+  assert.equal(outcome.linksVerifiedForReview,true);
+  assert.equal(outcome.paymentEvidenceAuthoritative,false);
+  assert.equal(outcome.licensesGranted,false);
+ }
+ assert.equal(f.store.ownerSnapshot().totals.liveWebhookEvents,2);
+ assert.equal(f.count(),0);
+});
+test('a different historical invoice customer or payment intent cannot inherit tenant authority',async t=>{
+ const f=fixture(t);
+ f.pin();f.record();
+ const invoice=f.responses['invoices/'+ids.inv],saved=invoice.customer;
+ invoice.customer='cus_live_OTHER1234';
+ let out=await f.inspect();
+ assert.equal(out.linksVerifiedForReview,false);
+ assert.equal(out.reason,'historical_invoice_subscription_mismatch');
+ invoice.customer=saved;
+ const payment=f.responses['invoices/'+ids.inv+'/payments?limit=100'];
+ payment.data[0].payment.payment_intent='pi_live_FOREIGN1234';
+ out=await f.inspect();
+ assert.equal(out.linksVerifiedForReview,false);
+ assert.equal(out.reason,'invoice_payment_lineage_mismatch');
+ assert.equal(f.count(),0);
+});
