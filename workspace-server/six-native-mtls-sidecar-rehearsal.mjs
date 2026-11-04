@@ -52,29 +52,38 @@ const generateCert=(root,name,cn,additionalExts=[])=>{
  * pinned native server CA and exact closed-world hostname -> 127.0.0.1.
  * No public DNS lookup, redirects, proxy or runtime-wide TLS bypass.
  */
-function privateMtlFetch({endpoints,serverCert,clientCert,clientKey}){
+function privateMtlFetch({
+ trustByEndpoint,clientFromApp=null,serverTrustFromApp=null,
+ omitClient=false,omitServerTrust=false
+}){
+ const forApp=id=>[...trustByEndpoint.values()].find(x=>x.id===id);
  return async(url,init)=>{
-  if(!endpoints.has(url)||typeof init?.body!=='string'||
+  const native=trustByEndpoint.get(url);
+  if(!native||typeof init?.body!=='string'||
      Buffer.byteLength(init.body)>2048||
      init.method!=='POST'||init.redirect!=='error'||
      init.credentials!=='omit'||init.cache!=='no-store')
    throw Error('unapproved_private_synthetic_mtls_request');
   const expected=new URL(url);
   if(expected.protocol!=='https:'||expected.pathname!==ROUTE||
-     !IDS.some(id=>hostname(id)===expected.hostname)||
-     !Number.isSafeInteger(Number(expected.port)))
+     hostname(native.id)!==expected.hostname||
+     !Number.isSafeInteger(Number(expected.port))||
+     Number(expected.port)<1)
    throw Error('unapproved_private_synthetic_mtls_destination');
+  const client=clientFromApp?forApp(clientFromApp):native;
+  const server=serverTrustFromApp?forApp(serverTrustFromApp):native;
+  if(!client||!server)throw Error('unreviewed_mtls_identity');
   return await new Promise((resolve,reject)=>{
    const request=httpsRequest(url,{
     method:'POST',headers:init.headers,
-    ca:serverCert,cert:clientCert,key:clientKey,
+    ca:omitServerTrust?'':server.serverCert,
+    cert:omitClient?undefined:client.clientCert,
+    key:omitClient?undefined:client.clientKey,
     rejectUnauthorized:true,minVersion:'TLSv1.3',agent:false,
     signal:init.signal,
     lookup:(name,opts,callback)=>{
-     if(name!==expected.hostname)
-      callback(Error('unapproved_native_host'));
-     else if(opts?.all)
-      callback(null,[{address:'127.0.0.1',family:4}]);
+     if(name!==expected.hostname)callback(Error('unapproved_native_host'));
+     else if(opts?.all)callback(null,[{address:'127.0.0.1',family:4}]);
      else callback(null,'127.0.0.1',4);
     }
    },response=>{
@@ -89,11 +98,9 @@ function privateMtlFetch({endpoints,serverCert,clientCert,clientKey}){
     });
     response.on('error',reject);
     response.on('end',()=>{
-     try{
-      resolve(new Response(Buffer.concat(chunks),{
-       status:response.statusCode,headers:response.headers
-      }));
-     }catch(error){reject(error)}
+     try{resolve(new Response(Buffer.concat(chunks),{
+      status:response.statusCode,headers:response.headers
+     }))}catch(error){reject(error)}
     });
    });
    request.on('error',reject);
@@ -117,18 +124,25 @@ export async function rehearseSixNativeMtlSidecars({
  chmodSync(root,0o700);
  const checks=[],servers=[];
  try{
-  const names=IDS.map(id=>'DNS:'+hostname(id)).join(',');
-  const serverCert=generateCert(root,'native-sidecar',hostname(IDS[0]),[
-   'subjectAltName='+names,
-   'basicConstraints=critical,CA:TRUE'
-  ]);
-  const clientCert=generateCert(root,'workspace-client','workspace-synthetic-qa',[
-   'extendedKeyUsage=clientAuth',
-   'basicConstraints=critical,CA:TRUE'
-  ]);
-  const fingerprint=new X509Certificate(clientCert.cert).fingerprint256;
   const clients=Object.create(null);
+  const trustByEndpoint=new Map();
+  const fingerprints=new Set();
   for(const row of SIX_NATIVE_SIGNER_CHECKOUTS){
+   const serverCert=generateCert(root,'native-'+row.id,hostname(row.id),[
+    'subjectAltName=DNS:'+hostname(row.id),
+    'basicConstraints=critical,CA:TRUE'
+   ]);
+   const clientCert=generateCert(root,'workspace-'+row.id,
+    'workspace-'+row.id+'-synthetic-qa',[
+    'extendedKeyUsage=clientAuth',
+    'basicConstraints=critical,CA:TRUE'
+   ]);
+   const serverFingerprint=new X509Certificate(serverCert.cert).fingerprint256;
+   const fingerprint=new X509Certificate(clientCert.cert).fingerprint256;
+   if(fingerprints.has(serverFingerprint)||fingerprints.has(fingerprint)||
+      serverFingerprint===fingerprint)
+    return fail('native_mtls_key_material_reuse',checks);
+   fingerprints.add(serverFingerprint);fingerprints.add(fingerprint);
    const pair=generateKeyPairSync('ed25519');
    const keyId='synthetic-'+row.id+'-mTLS-key';
    const bearerToken=randomBytes(48).toString('base64url');
@@ -162,23 +176,23 @@ export async function rehearseSixNativeMtlSidecars({
     token:bearerToken,keyId,
     publicKeyPem:pair.publicKey.export({type:'spki',format:'pem'})
    };
-  }
-  const endpoints=new Set(Object.values(clients).map(c=>c.endpoint));
-  const makeVerifier=(registry=clients,transport)=>{
-   const fetchImpl=transport||privateMtlFetch({
-    endpoints,serverCert:serverCert.cert,
+   trustByEndpoint.set(clients[row.id].endpoint,Object.freeze({
+    id:row.id,serverCert:serverCert.cert,
     clientCert:clientCert.cert,clientKey:clientCert.key
-   });
+   }));
+  }
+  if(trustByEndpoint.size!==6||fingerprints.size!==12)
+   return fail('native_mtls_six_distinct_trust_anchors_missing',checks);
+  const makeVerifier=(registry=clients,transport)=>{
+   const fetchImpl=transport||privateMtlFetch({trustByEndpoint});
    return createSignedNativeOwnershipVerifier({
     clients:registry,fetchImpl,clock:()=>now,timeoutMs:2000
    });
   };
+
   // Safe debugging labels only; never reveal cert/key, identities or URLs.
   let tlsWitness='unattempted';
-  const baseTransport=privateMtlFetch({
-   endpoints,serverCert:serverCert.cert,
-   clientCert:clientCert.cert,clientKey:clientCert.key
-  });
+  const baseTransport=privateMtlFetch({trustByEndpoint});
   const tracedTransport=async(url,init)=>{
    try{
     const response=await baseTransport(url,init);
@@ -235,17 +249,31 @@ export async function rehearseSixNativeMtlSidecars({
    ));
    if(await makeVerifier(invalidBearer).verifyNativeMapping(identity)!==false)
     return fail('native_mtls_wrong_bearer_accepted_'+id,checks);
-   const noClient=privateMtlFetch({
-    endpoints,serverCert:serverCert.cert
-   });
+   const noClient=privateMtlFetch({trustByEndpoint,omitClient:true});
    if(await makeVerifier(clients,noClient).verifyNativeMapping(identity)!==false)
     return fail('native_mtls_missing_client_certificate_accepted_'+id,checks);
-   const noTrust=privateMtlFetch({
-    endpoints,serverCert:'',
-    clientCert:clientCert.cert,clientKey:clientCert.key
-   });
+   const noTrust=privateMtlFetch({trustByEndpoint,omitServerTrust:true});
    if(await makeVerifier(clients,noTrust).verifyNativeMapping(identity)!==false)
     return fail('native_mtls_untrusted_native_ca_accepted_'+id,checks);
+   const foreignApp=IDS[(IDS.indexOf(id)+1)%IDS.length];
+   const foreignClient=privateMtlFetch({
+    trustByEndpoint,clientFromApp:foreignApp
+   });
+   if(await makeVerifier(clients,foreignClient).verifyNativeMapping(identity)!==false)
+    return fail('native_mtls_foreign_app_client_cert_accepted_'+id,checks);
+   const foreignCa=privateMtlFetch({
+    trustByEndpoint,serverTrustFromApp:foreignApp
+   });
+   if(await makeVerifier(clients,foreignCa).verifyNativeMapping(identity)!==false)
+    return fail('native_mtls_foreign_app_server_ca_accepted_'+id,checks);
+   const foreignBearer=Object.fromEntries(Object.entries(clients).map(
+    ([name,c])=>[name,name===id?{
+     ...c,token:clients[foreignApp].token
+    }:c]
+   ));
+   if(await makeVerifier(foreignBearer).verifyNativeMapping(identity)!==false)
+    return fail('native_mtls_foreign_app_bearer_accepted_'+id,checks);
+
    // Native-sidecar nonce replay rejection is distinct from Workspace's
    // verifier replay protection: send the exact same signed request twice.
    const nonce=randomBytes(32).toString('base64url');
@@ -254,10 +282,7 @@ export async function rehearseSixNativeMtlSidecars({
     ...identity
    });
    const client=clients[id];
-   const directFetch=privateMtlFetch({
-    endpoints,serverCert:serverCert.cert,
-    clientCert:clientCert.cert,clientKey:clientCert.key
-   });
+   const directFetch=privateMtlFetch({trustByEndpoint});
    const rawOptions={
     method:'POST',redirect:'error',credentials:'omit',cache:'no-store',
     headers:{
@@ -279,6 +304,7 @@ export async function rehearseSixNativeMtlSidecars({
   return Object.freeze({
    ok:true,checks,
    category:'six-real-loopback-mutual-tls-native-sidecars-only',
+   separateAppTlsIdentitiesVerified:true,
    deploymentAuthorized:false
   });
  }catch{
