@@ -41,10 +41,11 @@ async function fixture(t) {
   const grants = new Map(APP_IDS.map(id => [id, {
     localIdentity: { userId: 'native-' + id + '-user', organizationId: 'native-org-a' },
   }]));
+  let parentLookupOverride = null;
   const identity = {
     async getSession() { return parent; },
     async authenticate() { return parent; },
-    async getParentSession(id) { return id === parent.id ? parent : null; },
+    async getParentSession(id) { return id === parent.id ? (parentLookupOverride ?? parent) : null; },
     async getAccess(_parent, appId) { return grants.get(appId) ?? null; },
     async logout() {},
   };
@@ -122,6 +123,24 @@ async function fixture(t) {
   return {
     authorize, exchange, introspect, authStore,
     codeWrites: () => proofWrites, parent, clients,
+    // Simulate trusted client registration changing during redeploy while
+    // preserving the exact same durable SQLite authentication database.
+    setClientApp(clientId, appId) {
+      const registry = clients.map(c => c.id === clientId ? { ...c, appId } : c);
+      broker = createAuthBroker({
+        origin, issuer: 'https://identity.example.test',
+        clients: registry, identity, store: authStore, clock: () => NOW,
+      });
+    },
+    setParentLookup(parentSession) { parentLookupOverride = parentSession; },
+    async authenticateNative(appId, sessionToken) {
+      const auth = 'Basic ' + Buffer.from(
+        appId + ':' + clientFor(appId).secret,
+      ).toString('base64');
+      return broker.authenticateNativeSession({
+        headers: { authorization: auth },
+      }, { sessionToken });
+    },
     setGrant: (appId, localIdentity, revision = undefined) => grants.set(appId,
       localIdentity === null ? null : {
         localIdentity,
@@ -232,4 +251,60 @@ test('legacy single-tenant local identity stays compatible until its native tena
       active: false,
     }, appId + ' outstanding proof cannot survive a changed local identity');
   }
+});
+
+test('all six clients pin PKCE code and active native proof to the exact registered app ID', async t => {
+  const f = await fixture(t);
+  for (const [index, clientId] of APP_IDS.entries()) {
+    const otherApp = APP_IDS[(index + 1) % APP_IDS.length];
+    const sharedIdentity = { userId: 'shared-native-user', organizationId: 'shared-native-org' };
+    f.setGrant(clientId, sharedIdentity, 'stable:1');
+    f.setGrant(otherApp, sharedIdentity, 'stable:1');
+    const ticket = await f.authorize(clientId);
+    f.setClientApp(clientId, otherApp);
+    assert.deepEqual(await f.exchange(clientId, ticket), {
+      status: 401, data: { error: 'invalid_grant' },
+    }, clientId + ' stale code was issued for another registered app');
+    f.setClientApp(clientId, clientId);
+    const fresh = await f.authorize(clientId);
+    const issued = await f.exchange(clientId, fresh);
+    assert.equal(issued.status, 200);
+    assert.equal((await f.introspect(clientId, issued.data.sessionToken)).data.active, true);
+    f.setClientApp(clientId, otherApp);
+    assert.deepEqual((await f.introspect(clientId, issued.data.sessionToken)).data, {
+      active: false,
+    }, clientId + ' stale proof cannot switch audience on reconfiguration');
+    assert.equal(await f.authenticateNative(clientId, issued.data.sessionToken), null);
+    f.setClientApp(clientId, clientId);
+  }
+});
+
+test('pre-change durable SQLite proof without app ID cannot authenticate to any client', async t => {
+  const f = await fixture(t);
+  const clientId = 'goflo';
+  const sessionToken = opaque();
+  const oldIdentity = f.getGrant(clientId).localIdentity;
+  await f.authStore.putProof(createHash('sha256').update(sessionToken).digest('hex'), {
+    clientId, parentSessionId: f.parent.id, subject: f.parent.subject,
+    localIdentity: oldIdentity, bindingRevision: null,
+    expiresAt: NOW + 30_000,
+  });
+  assert.deepEqual((await f.introspect(clientId, sessionToken)).data, { active: false });
+  assert.equal(await f.authenticateNative(clientId, sessionToken), null);
+});
+
+test('a sibling parent session with identical subject cannot replace the original native proof parent', async t => {
+  const f = await fixture(t);
+  const code = await f.authorize('goflo');
+  const issued = await f.exchange('goflo', code);
+  assert.equal(issued.status, 200);
+  f.setParentLookup({ ...f.parent, id: 'different-sibling-session' });
+  assert.deepEqual((await f.introspect('goflo', issued.data.sessionToken)).data, {
+    active: false,
+  });
+  assert.equal(await f.authenticateNative('goflo', issued.data.sessionToken), null);
+  const pending = await f.authorize('goflo');
+  assert.deepEqual(await f.exchange('goflo', pending), {
+    status: 401, data: { error: 'invalid_grant' },
+  });
 });
