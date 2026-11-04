@@ -330,3 +330,40 @@ test('reusing a client ID for another app cannot revoke the original parent sess
     active: false,
   });
 });
+
+test('consumed PKCE codes cannot be replayed after successful exchange for any of the six apps', async t => {
+  const f = await fixture(t);
+  for (const appId of APP_IDS) {
+    const ticket = await f.authorize(appId);
+    const first = await f.exchange(appId, ticket);
+    assert.equal(first.status, 200, appId + ' first exchange');
+    assert.equal(first.data.audience, appId);
+    assert.deepEqual(await f.exchange(appId, ticket), {
+      status: 401, data: { error: 'invalid_grant' },
+    }, appId + ' already-consumed code');
+    assert.equal((await f.introspect(appId, first.data.sessionToken)).data.active, true);
+  }
+  assert.equal(f.codeWrites(), APP_IDS.length, 'one and only one proof per successful code');
+});
+
+test('revoked child proof cannot be reused and child-only revoke cannot log out parent', async t => {
+  const f = await fixture(t);
+  for (const appId of APP_IDS) {
+    const initial = await f.exchange(appId, await f.authorize(appId));
+    assert.equal(initial.status, 200);
+    const token = initial.data.sessionToken;
+    assert.equal((await f.introspect(appId, token)).data.active, true);
+    assert.equal((await f.revoke(appId, token, true)).status, 204);
+    assert.deepEqual((await f.introspect(appId, token)).data, { active: false });
+    assert.equal(await f.authenticateNative(appId, token), null);
+    assert.equal((await f.revoke(appId, token, true)).status, 204);
+    assert.equal(f.logoutCalls(), 0, 'child-only revoke must not destroy original parent');
+    const fresh = await f.exchange(appId, await f.authorize(appId));
+    assert.equal(fresh.status, 200, 'parent may issue fresh approved grant');
+    assert.equal((await f.introspect(appId, fresh.data.sessionToken)).data.active, true);
+    f.setGrant(appId, null);
+    assert.deepEqual((await f.introspect(appId, fresh.data.sessionToken)).data, {
+      active: false,
+    }, 'revoked native app grant must also invalidate an outstanding child proof');
+  }
+});
