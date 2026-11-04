@@ -15,7 +15,11 @@ export function createStripeLiveEventLedger({db,clock=Date.now}={}){
    if(!event||typeof event!=='object'||Array.isArray(event)||
       event.mode!=='live'||event.licensesGranted!==false||
       event.authorizesSeatChanges!==false||
-      event.financialReviewRequired!==reviewRequired||
+      // Preserve legacy verified non-review metadata (which had no flag).
+      // All NEW reversal signals must explicitly carry a true review flag.
+      (reviewRequired?event.financialReviewRequired!==true:
+        event.financialReviewRequired!==undefined&&
+        event.financialReviewRequired!==false)||
       typeof event.id!=='string'||!/^evt_[A-Za-z0-9_]{4,128}$/.test(event.id)||
       !prefix||typeof event.objectId!=='string'||
       !event.objectId.startsWith(prefix)||
