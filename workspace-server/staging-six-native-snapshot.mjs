@@ -26,18 +26,34 @@ const CURRENT_APPROVED=Object.freeze({
  })
 });
 
+// New reviewed 2026-11-04 main-push native SSO builds. Historical (233ca)
+// and previous 2026-11-03 current (1a3b) evidence stay immutable. This
+// second allowlist prevents promoting a random SHA by editing a JSON lock.
+const POST_PKCE_APPROVED=Object.freeze({
+ goflo:Object.freeze({sha:'2e1008a9b6d2a4c43efcf41aabf4d25ab1fd8e40',
+  runId:41786859215,workflowId:406043715}),
+ methpipe:Object.freeze({sha:'76fdae938d854af59ef98f19858c800f66896cdc',
+  runId:41786886411,workflowId:406043868}),
+ mantrain:Object.freeze({sha:'7fd90350965d0c2d0b4df6a73bb9088fe826ccd7',
+  runId:41786905381,workflowId:406042373})
+});
+function reviewedSnapshot(lock,approved){
+ return lock.central.runId===CURRENT_APPROVED.central.runId&&
+  lock.central.workflowId===CURRENT_APPROVED.central.workflowId&&
+  lock.apps.every(row=>{
+   const pinned=approved[row.id]||CURRENT_APPROVED.apps[row.id];
+   return pinned&&row.sha===pinned.sha&&
+    row.runId===pinned.runId&&row.workflowId===pinned.workflowId;
+  });
+}
 export function validateSixNativeStagingSnapshot(lock){
  const historical=validateQaLock(lock);
  if(historical.ok)return Object.freeze({ok:true,kind:'historical'});
  const current=validateCurrentCompatLock(lock);
- if(current.ok&&
-   lock.central.runId===CURRENT_APPROVED.central.runId&&
-   lock.central.workflowId===CURRENT_APPROVED.central.workflowId&&
-   lock.apps.every(row=>{
-    const pinned=CURRENT_APPROVED.apps[row.id];
-    return pinned&&row.sha===pinned.sha&&
-      row.runId===pinned.runId&&row.workflowId===pinned.workflowId;
-   }))return Object.freeze({ok:true,kind:'current'});
+ if(current.ok&&reviewedSnapshot(lock,CURRENT_APPROVED.apps))
+  return Object.freeze({ok:true,kind:'current'});
+ if(current.ok&&reviewedSnapshot(lock,POST_PKCE_APPROVED))
+  return Object.freeze({ok:true,kind:'post-pkce'});
  return Object.freeze({ok:false,kind:null});
 }
 
@@ -46,5 +62,6 @@ export function validateSixNativeStagingSnapshot(lock){
 export function stagingSnapshotFile(choice='historical'){
  if(choice==='historical')return 'six-app-source-qa-lock.json';
  if(choice==='current')return 'six-native-current-compat-lock.json';
+ if(choice==='post-pkce')return 'six-native-post-pkce-compat-lock.json';
  throw Error('unsupported_staging_snapshot');
 }
