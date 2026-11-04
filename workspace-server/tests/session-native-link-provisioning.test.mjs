@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
+import {spawnSync} from 'node:child_process';
 import {randomUUID,generateKeyPairSync,sign} from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
@@ -637,4 +638,45 @@ test('detached child tasks cannot reuse AsyncLocalStorage operator authority AFT
  assert.deepEqual(await childPromise,{authorized:false,signed:false});
  assert.equal(f.nativeRequests(),1,
   'a detached post-commit callback must not request another signed proof');
+});
+
+
+test('actual separate Node process cannot BEGIN IMMEDIATE while Workspace holds the fenced native commit',async t=>{
+ const contenderProgram=[
+  "const {DatabaseSync}=require('node:sqlite');",
+  "let db;",
+  "try{",
+  " db=new DatabaseSync(process.argv[1]);",
+  " db.exec('PRAGMA busy_timeout=0');",
+  " db.exec('BEGIN IMMEDIATE');",
+  " db.exec('ROLLBACK');",
+  " process.exitCode=0;",
+  "}catch(error){",
+  " process.exitCode=/database is locked/i.test(error?.message??'')?3:4;",
+  " if(process.exitCode===4)process.stderr.write(String(error));",
+  "}finally{try{db?.close();}catch{}}"
+ ].join('\n');
+ const attempt=databasePath=>{
+  const result=spawnSync(process.execPath,
+   ['--no-warnings','--input-type=commonjs','-e',contenderProgram,databasePath],
+   {encoding:'utf8',timeout:5000});
+  assert.equal(result.error,undefined,
+   'synthetic competing Node process must execute successfully');
+  return result;
+ };
+ let seen=0;
+ const f=await fixture(t,{fenceProbe:({organizationDatabasePath})=>{
+  seen++;
+  const blocked=attempt(organizationDatabasePath);
+  assert.equal(blocked.status,3,
+   'real separate process cannot write organization SQLite during canonical identity commit: '+blocked.stderr);
+ }});
+ assert.equal((await f.controller.bind(f.input())).applied,true);
+ assert.equal(seen,1);
+ const afterwards=attempt(f.organizationDatabasePath);
+ assert.equal(afterwards.status,0,
+  'other process must be allowed to write immediately after commit-fence release: '+afterwards.stderr);
+ assert.equal(f.identity.orgNativeLinkAudit({
+  appId,workspaceOrganizationId:'alpha'
+ }).length,1);
 });
