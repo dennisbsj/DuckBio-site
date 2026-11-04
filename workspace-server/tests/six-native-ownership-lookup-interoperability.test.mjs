@@ -15,6 +15,8 @@ import {canonicalNativeOwnershipProofBytes}
  from '../shared-auth/signed-native-ownership-verifier.mjs';
 import {rehearseSixNativeSignerFactories}
  from '../six-native-signer-interoperability.mjs';
+import {rehearseSixNativeOwnershipOverRealTls}
+ from '../six-native-real-https-rehearsal.mjs';
 import {SIX_NATIVE_LOOKUP_MODULES,rehearseSixNativeLookupFactories,
  verifySixNativeLookupSources,auditSixGenuineNativeLookups}
  from '../six-native-ownership-lookup-interoperability.mjs';
@@ -217,4 +219,39 @@ test('broken signed native chain prevents any positive offline conclusion',async
  assert.equal(result.ok,false);
  assert.equal(result.reason,'signed_native_lookup_chain_failed');
  assert.equal(result.deploymentAuthorized,false);
+});
+
+test('six independent real local HTTPS/TLS native services validate Ed25519 plus owned native storage and deny abuse',async()=>{
+ let witness=null;
+ const result=await rehearseSixNativeLookupFactories({
+  factories:factories(),
+  onVerifiedLookups:async(lookups,controls)=>{
+   witness=await rehearseSixNativeOwnershipOverRealTls({
+    signerFactories:nativeSignerFactories(),
+    nativeLookups:lookups,syntheticControls:controls
+   });
+   return witness;
+  }
+ });
+ assert.equal(result.ok,true,JSON.stringify({result,witness}));
+ assert.equal(result.signedNativeChainChecked,true);
+ assert.equal(result.deploymentAuthorized,false);
+ assert.equal(witness.ok,true,JSON.stringify(witness));
+ assert.equal(witness.deploymentAuthorized,false);
+ assert.equal(witness.category,'six-real-loopback-https-native-owned-only');
+ assert.deepEqual(witness.checks.map(x=>x.id),APPS);
+});
+
+test('real TLS integration refuses missing app/mapping controls or unsupported clock without opening any service',async()=>{
+ const signer=nativeSignerFactories();
+ const denied=await rehearseSixNativeOwnershipOverRealTls({
+  signerFactories:signer,nativeLookups:new Map(),syntheticControls:new Map()
+ });
+ assert.equal(denied.ok,false);
+ assert.equal(denied.reason,'invalid_six_native_tls_fixture');
+ assert.equal(denied.deploymentAuthorized,false);
+ const badClock=await rehearseSixNativeOwnershipOverRealTls({
+  signerFactories:signer,nativeLookups:new Map(),syntheticControls:new Map(),now:0
+ });
+ assert.equal(badClock.ok,false);
 });

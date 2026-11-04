@@ -18,6 +18,8 @@ import {execFileSync} from 'node:child_process';
 import {SIX_NATIVE_SIGNER_CHECKOUTS,verifySixNativeSignerSources,
  rehearseSixNativeSignerFactories}
  from './six-native-signer-interoperability.mjs';
+import {rehearseSixNativeOwnershipOverRealTls}
+ from './six-native-real-https-rehearsal.mjs';
 
 export const SIX_NATIVE_LOOKUP_MODULES=Object.freeze([
  Object.freeze({id:'goflo',file:'server/workspace-native-ownership-lookup.cjs',
@@ -206,7 +208,7 @@ export async function rehearseSixNativeLookupFactories({
   return result(false,'invalid_native_lookup_matrix');
  const root=mkdtempSync(join(tmpdir(),'duckbio-six-native-lookups-'));
  chmodSync(root,0o700);
- const checks=[],lookups=new Map();
+ const checks=[],lookups=new Map(),syntheticControls=new Map();
  try{
   for(const row of SIX_NATIVE_LOOKUP_MODULES){
    const factory=factories.get(row.id);
@@ -224,6 +226,13 @@ export async function rehearseSixNativeLookupFactories({
      throw Error('invalid_lookup');
    }catch{return result(false,'invalid_'+row.id+'_native_lookup',checks)}
    lookups.set(row.id,fixture.lookup);
+   // Controls only disposable native DBs while the TLS rehearsal is active.
+   syntheticControls.set(row.id,Object.freeze({
+    revoke:fixture.revoke,restore:fixture.restore,
+    expire:fixture.expire,unexpire:fixture.unexpire,
+    removeAccount:fixture.removeAccount,restoreAccount:fixture.restoreAccount,
+    duplicate:fixture.duplicate,unduplicate:fixture.unduplicate
+   }));
    try{
     for(const purpose of ['inspect','bind','migrate']){
      if(!sameProof(await fixture.lookup(input(row.id,purpose))))
@@ -269,7 +278,7 @@ export async function rehearseSixNativeLookupFactories({
   // and the central Workspace Ed25519 verifier, in the SAME offline flow.
   if(onVerifiedLookups){
    let linked;
-   try{linked=await onVerifiedLookups(lookups)}
+   try{linked=await onVerifiedLookups(lookups,syntheticControls)}
    catch{return result(false,'signed_native_lookup_chain_failed',checks)}
    if(!linked||linked.ok!==true||linked.deploymentAuthorized!==false||
       !Array.isArray(linked.checks)||linked.checks.length!==6)
@@ -284,7 +293,8 @@ export async function rehearseSixNativeLookupFactories({
 /** Operators with all SIX reviewed private native repo clones may invoke
  * this explicitly; no automatic cloning, Git remote access or token export.
  */
-export async function auditSixGenuineNativeLookups({sourcesRoot}={}){
+export async function auditSixGenuineNativeLookups({sourcesRoot,realTls=false}={}){
+ if(typeof realTls!=='boolean')return result(false,'invalid_offline_transport_mode');
  const before=verifySixNativeLookupSources(sourcesRoot);
  if(!before.ok)return before;
  let factories,signerFactories;
@@ -310,32 +320,42 @@ export async function auditSixGenuineNativeLookups({sourcesRoot}={}){
  }catch{return result(false,'native_lookup_import_failed')}
  const output=await rehearseSixNativeLookupFactories({
   factories,
-  onVerifiedLookups:lookups=>rehearseSixNativeSignerFactories({
+  onVerifiedLookups:(lookups,controls)=>realTls?
+   rehearseSixNativeOwnershipOverRealTls({
+    signerFactories,nativeLookups:lookups,syntheticControls:controls
+   }):
+   rehearseSixNativeSignerFactories({
     factories:signerFactories,nativeLookups:lookups
-  })
+   })
  });
  if(!output.ok)return output;
  const after=verifySixNativeLookupSources(sourcesRoot);
  if(!after.ok)return result(false,'native_lookup_sources_changed');
  return Object.freeze({...output,
-  reason:'six_real_native_signer_and_lookup_chain_offline_verified',
+  reason:realTls?
+   'six_genuine_native_modules_real_loopback_tls_verified':
+   'six_real_native_signer_and_lookup_chain_offline_verified',
   sourcesPinned:true,deploymentAuthorized:false});
 }
 
 if(process.argv[1]&&resolve(process.argv[1])===
  fileURLToPath(import.meta.url)){
  const args=process.argv.slice(2);
+ const tls=args.length===3&&
+  args[2]==='--confirm-offline-six-native-real-https-only';
  if(args.length!==3||args[0]!=='--sources-root'||
-    args[2]!=='--confirm-offline-native-lookup-only'){
-  console.error('Usage: node six-native-ownership-lookup-interoperability.mjs --sources-root PRIVATE_SIX_NATIVE_REPO_ROOT --confirm-offline-native-lookup-only');
+    (!tls&&args[2]!=='--confirm-offline-native-lookup-only')){
+  console.error('Usage: node six-native-ownership-lookup-interoperability.mjs --sources-root PRIVATE_SIX_NATIVE_REPO_ROOT (--confirm-offline-native-lookup-only | --confirm-offline-six-native-real-https-only)');
   process.exitCode=2;
  }else{
-  const output=await auditSixGenuineNativeLookups({sourcesRoot:args[1]});
+  const output=await auditSixGenuineNativeLookups({sourcesRoot:args[1],realTls:tls});
   for(const row of output.checks??[])
    console.log((row.ok?'PASS ':'FAIL ')+row.id);
   if(!output.ok){
    console.error('BLOCKED offline native lookup: '+output.reason);
    process.exitCode=1;
-  }else console.log('PASS six real native signer+lookup modules against Workspace Ed25519 with synthetic data; five real SQLite DBs, one mocked DuckNote PostgreSQL query; NO native service, live SSO or deployment');
+  }else console.log(tls?
+   'PASS six pinned real native lookup+signer modules using disposable native records and six real loopback HTTPS/TLS endpoints; no active native app, live SSO, genuine Postgres, or deployment':
+   'PASS six real native signer+lookup modules against Workspace Ed25519 with synthetic data; five real SQLite DBs, one mocked DuckNote PostgreSQL query; NO native service, live SSO or deployment');
  }
 }
