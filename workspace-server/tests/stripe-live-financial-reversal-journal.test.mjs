@@ -195,3 +195,24 @@ test('webhook ingestion cannot assign a reversal signal to a Workspace tenant',t
  assert.equal(latest.reviewCategory,'dispute_review');
  assert(f.seats().every(n=>n===0));
 });
+
+test('Stripe dispute legacy dp_ and current du_ IDs are both signed, persisted and review-only',t=>{
+ const f=fixture(t);
+ for(const [prefix,n] of [['dp_',900],['du_',901]]){
+  const verified=verifier.verify(signed(event(
+   'charge.dispute.created',prefix,'dispute',n)));
+  assert.equal(verified.objectId,prefix+'live_reversal12345');
+  assert.equal(verified.financialReviewRequired,true);
+  assert.equal(f.store.recordVerifiedStripeLiveEvent(verified).recorded,true);
+  assert.equal(f.store.recordVerifiedStripeLiveEvent(verified).duplicate,true);
+ }
+ assert.equal(f.store.ownerSnapshot().totals.liveWebhookEvents,2);
+ assert(f.store.ownerSnapshot().liveWebhookEvents.every(x=>
+  x.reviewCategory==='dispute_review'&&x.linkage==='unassigned'));
+ for(const prefix of ['de_','dx_','ch_','re_']){
+  assert.throws(()=>verifier.verify(signed(event(
+   'charge.dispute.created',prefix,'dispute',990))),
+   /Unsupported Stripe LIVE webhook event/);
+ }
+ assert(f.seats().every(x=>x===0));
+});
