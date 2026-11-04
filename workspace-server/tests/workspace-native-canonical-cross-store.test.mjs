@@ -375,3 +375,21 @@ test('preflight rejects incomplete monotonic organization audit generation',asyn
  assert.equal(result.candidateReady,false);
  assert.equal(result.accessGranted,false);
 });
+
+test('permission ABA inside trusted native lookup cannot pass the final preflight',async t=>{
+ const f=await fixture(t);
+ const inspector=f.inspector(async x=>{
+  assert.equal(f.verified(x),true);
+  f.organization.setPermission({organizationId:'alpha',actorId:f.user.id,
+   accountId:f.user.id,appId:'goflo',permission:'workspace.view',
+   enabled:false});
+  f.organization.setPermission({organizationId:'alpha',actorId:f.user.id,
+   accountId:f.user.id,appId:'goflo',permission:'workspace.view',
+   enabled:true});
+  return true;
+ });
+ const answer=await inspector.inspect(f.alphaRequest);
+ assert.equal(answer.candidateReady,false);
+ assert.equal(answer.reason,'access_changed_during_verification');
+ assert.equal((await f.inspector().inspect(f.alphaRequest)).candidateReady,true);
+});
