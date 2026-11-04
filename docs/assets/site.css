@@ -2998,7 +2998,7 @@ html body .product-hero img.suite-sprite.logo-cytoduck{
 /* 2026-11-04: intentional spacing for Pricing and Support hero copy.
    The navigation brand is unchanged; duplicate logos inside hero markup are removed. */
 body:not(.homepage-exact) .pr-banner.duckbio-real-hero--pricing .duckbio-real-hero-desc{
- line-height:1.22!important;
+ line-height:1.4!important;
 }
 body:not(.homepage-exact) .pr-banner.duckbio-real-hero--pricing .duckbio-real-hero-cta{
  margin-top:clamp(16px,1.6vw,25px)!important;
@@ -3007,7 +3007,24 @@ html body.support-faq-page .page-hero.support-hero.duckbio-real-hero--support .d
  margin-bottom:clamp(20px,1.9vw,30px)!important;
 }
 @media(max-width:850px){
- body:not(.homepage-exact) .pr-banner.duckbio-real-hero--pricing .duckbio-real-hero-desc{line-height:1.22!important}
+ body:not(.homepage-exact) .pr-banner.duckbio-real-hero--pricing .duckbio-real-hero-desc{line-height:1.45!important}
  body:not(.homepage-exact) .pr-banner.duckbio-real-hero--pricing .duckbio-real-hero-cta{margin-top:18px!important}
  html body.support-faq-page .page-hero.support-hero.duckbio-real-hero--support .duckbio-real-hero-title{margin-bottom:22px!important}
+}
+
+/* Align Support hero body text line rhythm with the Home hero.
+   Preserve the larger title-to-body gap and the Pricing CTA spacing. */
+html body.support-faq-page .page-hero.support-hero.duckbio-real-hero--support .duckbio-real-hero-desc{
+ line-height:1.4!important;
+}
+html body.support-faq-page .page-hero.support-hero.duckbio-real-hero--support .duckbio-real-hero-desc:not(.duckbio-real-hero-copy-break){
+ margin-bottom:0!important;
+}
+html body.support-faq-page .page-hero.support-hero.duckbio-real-hero--support .duckbio-real-hero-copy-break{
+ margin-top:0!important;
+}
+@media(max-width:850px){
+ html body.support-faq-page .page-hero.support-hero.duckbio-real-hero--support .duckbio-real-hero-desc{
+  line-height:1.45!important;
+ }
 }
