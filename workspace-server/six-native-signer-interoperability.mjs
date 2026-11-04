@@ -115,12 +115,16 @@ export function verifySixNativeSignerSources(sourcesRoot,{runGit=git}={}){
  * the CLI path. A pure factory-map seam permits isolated no-private-repo CI.
  */
 export async function rehearseSixNativeSignerFactories({
- factories,now=NOW
+ factories,nativeLookups=null,now=NOW
 }={}){
  const checks=[];
  if(!factories||!(factories instanceof Map)||
     factories.size!==SIX_NATIVE_SIGNER_CHECKOUTS.length||
-    !Number.isSafeInteger(now)||now<=0)
+    !Number.isSafeInteger(now)||now<=0||
+    (nativeLookups!==null&&(!(nativeLookups instanceof Map)||
+       nativeLookups.size!==SIX_NATIVE_SIGNER_CHECKOUTS.length||
+       SIX_NATIVE_SIGNER_CHECKOUTS.some(row=>
+        typeof nativeLookups.get(row.id)!=='function'))))
   return deny('invalid_private_native_factory_matrix');
  const clients=Object.create(null);
  const signers=new Map(),nativeActive=new Map();
@@ -143,18 +147,30 @@ export async function rehearseSixNativeSignerFactories({
    nativeActive.set(row.id,true);
    const signer=factory({
     privateKeyPem,keyId,clock:()=>now,
-    lookupOwnership:async binding=>
-      exact(binding,['appId','workspaceAccountId',
-       'workspaceOrganizationId','nativeUserId',
-       'nativeOrganizationId','purpose'])&&
-      binding.appId===row.id&&
-      binding.workspaceAccountId===ID&&
-      binding.workspaceOrganizationId===ORG&&
-      binding.nativeUserId===NATIVE_USER&&
-      binding.nativeOrganizationId===NATIVE_ORG&&
-      ['inspect','bind','migrate'].includes(binding.purpose)&&
-      nativeActive.get(row.id)===true
-       ?{active:true,ownershipVerified:true}:null
+    lookupOwnership:async binding=>{
+      if(!exact(binding,['appId','workspaceAccountId',
+          'workspaceOrganizationId','nativeUserId',
+          'nativeOrganizationId','purpose'])||
+         binding.appId!==row.id||
+         binding.workspaceAccountId!==ID||
+         binding.workspaceOrganizationId!==ORG||
+         binding.nativeUserId!==NATIVE_USER||
+         binding.nativeOrganizationId!==NATIVE_ORG||
+         !['inspect','bind','migrate'].includes(binding.purpose)||
+         nativeActive.get(row.id)!==true)return null;
+      // Optional genuine-source native lookup integration: the actual native
+      // storage verifier must also return a strict verified ownership record.
+      // It remains synthetic/offline; this is never a central app entitlement.
+      if(nativeLookups){
+       try{
+        const verified=await nativeLookups.get(row.id)(binding);
+        return exact(verified,['active','ownershipVerified'])&&
+         verified.active===true&&verified.ownershipVerified===true
+          ?verified:null;
+       }catch{return null}
+      }
+      return {active:true,ownershipVerified:true};
+    }
    });
    if(typeof signer?.prove!=='function')
     throw Error('invalid_native_signer');
