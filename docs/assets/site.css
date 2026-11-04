@@ -2980,3 +2980,16 @@ html body img.suite-sprite.logo-methduck {
 html body .product-hero img.suite-sprite.logo-methduck {
  background-image:url("icons/duckbio-20261103/duckpipe-1254.webp") !important;
 }
+
+
+/* 2026-11-04: CytoDuck 3D illustration without circular ceiling light.
+   Marketing-only artwork: independent compact SVG glyphs remain on Workspace and Pricing. */
+html body img.suite-sprite.logo-cytoduck{
+ background-image:url("icons/duckbio-20261104/cytoduck-no-ring-448.webp") !important;
+ background-position:center !important;
+ background-size:100% 100% !important;
+ background-repeat:no-repeat !important;
+}
+html body .product-hero img.suite-sprite.logo-cytoduck{
+ background-image:url("icons/duckbio-20261104/cytoduck-no-ring-1254.webp") !important;
+}
