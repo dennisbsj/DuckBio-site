@@ -157,3 +157,75 @@ test('epoch overflow refuses the mutation without clearing a live selection',asy
  assert.equal(f.selected().id,'alpha');
  assert.equal(f.selected().sessionSelectionRevision,Number.MAX_SAFE_INTEGER);
 });
+
+
+test('separate organization-store connection detects same-tenant ABA across SQLite handles',async t=>{
+ const f=await fixture(t);
+ const peer=createOrganizationStore({databasePath:f.organizationPath,
+  clock:()=>NOW,verifyLiveSubscriptionEvidence:x=>x});
+ t.after(()=>peer.close());
+ const previous=f.selected().sessionSelectionRevision;
+ const inspector=f.inspector(async()=>{
+  peer.clearSessionOrganization(f.session.id);
+  assert.equal(f.selected(),null); // The primary connection sees committed peer writes.
+  peer.selectSessionOrganization({sessionId:f.session.id,
+   accountId:f.user.id,organizationId:'alpha'});
+  assert.equal(f.selected().sessionSelectionRevision,previous+2);
+  return true;
+ });
+ const result=await inspector.inspect(f.request);
+ assert.equal(result.reason,'access_changed_during_verification');
+ assert.equal(result.candidateReady,false);
+ assert.equal(result.accessGranted,false);
+ assert.equal((await f.inspector().inspect(f.request)).candidateReady,true);
+});
+
+test('reopening the same SQLite store does not reseed a cleared session tombstone',async t=>{
+ const f=await fixture(t);
+ f.organization.clearSessionOrganization(f.session.id);
+ const afterClear=new DatabaseSync(f.organizationPath,{readOnly:true});
+ try{
+  assert.equal(afterClear.prepare('SELECT revision FROM session_organization_versions WHERE session_id=?')
+   .get(f.session.id)?.revision,2);
+ }finally{afterClear.close();}
+ const reopened=createOrganizationStore({databasePath:f.organizationPath,
+  clock:()=>NOW,verifyLiveSubscriptionEvidence:x=>x});
+ t.after(()=>reopened.close());
+ assert.equal(reopened.currentSessionOrganization({
+  sessionId:f.session.id,accountId:f.user.id}),null);
+ reopened.selectSessionOrganization({sessionId:f.session.id,
+  accountId:f.user.id,organizationId:'alpha'});
+ assert.equal(f.selected().sessionSelectionRevision,3);
+ // Reopening once more must not reset or duplicate migration rows.
+ const third=createOrganizationStore({databasePath:f.organizationPath,
+  clock:()=>NOW,verifyLiveSubscriptionEvidence:x=>x});
+ t.after(()=>third.close());
+ assert.equal(third.currentSessionOrganization({
+  sessionId:f.session.id,accountId:f.user.id})?.sessionSelectionRevision,3);
+ third.clearSessionOrganization(f.session.id);
+ third.clearSessionOrganization(f.session.id); // idempotent no-op
+ const check=new DatabaseSync(f.organizationPath,{readOnly:true});
+ try{
+  assert.equal(check.prepare('SELECT revision FROM session_organization_versions WHERE session_id=?')
+   .get(f.session.id)?.revision,4);
+ }finally{check.close();}
+});
+
+test('selection epoch is isolated to the session, not to every session of the same account',async t=>{
+ const f=await fixture(t);
+ const other=f.identity.createSession(f.user.id).parent;
+ f.organization.selectSessionOrganization({sessionId:other.id,
+  accountId:f.user.id,organizationId:'alpha'});
+ const peerRequest={...f.request,sessionId:other.id};
+ assert.equal(f.organization.currentSessionOrganization({
+  sessionId:other.id,accountId:f.user.id})?.sessionSelectionRevision,1);
+ f.organization.clearSessionOrganization(f.session.id);
+ f.reselect();
+ assert.equal(f.selected().sessionSelectionRevision,3);
+ assert.equal(f.organization.currentSessionOrganization({
+  sessionId:other.id,accountId:f.user.id})?.sessionSelectionRevision,1);
+ const otherDecision=await f.inspector().inspect(peerRequest);
+ assert.equal(otherDecision.candidateReady,true);
+ assert.equal(otherDecision.accessGranted,false);
+ assert.equal(otherDecision.licensesGranted,false);
+});
