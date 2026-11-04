@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "scope": "independent-original-six-real-database-mtls-ci-evidence-only",
+  "releaseAuthorized": false,
+  "workspace": {
+    "repo": "dennisbsj/DuckBio-site",
+    "sha": "3932361e7bd3f2b0bafaef49a62f2487a07b5e6b",
+    "workflow": ".github/workflows/workspace-auth-core.yml",
+    "workflowId": 403711277,
+    "runId": 41830839811
+  },
+  "apps": [
+    {
+      "name": "CytoDuck",
+      "id": "goflo",
+      "repo": "dennisbsj/CytoDuck",
+      "sha": "ba22006b75b75d6b1fbe680c3d59116768806798",
+      "workflow": ".github/workflows/build.yml",
+      "workflowId": 365920928,
+      "runId": 41823086005,
+      "testFile": "tests/workspace-native-ownership-https.test.cjs",
+      "testLauncher": "package.json"
+    },
+    {
+      "name": "DuckNote",
+      "id": "eel",
+      "repo": "dennisbsj/DuckNote",
+      "sha": "83f3892442eabb64f050934d435d39c4e72b3d8b",
+      "workflow": ".github/workflows/ci.yml",
+      "workflowId": 373790435,
+      "runId": 41837318986,
+      "testFile": "scripts/workspace-native-ownership-mtls-pg-real.mjs",
+      "testLauncher": ".github/workflows/ci.yml"
+    },
+    {
+      "name": "DuckPipe",
+      "id": "methpipe",
+      "repo": "dennisbsj/DuckPipe",
+      "sha": "6acd3fec8d8a3c057b15fb79c9f47351c54c8294",
+      "workflow": ".github/workflows/api-checks.yml",
+      "workflowId": 400754499,
+      "runId": 41853056933,
+      "testFile": "tests/workspace-native-ownership-sqlite-mtls.integration.test.cjs",
+      "testLauncher": "package.json"
+    },
+    {
+      "name": "DuckTrain",
+      "id": "mantrain",
+      "repo": "dennisbsj/DuckTrain",
+      "sha": "977bc15111004b71f9fc6e95d8facbb4bc2a3bcd",
+      "workflow": ".github/workflows/verify.yml",
+      "workflowId": 400802066,
+      "runId": 41853561782,
+      "testFile": "tests/workspace-native-ownership-sqlite-mtls.integration.test.cjs",
+      "testLauncher": "package.json"
+    },
+    {
+      "name": "DuckMan",
+      "id": "duckman",
+      "repo": "dennisbsj/DuckMan",
+      "sha": "a1cf2ff6ba7f1d7d95cbd7a8af1d3a3149667257",
+      "workflow": ".github/workflows/verify.yml",
+      "workflowId": 382858766,
+      "runId": 41854693598,
+      "testFile": "tests/workspace-native-ownership-sqlite-mtls.integration.test.cjs",
+      "testLauncher": "package.json"
+    },
+    {
+      "name": "LabDuck",
+      "id": "limsman",
+      "repo": "dennisbsj/LabDuck",
+      "sha": "e03f49d3df81719db6fc7c5d6c64a050edec9641",
+      "workflow": ".github/workflows/verify.yml",
+      "workflowId": 400452582,
+      "runId": 41854484043,
+      "testFile": "tests/workspace-native-ownership-sqlite-mtls.integration.test.cjs",
+      "testLauncher": "package.json"
+    }
+  ]
+}
