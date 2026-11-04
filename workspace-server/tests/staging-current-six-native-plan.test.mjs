@@ -25,6 +25,8 @@ const historical=JSON.parse(readFileSync(new URL(
  '../six-app-source-qa-lock.json',import.meta.url),'utf8'));
 const postPkce=JSON.parse(readFileSync(new URL(
  '../six-native-post-pkce-compat-lock.json',import.meta.url),'utf8'));
+const ownershipMtls=JSON.parse(readFileSync(new URL(
+ '../six-native-ownership-mtls-compat-lock.json',import.meta.url),'utf8'));
 const key=()=>randomBytes(32).toString('base64url');
 const info=id=>id==='eel'||id==='duckman'?
  'DUCKBIO_WORKSPACE_ORGANIZATION_ID':'DUCKBIO_WORKSPACE_ORG_ID';
@@ -197,6 +199,36 @@ test('post-PKCE lock is separate, reviewed, non-promotable and preserves the two
   assert.equal(validateSixNativeStagingSnapshot(bad).ok,false);
  }
 });
+test('new six-native ownership-mTLS lock generates valid offline seven-route/six-unit plans with no mixed SHA reuse',
+ {timeout:120000},t=>{
+ assert.deepEqual(validateSixNativeStagingSnapshot(ownershipMtls),
+  {ok:true,kind:'ownership-mtls'});
+ assert.equal(stagingSnapshotFile('ownership-mtls'),
+  'six-native-ownership-mtls-compat-lock.json');
+ const f=fixture(t,ownershipMtls),p=plans(f);
+ assert.equal(p.proxy.manifest.routeCount,7);
+ assert.equal(p.native.manifest.serviceCount,6);
+ assert.equal(p.proxy.manifest.sourceQaWorkspaceSha,ownershipMtls.central.sha);
+ assert.equal(p.native.manifest.jointlyVerifiedWorkspaceSha,ownershipMtls.central.sha);
+ assert.equal(p.native.manifest.routesSha256,p.proxy.manifest.caddySha256);
+ assert.deepEqual(p.native.manifest.services.map(x=>x.appId),
+  ownershipMtls.apps.map(x=>x.id));
+ assert(p.native.units.every(x=>x.content.includes('ProtectSystem=strict')));
+ writePlans(f);
+ const accepted=prestart(f);
+ assert.equal(accepted.ok,true);
+ assert.equal(accepted.deploymentAuthorized,false);
+ for(const previous of [postPkce,current]){
+  const stale=prestart(f,{lock:previous});
+  assert.equal(stale.ok,false,'previous snapshot cannot approve newer native sources');
+  assert(stale.checks.some(x=>x.ok===false));
+ }
+ const fake=structuredClone(ownershipMtls);
+ fake.apps[3].runId=999999999;
+ assert.equal(prestart(f,{lock:fake}).ok,false,
+  'edited CI identity may not promote a new snapshot');
+});
+
 test('new post-PKCE six-app lock generates coherent seven-route Caddy and six native service plans and passes source audits', {timeout:120000},t=>{
  const f=fixture(t,postPkce),p=plans(f);
  assert.equal(p.proxy.manifest.routeCount,7);
