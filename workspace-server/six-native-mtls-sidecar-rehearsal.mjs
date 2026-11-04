@@ -171,7 +171,24 @@ export async function rehearseSixNativeMtlSidecars({
     clients:registry,fetchImpl,clock:()=>now,timeoutMs:2000
    });
   };
-  const verifier=makeVerifier();
+  // Safe debugging labels only; never reveal cert/key, identities or URLs.
+  let tlsWitness='unattempted';
+  const baseTransport=privateMtlFetch({
+   endpoints,serverCert:serverCert.cert,
+   clientCert:clientCert.cert,clientKey:clientCert.key
+  });
+  const tracedTransport=async(url,init)=>{
+   try{
+    const response=await baseTransport(url,init);
+    tlsWitness='http_'+response.status;
+    return response;
+   }catch(error){
+    const code=String(error?.code||error?.cause?.code||'unknown');
+    tlsWitness='tls_'+(/^[A-Z_]{1,60}$/.test(code)?code:'unknown');
+    throw error;
+   }
+  };
+  const verifier=makeVerifier(clients,tracedTransport);
   for(const row of SIX_NATIVE_SIGNER_CHECKOUTS){
    const id=row.id,identity=subject(id);
    const controls=syntheticControls.get(id);
@@ -187,7 +204,7 @@ export async function rehearseSixNativeMtlSidecars({
       operation:purpose
      });
     if(accepted!==true)
-     return fail('native_mtls_signed_'+purpose+'_denied_'+id,checks);
+     return fail('native_mtls_signed_'+purpose+'_denied_'+id+'_'+tlsWitness,checks);
    }
    for(const change of [
     {workspaceAccountId:'synthetic-other-workspace-account'},
