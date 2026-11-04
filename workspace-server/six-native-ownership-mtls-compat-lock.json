@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "scope": "independent-six-native-https-compatibility",
+  "central": {
+    "repo": "dennisbsj/DuckBio-site",
+    "sha": "1a3b19c993fcd63ff625113cc2628b2642fe2d2f",
+    "workflow": ".github/workflows/workspace-auth-core.yml",
+    "runId": 41681059383,
+    "workflowId": 403711277
+  },
+  "apps": [
+    {
+      "name": "CytoDuck",
+      "id": "goflo",
+      "repo": "dennisbsj/CytoDuck",
+      "sha": "ba22006b75b75d6b1fbe680c3d59116768806798",
+      "workflow": ".github/workflows/native-cytoduck-workspace-1a3b19c-qa.yml",
+      "runId": 41823086283,
+      "workflowId": 406043715
+    },
+    {
+      "name": "DuckNote",
+      "id": "eel",
+      "repo": "dennisbsj/DuckNote",
+      "sha": "c64da055b82e0f8a499c5dd6ef47eaaa089be13f",
+      "workflow": ".github/workflows/native-ducknote-workspace-1a3b19c-qa.yml",
+      "runId": 41825543890,
+      "workflowId": 406043818
+    },
+    {
+      "name": "DuckPipe",
+      "id": "methpipe",
+      "repo": "dennisbsj/DuckPipe",
+      "sha": "cd5369134c230c5afcbd0fc4a4bf9a136d5211b7",
+      "workflow": ".github/workflows/native-duckpipe-workspace-1a3b19c-qa.yml",
+      "runId": 41825060709,
+      "workflowId": 406043868
+    },
+    {
+      "name": "DuckTrain",
+      "id": "mantrain",
+      "repo": "dennisbsj/DuckTrain",
+      "sha": "f25eabfbb0cb9ebac45c77948a14b217fa458733",
+      "workflow": ".github/workflows/native-ducktrain-current-workspace-1a3b19c.yml",
+      "runId": 41825092520,
+      "workflowId": 406042373
+    },
+    {
+      "name": "DuckMan",
+      "id": "duckman",
+      "repo": "dennisbsj/DuckMan",
+      "sha": "f8a86c10db6b6ec86b6224a8c81b90cebcf652d2",
+      "workflow": ".github/workflows/native-duckman-workspace-1a3b19c-qa.yml",
+      "runId": 41825150001,
+      "workflowId": 406043909
+    },
+    {
+      "name": "LabDuck",
+      "id": "limsman",
+      "repo": "dennisbsj/LabDuck",
+      "sha": "48a2ee834f1bcc6eb3f910ad5399cc4883acb2bd",
+      "workflow": ".github/workflows/native-labduck-workspace-1a3b19c-qa.yml",
+      "runId": 41825121913,
+      "workflowId": 406043938
+    }
+  ]
+}
