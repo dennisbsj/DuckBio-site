@@ -36,9 +36,10 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
   mkdirSync(path.dirname(databasePath),{recursive:true,mode:0o700});
   const db=new DatabaseSync(databasePath);
   db.exec('PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON');
-  // Migrate pre-epoch private databases only once. A missing epoch in a database
-  // that already has this table is corruption and must deny, not be reseeded.
-  const legacySessionEpochMigration=!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_organization_versions'").get();
+  // The first-time session epoch migration is performed atomically AFTER
+  // the existing schema is ready, under a separate SQLite IMMEDIATE lock.
+  // A second process must re-check the table under that lock, not use a
+  // potentially stale check performed before schema initialization.
   db.exec([
     'CREATE TABLE IF NOT EXISTS organizations(id TEXT PRIMARY KEY,name TEXT NOT NULL)',
     'CREATE TABLE IF NOT EXISTS members(org TEXT NOT NULL REFERENCES organizations(id),account TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,email TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),PRIMARY KEY(org,account),UNIQUE(org,email))',
@@ -46,9 +47,6 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     'CREATE TABLE IF NOT EXISTS assignments(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,role TEXT NOT NULL,PRIMARY KEY(org,account,app),FOREIGN KEY(org,account) REFERENCES members(org,account) ON DELETE CASCADE)',
     'CREATE TABLE IF NOT EXISTS receipts(reference TEXT PRIMARY KEY,org TEXT NOT NULL,digest TEXT NOT NULL,recorded_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS session_organizations(session_id TEXT PRIMARY KEY,account TEXT NOT NULL,org TEXT NOT NULL,selected_at INTEGER NOT NULL)',
-    // Tombstones persist after clear: deleting + reselecting the same org must
-    // never restore an in-flight preflight's previous selection revision.
-    'CREATE TABLE IF NOT EXISTS session_organization_versions(session_id TEXT PRIMARY KEY,revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991))',
     'CREATE TABLE IF NOT EXISTS permission_overrides(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,permission TEXT NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),PRIMARY KEY(org,account,app,permission),FOREIGN KEY(org,account,app) REFERENCES assignments(org,account,app) ON DELETE CASCADE)',
     'CREATE TABLE IF NOT EXISTS organization_roles(org TEXT NOT NULL REFERENCES organizations(id),app TEXT NOT NULL,role TEXT NOT NULL,custom INTEGER NOT NULL CHECK(custom IN (0,1)),permissions TEXT NOT NULL CHECK(json_valid(permissions)),updated_at INTEGER NOT NULL,PRIMARY KEY(org,app,role))',
     'CREATE TABLE IF NOT EXISTS organization_invites(token_hash TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),issued_by TEXT NOT NULL,email TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),expires_at INTEGER NOT NULL,UNIQUE(org,email))',
@@ -66,11 +64,26 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     "CREATE TABLE IF NOT EXISTS owner_alert_outbox(id INTEGER PRIMARY KEY AUTOINCREMENT,audit_id INTEGER NOT NULL UNIQUE REFERENCES organization_audit(id),category TEXT NOT NULL CHECK(category IN ('organization','subscription','user','permission')),state TEXT NOT NULL CHECK(state IN ('pending','sending','sent','failed')),attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),lease_token TEXT,locked_until INTEGER,next_attempt_at INTEGER NOT NULL,sent_at INTEGER)",
     "CREATE TABLE IF NOT EXISTS stripe_live_event_log(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,object_id TEXT NOT NULL,event_created INTEGER NOT NULL,raw_digest TEXT NOT NULL,received_at INTEGER NOT NULL)"
   ].join(';')+';');
-  if(legacySessionEpochMigration){
-    // Existing selected sessions get their initial epoch; only a truly legacy
-    // database may be backfilled. Never repair missing records automatically
-    // after the epoch table has been established.
-    db.prepare('INSERT INTO session_organization_versions(session_id,revision) SELECT session_id,1 FROM session_organizations').run();
+  db.exec('BEGIN IMMEDIATE');
+  try{
+    const epochTableExists=Boolean(db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_organization_versions'"
+    ).get());
+    if(!epochTableExists){
+      // Tombstones persist after clear: deleting + reselecting the same org
+      // must never restore an in-flight preflight's prior selection revision.
+      // DDL and legacy seed commit together. A crash never leaves an empty
+      // but 'established' table that permanently disables legacy sessions.
+      db.exec('CREATE TABLE session_organization_versions(session_id TEXT PRIMARY KEY,revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991))');
+      db.prepare('INSERT INTO session_organization_versions(session_id,revision) SELECT session_id,1 FROM session_organizations').run();
+    }
+    // When the table already exists, do NOT backfill missing records;
+    // those represent corruption or attempted tampering, not a migration.
+    db.exec('COMMIT');
+  }catch(error){
+    db.exec('ROLLBACK');
+    db.close();
+    throw error;
   }
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
