@@ -249,3 +249,129 @@ test('missing scoped generation cannot produce even an inspection candidate',asy
  assert.equal(decision.accessGranted,false);
  assert.equal(decision.reason,'central_session_role_seat_or_link_missing');
 });
+
+test('native preflight revision is private, scoped, and stable for unchanged authority',async t=>{
+ const f=await fixture(t),inspector=f.inspector();
+ const first=await inspector.inspect(f.alphaRequest);
+ const second=await inspector.inspect(f.alphaRequest);
+ assert.equal(first.candidateReady,true);
+ assert.match(first.preflightBindingRevision,/^[a-f0-9]{64}$/);
+ assert.equal(first.preflightBindingRevision,second.preflightBindingRevision);
+ assert.equal(first.accessGranted,false);
+ assert.equal(first.loginEnabled,false);
+ // An unrelated organization member and an unrelated app role do not
+ // invalidate this account's GoFlo authorization generation.
+ f.organization.saveMember({organizationId:'alpha',actorId:f.user.id,
+  member:{accountId:'unrelated',name:'Unrelated',
+   nickname:'Other',email:'other@example.test',admin:false,roles:{}}});
+ const eel=f.organization.listRoles({organizationId:'alpha',
+  actorId:f.user.id,appId:'eel'});
+ const nativeRole=eel.roles[0];
+ f.organization.saveRole({organizationId:'alpha',actorId:f.user.id,
+  appId:'eel',role:nativeRole.name,permissions:nativeRole.permissions});
+ const unchanged=await inspector.inspect(f.alphaRequest);
+ assert.equal(unchanged.preflightBindingRevision,first.preflightBindingRevision);
+});
+
+test('permission revoke/regrant with identical final effective permissions changes revision',async t=>{
+ const f=await fixture(t),inspector=f.inspector();
+ const before=await inspector.inspect(f.alphaRequest);
+ assert.equal(before.candidateReady,true);
+ f.organization.setPermission({organizationId:'alpha',actorId:f.user.id,
+  accountId:f.user.id,appId:'goflo',permission:'workspace.view',
+  enabled:false});
+ assert.equal((await inspector.inspect(f.alphaRequest)).candidateReady,false);
+ f.organization.setPermission({organizationId:'alpha',actorId:f.user.id,
+  accountId:f.user.id,appId:'goflo',permission:'workspace.view',
+  enabled:true});
+ const after=await inspector.inspect(f.alphaRequest);
+ assert.equal(after.candidateReady,true);
+ assert.equal(after.role,before.role);
+ assert.equal(after.nativeUserId,before.nativeUserId);
+ assert.equal(after.verifiedPaidThroughMs,before.verifiedPaidThroughMs);
+ assert.notEqual(after.preflightBindingRevision,before.preflightBindingRevision);
+});
+
+test('app assignment removal/regrant of identical role changes native preflight generation',async t=>{
+ const f=await fixture(t),inspector=f.inspector();
+ const before=await inspector.inspect(f.alphaRequest);
+ const member=roles=>({accountId:f.user.id,name:'Alice',nickname:'Alice',
+  email:'alice@example.test',admin:true,roles});
+ f.organization.saveMember({organizationId:'alpha',actorId:f.user.id,
+  member:member({})});
+ assert.equal((await inspector.inspect(f.alphaRequest)).candidateReady,false);
+ f.organization.saveMember({organizationId:'alpha',actorId:f.user.id,
+  member:member({goflo:'Analyst'})});
+ const after=await inspector.inspect(f.alphaRequest);
+ assert.equal(after.candidateReady,true);
+ assert.equal(after.role,before.role);
+ assert.notEqual(after.preflightBindingRevision,before.preflightBindingRevision);
+});
+
+test('native tuple revoke/rebind of identical user and tenant changes preflight generation',async t=>{
+ const f=await fixture(t),inspector=f.inspector();
+ const before=await inspector.inspect(f.alphaRequest);
+ assert.equal(before.candidateReady,true);
+ await f.identity.revokeVerifiedOrganizationNativeLink({actorId:f.user.id,
+  userId:f.user.id,appId:'goflo',workspaceOrganizationId:'alpha'});
+ assert.equal((await inspector.inspect(f.alphaRequest)).candidateReady,false);
+ await f.identity.bindVerifiedOrganizationNativeLink({actorId:f.user.id,
+  userId:f.user.id,appId:'goflo',workspaceOrganizationId:'alpha',
+  nativeUserId:NATIVE_USER,nativeOrganizationId:NATIVE_ORG});
+ const after=await inspector.inspect(f.alphaRequest);
+ assert.equal(after.candidateReady,true);
+ assert.equal(after.nativeUserId,before.nativeUserId);
+ assert.equal(after.nativeOrganizationId,before.nativeOrganizationId);
+ assert.notEqual(after.preflightBindingRevision,before.preflightBindingRevision);
+});
+
+test('role ABA during asynchronous native verification is denied even with same wall clock',async t=>{
+ const f=await fixture(t);
+ const baseline=f.organization.listRoles({organizationId:'alpha',
+  actorId:f.user.id,appId:'goflo'}).roles.find(x=>x.name==='Analyst');
+ assert(baseline.permissions.includes('workspace.view'));
+ const inspector=f.inspector(async x=>{
+  assert.equal(f.verified(x),true);
+  f.organization.saveRole({organizationId:'alpha',actorId:f.user.id,
+   appId:'goflo',role:'Analyst',
+   permissions:baseline.permissions.filter(p=>p!=='workspace.view')});
+  f.organization.saveRole({organizationId:'alpha',actorId:f.user.id,
+   appId:'goflo',role:'Analyst',permissions:baseline.permissions});
+  return true;
+ });
+ assert.equal((await inspector.inspect(f.alphaRequest)).reason,
+  'access_changed_during_verification');
+ assert.equal((await f.inspector().inspect(f.alphaRequest)).candidateReady,true);
+});
+
+test('LIVE subscription renewals generate a new native preflight binding',async t=>{
+ const f=await fixture(t),inspector=f.inspector();
+ const before=await inspector.inspect(f.alphaRequest);
+ f.organization.applyVerifiedSubscriptionTransition({
+  source:'stripe_live',eventKey:'alpha-renewal-second',
+  organizationId:'alpha',subscriptionId:'sub-alpha',revision:2,
+  plan:'Single',apps:['goflo'],seats:2,status:'active',
+  paidThrough:PAID_THROUGH+50000
+ });
+ const after=await inspector.inspect(f.alphaRequest);
+ assert.equal(after.candidateReady,true);
+ assert(after.verifiedPaidThroughMs>before.verifiedPaidThroughMs);
+ assert.notEqual(after.preflightBindingRevision,before.preflightBindingRevision);
+});
+
+test('preflight rejects incomplete monotonic organization audit generation',async t=>{
+ const f=await fixture(t);
+ const organizationStore={
+  currentSessionOrganization:input=>f.organization.currentSessionOrganization(input),
+  verifiedNativePermissionCandidate:input=>{
+   const candidate=f.organization.verifiedNativePermissionCandidate(input);
+   return candidate?{...candidate,authorityAuditRevision:null}:null;
+  }
+ };
+ const result=await createWorkspaceNativeAccessInspector({
+  identityStore:f.identity,organizationStore,
+  verifyNativeMapping:async()=>true,clock:()=>1800000000000
+ }).inspect(f.alphaRequest);
+ assert.equal(result.candidateReady,false);
+ assert.equal(result.accessGranted,false);
+});
