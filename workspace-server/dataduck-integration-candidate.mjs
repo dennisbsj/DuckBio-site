@@ -95,3 +95,50 @@ export function inspectDataDuckNativeEntitlement({entitlement,localIdentity}={})
  return Object.freeze({ready:true,reason:'source-contract-only',
   accessGranted:false});
 }
+
+
+/**
+ * Commercial PRODUCT decision approved 2026-11-03:
+ * DataDuck is the seventh INDEPENDENT, per-app licensed DuckBio product.
+ *
+ * This describes the future subscription catalog, not today's billing
+ * authority. The existing six paid apps are still the only apps available
+ * for real seat purchases until the DataDuck SSO + verified-live entitlement
+ * implementation has passed its release gates.
+ */
+export const DATADUCK_COMMERCIAL_PLAN=Object.freeze({
+ decided:true,
+ seventhIndependentApp:true,
+ appId:DATADUCK_APP.id,
+ plans:Object.freeze(['Single','Mixed','Bundle']),
+ singleAppCount:1,
+ mixedMinApps:2,
+ mixedMaxApps:6,
+ bundleAppCount:7,
+ preserveHistoricalSixAppBundles:true,
+ availableToPurchaseNow:false,
+ licensesGranted:false,
+ workspaceSsoActive:false,
+ pricingAmountsUnchanged:true,
+});
+
+/**
+ * Read-only prospective plan validation. Do NOT pass its result to the
+ * active six-app seat allocator: a valid prospective selection is NOT
+ * an entitlement, a purchased user seat or a Checkout request.
+ */
+export function inspectFutureSevenAppSelection({plan,apps}={}){
+ const all=[...EXISTING_DUCKBIO_APP_IDS,DATADUCK_APP.id];
+ if(!DATADUCK_COMMERCIAL_PLAN.plans.includes(plan)||
+    !Array.isArray(apps)||apps.some(id=>typeof id!=='string'||
+      !all.includes(id))||!unique(apps)){
+  return Object.freeze({valid:false,orderable:false,licensesGranted:false});
+ }
+ const permitted=plan==='Single'?apps.length===1:
+   plan==='Mixed'?apps.length>=2&&apps.length<=6:
+   apps.length===7&&all.every(id=>apps.includes(id));
+ return Object.freeze({
+  valid:permitted,plan,apps:Object.freeze([...apps].sort()),
+  orderable:false,licensesGranted:false,
+ });
+}

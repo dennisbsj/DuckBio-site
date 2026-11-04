@@ -53,7 +53,7 @@ function renderSeats(){
   const card=el('div',undefined,'seat-card');
   card.append(el('div',app.name),
    el('strong','Integration in progress'),
-   el('small','Coming soon · no licenses or user access available yet'));
+   el('small','Planned seventh standalone app · Single / Mixed / Bundle · no licenses or access available yet'));
   root.append(card);
  }
 }
