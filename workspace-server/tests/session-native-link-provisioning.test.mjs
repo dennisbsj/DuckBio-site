@@ -43,7 +43,8 @@ async function fixture(t,{historicalOnly=false}={}){
  });
  const org=createOrganizationStore({
   databasePath:path.join(root,'private','org.sqlite'),
-  clock:()=>now,verifyLiveSubscriptionEvidence:value=>value
+  clock:()=>now,verifyLiveSubscriptionEvidence:value=>value,
+  nativeProvisioningSessionEpochs:true
  });
  let identity;
  const controller=createWorkspaceNativeLinkProvisioner({
@@ -396,20 +397,23 @@ test('ABA: issue then revoke a pending app-seat invitation during proof is denie
  }),null);
 });
 
-test('audit generation persists on reopen and is not based on wall-clock time',async t=>{
+test('audit generation advances at identical clock ticks',async t=>{
  const f=await fixture(t);
  const args={organizationId:'alpha',accountId:f.userIds.ownerA,
   sessionId:f.adminSessionA.id};
  const original=f.org.nativeProvisioningAuditRevision(args);
- assert(Number.isSafeInteger(original));
+ assert(Number.isSafeInteger(original.organizationAuditRevision));
+ assert(Number.isSafeInteger(original.sessionLockEpoch));
  const roleArgs={organizationId:'alpha',actorId:f.userIds.ownerA,
   accountId:f.userIds.member,appId,permission:'workspace.view'};
  f.org.setPermission({...roleArgs,enabled:false});
  const revoked=f.org.nativeProvisioningAuditRevision(args);
  f.org.setPermission({...roleArgs,enabled:true});
  const restored=f.org.nativeProvisioningAuditRevision(args);
- assert(revoked>original);
- assert(restored>revoked);
+ assert(revoked.organizationAuditRevision>original.organizationAuditRevision);
+ assert(restored.organizationAuditRevision>revoked.organizationAuditRevision);
+ assert.equal(original.sessionLockEpoch,revoked.sessionLockEpoch);
+ assert.equal(revoked.sessionLockEpoch,restored.sessionLockEpoch);
  assert.equal(f.now(),START,
   'all revisions must differ even when mocked timestamp is identical');
  assert.equal(f.org.nativeProvisioningAuditRevision({
