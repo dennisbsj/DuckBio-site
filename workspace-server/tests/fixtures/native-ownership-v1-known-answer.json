@@ -1,0 +1,128 @@
+{
+  "description": "PUBLIC SYNTHETIC ED25519 KNOWN-ANSWER VECTORS ONLY; NEVER PIN THESE TEST KEYS OR REPLAY THESE CHALLENGES IN PRODUCTION",
+  "format": "duckbio.native-ownership.v1",
+  "publicKeys": {
+    "limsman": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAFcDneFRS5cqgVGPNr3Z86/Pu/b0FvApkYHfLDX+IqNs=\n-----END PUBLIC KEY-----\n",
+    "eel": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbA/bt/PoKvFRyR7E46MoP8oj6mIyDrclqweJzSs0R+I=\n-----END PUBLIC KEY-----\n",
+    "methpipe": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAm6a06sBL+kGs2+QeysqF9ank6BdqxeKoEQbWqWTlscM=\n-----END PUBLIC KEY-----\n",
+    "mantrain": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA3IHbx/AJAdAlTZ9Tyhv6pR7l305pNyQsggzjR77+L5s=\n-----END PUBLIC KEY-----\n",
+    "duckman": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAdfQ4a+mZozb/Rg75pcx2gpN7fZLWg1AzU3d0TrJVyrc=\n-----END PUBLIC KEY-----\n",
+    "goflo": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAsUiCKKHFbp237ubixppVYTJoRg3AmDgfHJD2ZtWee0k=\n-----END PUBLIC KEY-----\n"
+  },
+  "vectors": [
+    {
+      "proof": {
+        "version": "duckbio.native-ownership.v1",
+        "keyId": "synthetic-limsman-v1",
+        "purpose": "inspect",
+        "nonce": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+        "appId": "limsman",
+        "workspaceAccountId": "central.user:001",
+        "workspaceOrganizationId": "workspace.org-001",
+        "nativeUserId": "native_user_01",
+        "nativeOrganizationId": "native.tenant:01",
+        "issuedAt": 1800000000000,
+        "expiresAt": 1800000015000,
+        "active": true,
+        "ownershipVerified": true
+      },
+      "canonicalUtf8": "[\"duckbio.native-ownership.v1\",\"synthetic-limsman-v1\",\"inspect\",\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"limsman\",\"central.user:001\",\"workspace.org-001\",\"native_user_01\",\"native.tenant:01\",1800000000000,1800000015000,true,true]",
+      "signatureBase64url": "cQPW2APriCLeGI-FMgNNXA6byppeRakV7WjoysEHA1UA0dmv5lGuXZHjgU2RAZc7DSlSBv6SS0AesKJnul5jBw"
+    },
+    {
+      "proof": {
+        "version": "duckbio.native-ownership.v1",
+        "keyId": "synthetic-eel-v1",
+        "purpose": "bind",
+        "nonce": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8",
+        "appId": "eel",
+        "workspaceAccountId": "central.user:002",
+        "workspaceOrganizationId": "workspace.org-002",
+        "nativeUserId": "native_user_02",
+        "nativeOrganizationId": "native.tenant:02",
+        "issuedAt": 1800000010000,
+        "expiresAt": 1800000025000,
+        "active": true,
+        "ownershipVerified": true
+      },
+      "canonicalUtf8": "[\"duckbio.native-ownership.v1\",\"synthetic-eel-v1\",\"bind\",\"ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8\",\"eel\",\"central.user:002\",\"workspace.org-002\",\"native_user_02\",\"native.tenant:02\",1800000010000,1800000025000,true,true]",
+      "signatureBase64url": "KfjdBYRCvhq0Ln4ZzR1zHX4OiSc67DZdnSXJZAZh7cMUz7EpKDYUqrecBC-qRyvrkPsIw562B8GvAmX45kbODQ"
+    },
+    {
+      "proof": {
+        "version": "duckbio.native-ownership.v1",
+        "keyId": "synthetic-methpipe-v1",
+        "purpose": "migrate",
+        "nonce": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+        "appId": "methpipe",
+        "workspaceAccountId": "central.user:003",
+        "workspaceOrganizationId": "workspace.org-003",
+        "nativeUserId": "native_user_03",
+        "nativeOrganizationId": "native.tenant:03",
+        "issuedAt": 1800000020000,
+        "expiresAt": 1800000035000,
+        "active": true,
+        "ownershipVerified": true
+      },
+      "canonicalUtf8": "[\"duckbio.native-ownership.v1\",\"synthetic-methpipe-v1\",\"migrate\",\"QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8\",\"methpipe\",\"central.user:003\",\"workspace.org-003\",\"native_user_03\",\"native.tenant:03\",1800000020000,1800000035000,true,true]",
+      "signatureBase64url": "EAgpCwWhcM7MvwHJAKlmorBY7sQw-gricbmy7LtX-YZi5o1yCN81qc2MnoRaFOsqVg5B-AjoU2W2iY5lq_Y9CQ"
+    },
+    {
+      "proof": {
+        "version": "duckbio.native-ownership.v1",
+        "keyId": "synthetic-mantrain-v1",
+        "purpose": "inspect",
+        "nonce": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "appId": "mantrain",
+        "workspaceAccountId": "central.user:004",
+        "workspaceOrganizationId": "workspace.org-004",
+        "nativeUserId": "native_user_04",
+        "nativeOrganizationId": "native.tenant:04",
+        "issuedAt": 1800000030000,
+        "expiresAt": 1800000045000,
+        "active": true,
+        "ownershipVerified": true
+      },
+      "canonicalUtf8": "[\"duckbio.native-ownership.v1\",\"synthetic-mantrain-v1\",\"inspect\",\"YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8\",\"mantrain\",\"central.user:004\",\"workspace.org-004\",\"native_user_04\",\"native.tenant:04\",1800000030000,1800000045000,true,true]",
+      "signatureBase64url": "gJBgu_Db3drz8hZtvIsYs9kzDQzHgHTRYZKUw0gQhF4upFLDipsXFPO-acr4PTlyA9IbkZkJ46lGuOV-gObbBg"
+    },
+    {
+      "proof": {
+        "version": "duckbio.native-ownership.v1",
+        "keyId": "synthetic-duckman-v1",
+        "purpose": "bind",
+        "nonce": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8",
+        "appId": "duckman",
+        "workspaceAccountId": "central.user:005",
+        "workspaceOrganizationId": "workspace.org-005",
+        "nativeUserId": "native_user_05",
+        "nativeOrganizationId": "native.tenant:05",
+        "issuedAt": 1800000040000,
+        "expiresAt": 1800000055000,
+        "active": true,
+        "ownershipVerified": true
+      },
+      "canonicalUtf8": "[\"duckbio.native-ownership.v1\",\"synthetic-duckman-v1\",\"bind\",\"gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8\",\"duckman\",\"central.user:005\",\"workspace.org-005\",\"native_user_05\",\"native.tenant:05\",1800000040000,1800000055000,true,true]",
+      "signatureBase64url": "Ku-aJDaGFsldM0N2QObLkZ4yLpFdbMzTu5WOPk29eJcjwF5YTvqONDpZcPJe29uc5WgRjzJiZXiFsyLLSKJEBQ"
+    },
+    {
+      "proof": {
+        "version": "duckbio.native-ownership.v1",
+        "keyId": "synthetic-goflo-v1",
+        "purpose": "migrate",
+        "nonce": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8",
+        "appId": "goflo",
+        "workspaceAccountId": "central.user:006",
+        "workspaceOrganizationId": "workspace.org-006",
+        "nativeUserId": "native_user_06",
+        "nativeOrganizationId": "native.tenant:06",
+        "issuedAt": 1800000050000,
+        "expiresAt": 1800000065000,
+        "active": true,
+        "ownershipVerified": true
+      },
+      "canonicalUtf8": "[\"duckbio.native-ownership.v1\",\"synthetic-goflo-v1\",\"migrate\",\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8\",\"goflo\",\"central.user:006\",\"workspace.org-006\",\"native_user_06\",\"native.tenant:06\",1800000050000,1800000065000,true,true]",
+      "signatureBase64url": "vkL6sApjl4INIYrMBBiRdZdaEswyVPcTtsiXyhwnpDCokGxqOUmuuldJ30vrwyRVego0SvMGqm5YzXRl1nKxAg"
+    }
+  ]
+}
