@@ -2,18 +2,20 @@
 
 **Status: operator-only, source-pinned, offline interoperability rehearsal. NOT LIVE SSO.** This QA branch is stacked on draft #167 → #164 → #162 → #150 → #145 → #141. It does not depend on the separate #170–#171 PKCE/audience hardening series. These independent draft series must be reconciled by code review before release.
 
+> **Source refresh, 2026-11-04:** Each native repository advanced exactly one commit to add a dormant, explicitly configured loopback mTLS ownership sidecar. The previous signer and authoritative lookup modules were unchanged by those six commits (verified with GitHub commit comparisons). The six pinned review SHAs below now include the sidecars; they are not release approval.
+
 ## What was actually checked in the six native repositories
 
 On **2026-11-04**, the actual private default-branch GitHub trees were inspected, including these existing, **UNMOUNTED** signer exports:
 
 | Native app | Repo (private) | App ID | Reviewed commit | Source |
 | --- | --- | --- | --- | --- |
-| CytoDuck | dennisbsj/CytoDuck | goflo | `0626d6d192e478cead5fcb4f2549a31dd8674a14` | `server/workspace-native-ownership.cjs` |
-| DuckNote | dennisbsj/DuckNote | eel | `f3bd11abf4d7ff14c555b53bdb34b5eb69412a70` | `server/workspace-native-ownership.js` |
-| DuckPipe | dennisbsj/DuckPipe | methpipe | `522f196dfdb1d0676519be23a95327ab0aad9171` | `server/workspace-native-ownership.cjs` |
-| DuckTrain | dennisbsj/DuckTrain | mantrain | `00a88cb531015c09a20070cf645194bdc9450ef1` | `server/workspace-native-ownership.cjs` |
-| DuckMan | dennisbsj/DuckMan | duckman | `216cb7c7bee1c24d0588cf55d73ebb1d2bb8d41e` | `server/workspace-native-ownership.cjs` |
-| LabDuck | dennisbsj/LabDuck | limsman | `084c192ec200f813b95466fd0a9232b864560ff1` | `server/workspace-native-ownership.cjs` |
+| CytoDuck | dennisbsj/CytoDuck | goflo | `ba22006b75b75d6b1fbe680c3d59116768806798` | `server/workspace-native-ownership.cjs` |
+| DuckNote | dennisbsj/DuckNote | eel | `c64da055b82e0f8a499c5dd6ef47eaaa089be13f` | `server/workspace-native-ownership.js` |
+| DuckPipe | dennisbsj/DuckPipe | methpipe | `cd5369134c230c5afcbd0fc4a4bf9a136d5211b7` | `server/workspace-native-ownership.cjs` |
+| DuckTrain | dennisbsj/DuckTrain | mantrain | `f25eabfbb0cb9ebac45c77948a14b217fa458733` | `server/workspace-native-ownership.cjs` |
+| DuckMan | dennisbsj/DuckMan | duckman | `f8a86c10db6b6ec86b6224a8c81b90cebcf652d2` | `server/workspace-native-ownership.cjs` |
+| LabDuck | dennisbsj/LabDuck | limsman | `48a2ee834f1bcc6eb3f910ad5399cc4883acb2bd` | `server/workspace-native-ownership.cjs` |
 
 These exact SHAs are **code review pins for this offline rehearsal**, not staging release approval or the old six-app compatibility deployment lock. The native signers' own docs state that no authoritative trusted native-account-to-Workspace-org ownership endpoints are mounted, and that a native datastore mapping must still be implemented. Native source changes after these commits require a new separately reviewed attestation. **No native code is copied into the public central Workspace repository.**
 
