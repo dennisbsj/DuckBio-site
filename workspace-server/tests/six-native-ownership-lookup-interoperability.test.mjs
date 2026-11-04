@@ -3,6 +3,7 @@
  * modules. Operator-only CLI imports them from clean pinned local checkouts.
  */
 import test from 'node:test';
+import {createPrivateKey,sign} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {mkdtempSync,chmodSync,rmSync,mkdirSync,symlinkSync} from 'node:fs';
@@ -10,6 +11,10 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {canonicalNativeOwnershipProofBytes}
+ from '../shared-auth/signed-native-ownership-verifier.mjs';
+import {rehearseSixNativeSignerFactories}
+ from '../six-native-signer-interoperability.mjs';
 import {SIX_NATIVE_LOOKUP_MODULES,rehearseSixNativeLookupFactories,
  verifySixNativeLookupSources,auditSixGenuineNativeLookups}
  from '../six-native-ownership-lookup-interoperability.mjs';
@@ -153,4 +158,63 @@ test('operator-only CLI never inspects checkouts without explicit opt-in',()=>{
  assert.equal(r.status,2);
  assert.match(r.stderr,/--confirm-offline-native-lookup-only/);
  assert.doesNotMatch(r.stdout,/PASS/);
+});
+
+function nativeSignerFactories(){
+ return new Map(APPS.map(id=>[id,
+  ({privateKeyPem,keyId,lookupOwnership,clock})=>{
+   const key=createPrivateKey(privateKeyPem);
+   return {async prove(body){
+    if(!body||body.appId!==id||
+       body.version!=='duckbio.native-ownership.v1'||
+       !['inspect','bind','migrate'].includes(body.purpose))return null;
+    const trusted=await lookupOwnership({
+     appId:id,workspaceAccountId:body.workspaceAccountId,
+     workspaceOrganizationId:body.workspaceOrganizationId,
+     nativeUserId:body.nativeUserId,nativeOrganizationId:body.nativeOrganizationId,
+     purpose:body.purpose
+    });
+    if(trusted?.active!==true||trusted.ownershipVerified!==true)return null;
+    const payload={...body,keyId,issuedAt:clock(),expiresAt:clock()+15000,
+     active:true,ownershipVerified:true};
+    return {payload,signature:sign(null,
+     canonicalNativeOwnershipProofBytes(payload),key).toString('base64url')};
+   }};
+  }
+ ]));
+}
+
+test('same offline chain verifies six native datastore lookups -> signer -> Workspace Ed25519, no access granted',async()=>{
+ let signed=null;
+ const output=await rehearseSixNativeLookupFactories({
+  factories:factories(),
+  onVerifiedLookups:async lookups=>{
+   signed=await rehearseSixNativeSignerFactories({
+    factories:nativeSignerFactories(),nativeLookups:lookups
+   });
+   return signed;
+  }
+ });
+ assert.equal(output.ok,true,JSON.stringify(output));
+ assert.equal(output.signedNativeChainChecked,true);
+ assert.equal(output.deploymentAuthorized,false);
+ assert.equal(signed.ok,true,JSON.stringify(signed));
+ assert.equal(signed.deploymentAuthorized,false);
+ assert.deepEqual(signed.checks.map(x=>x.id),APPS);
+});
+
+test('broken signed native chain prevents any positive offline conclusion',async()=>{
+ const result=await rehearseSixNativeLookupFactories({
+  factories:factories(),
+  onVerifiedLookups:async lookups=>{
+   const fake=nativeSignerFactories();
+   fake.delete('eel');
+   return rehearseSixNativeSignerFactories({
+    factories:fake,nativeLookups:lookups
+   });
+  }
+ });
+ assert.equal(result.ok,false);
+ assert.equal(result.reason,'signed_native_lookup_chain_failed');
+ assert.equal(result.deploymentAuthorized,false);
 });
