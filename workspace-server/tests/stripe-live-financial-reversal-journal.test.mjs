@@ -145,3 +145,53 @@ test('signed reversal signals persist with private review markers and never gran
  assert(snap.liveWebhookEvents.every(x=>x.financialReviewRequired===true));
  assert(f.seats().every(x=>x===0));
 });
+
+test('normal verified LIVE invoice remains observational without false reversal alert',t=>{
+ const f=fixture(t);
+ const basic=event('invoice.paid','in_','invoice',90);
+ const x=verifier.verify(signed(basic));
+ assert.equal(x.financialReviewRequired,false);
+ assert.equal(stripeLiveReviewCategory(x.type),null);
+ assert.equal(f.store.recordVerifiedStripeLiveEvent(x).recorded,true);
+ const latest=f.store.ownerSnapshot().liveWebhookEvents[0];
+ assert.equal(latest.financialReviewRequired,false);
+ assert.equal(latest.reviewCategory,null);
+ assert.equal(latest.licensesGranted,false);
+ assert(f.seats().every(n=>n===0));
+});
+test('forged review flags, event IDs and event-type collisions cannot change the private ledger',t=>{
+ const f=fixture(t);
+ const accepted=verifier.verify(signed(event('charge.refunded','ch_','charge',400)));
+ f.store.recordVerifiedStripeLiveEvent(accepted);
+ for(const altered of [
+  {...accepted,financialReviewRequired:false},
+  {...accepted,licensesGranted:true},
+  {...accepted,authorizesSeatChanges:true},
+  {...accepted,mode:'test'},
+  {...accepted,type:'refund.created'},
+  {...accepted,objectId:'re_live_OTHER1234'},
+  {...accepted,digest:'not-a-sha256'}
+ ]){
+  assert.throws(()=>f.store.recordVerifiedStripeLiveEvent(altered),
+   /invalid_stripe_live_event|stripe_live_event_conflict/);
+ }
+ const sameIdDifferentDigest={...accepted,digest:'f'.repeat(64)};
+ assert.throws(()=>f.store.recordVerifiedStripeLiveEvent(sameIdDifferentDigest),
+  /stripe_live_event_conflict/);
+ assert.equal(f.store.ownerSnapshot().totals.liveWebhookEvents,1);
+ assert(f.seats().every(n=>n===0));
+});
+test('webhook ingestion cannot assign a reversal signal to a Workspace tenant',t=>{
+ const f=fixture(t);
+ const input=event('charge.dispute.created','dp_','dispute',700);
+ input.data.object.metadata.organization_id='org1';
+ const stored=verifier.verify(signed(input));
+ assert.equal(f.store.recordVerifiedStripeLiveEvent(stored).recorded,true);
+ const latest=f.store.ownerSnapshot().liveWebhookEvents[0];
+ assert.equal(latest.linkage,'unassigned');
+ assert.equal(Object.hasOwn(latest,'organizationId'),false);
+ assert.equal(Object.hasOwn(latest,'objectId'),false);
+ assert.equal(Object.hasOwn(latest,'customerId'),false);
+ assert.equal(latest.reviewCategory,'dispute_review');
+ assert(f.seats().every(n=>n===0));
+});
