@@ -62,24 +62,71 @@ reuse a known nonce, public key, certificate or synthetic account ID to create
 an actual native identity link. DataDuck remains outside this six-app contract.
 
 
-## Integration scope and operator-only native source audit
+## Operator-only check against the SIX actual native signer modules
 
-This particular stacked PR imports the *immutable public vectors and deterministic Workspace verifier tests* from independent QA PR #188, not its optional genuine-source runner. The original runner requires `six-native-signer-interoperability.mjs` and `six-native-ownership-lookup-interoperability.mjs`, neither of which is present in this reviewed Workspace backend integration tree. Copying the runner alone would produce a broken import and a false sense of complete interoperability.
+The new source-only `six-native-known-answer-audit.mjs` independently
+loads the **actual native implementations** only when the operator explicitly
+requests it, and only after the existing six-repository
+`verifySixNativeMtlSidecarSources` gate has verified the approved local
+private root, exact reviewed Git commit HEADs, expected remotes, clean worktrees,
+no path symlinks, and the tracked signer, lookup and mTLS sidecar source blobs.
+It rechecks all of those source gates **after** the test. It never copies private
+source into DuckBio-site, clones repos, reads real native user data, imports
+the app runtime, opens HTTP servers or uses production secrets.
 
-The full reviewed six-repository source and mTLS operator tests must be completed **separately** using the full dependency stack and exact native signed-source SHAs, then recorded for release. This current static verification does not import real native signer code and does not prove any real signer is deployed or correctly configured.
+The genuine native exports are
+`canonicalNativeOwnershipProofBytes` (all six apps, five CJS + one ESM)
+and the already reviewed private `create*NativeOwnershipSigner` factories.
+The tester does **not** rely on the Workspaces canonicalization helper when
+checking their generated signatures: each native encoder is compared against
+**all six** frozen expected canonical strings (36 cross-app byte checks).
+Each native signer receives an independent throwaway Ed25519 key, the exact
+fixed fixture request fields, immutable fixture time and key ID, plus a
+strict synthetic lookup. Its returned payload must be the expected frozen
+proof, and its signature must **equal** Node Ed25519 signing over the
+precomputed `canonicalUtf8` bytes. Wrong tenant and wrong app requests deny.
+
+```sh
+cd workspace-server
+node six-native-known-answer-audit.mjs \
+  --sources-root /srv/duckbio-private/offline-reviewed-six \
+  --confirm-private-six-native-known-answer-only
+```
+
+The private source checkouts have to be **already present** and match the
+exact SHAs in `SIX_NATIVE_SIGNER_CHECKOUTS`; the QA tool never auto-updates
+reviewed source pins. Checkouts on newer unreviewed `main` commits will
+intentionally be denied until separately reviewed and repinned. No genuine
+private source executes in public GitHub Actions.
+
+In contrast, `tests/six-native-known-answer-audit.test.mjs` injects
+**synthetic** native exports to test the harness, fail-closed source refusal,
+mutated signature bytes, malformed signers, missing/extra app mappings,
+wrong native ownership and lack of an opt-in flag. Green public CI means the
+QA mechanism works with those test doubles; it is **not evidence the
+operator-only genuine six-native module run was performed**.
+
+This check does not validate real native PostgreSQL, Stripe LIVE licenses,
+actual service certificates, genuine native ownership data, native resource
+ACLs or active Workspace SSO. Positive reports retain
+`deploymentAuthorized:false`, `loginEnabled:false`,
+`licensesGranted:false` and `accessGranted:false`.
 
 ## Verification and release boundary
 
 ```sh
 cd workspace-server
-node --test tests/native-ownership-known-answer-vectors.test.mjs
+node --test tests/native-ownership-known-answer-vectors.test.mjs tests/six-native-known-answer-audit.test.mjs
 npm test
 ```
 
-Public CI only runs offline, public known-answer byte and signature QA. The separate
+Public CI only runs offline, synthetic source-contract QA. The separate
 operator CLI can run genuine pinned native signers but is not invoked by CI.
 Neither mode accesses real PostgreSQL, real Stripe, deployed mTLS services or
 the active SSO broker. They change no native repository and cannot create
 license/access/login grants. Maintain this as a **draft, unmerged and
 undeployed** stacked on the reviewed six-app mTLS rehearsal; require native
 owner validation and the entire #140 / #26 release matrix before any activation.
+
+
+> Integration note (PR #196): the genuine native-source runner is now available in the central stacked Workspace draft. It has **not** been run against operator-provided exact native Git checkouts in this conversation. GitHub CI invokes only synthetic factories and public static vectors.
