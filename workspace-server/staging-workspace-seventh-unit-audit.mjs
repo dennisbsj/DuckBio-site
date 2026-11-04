@@ -165,7 +165,7 @@ export function auditSeventhWorkspaceUnit({
  verifyNode=verifyNodeStagingExecutable
 }={}){
  if(!validateWorkspaceStagingConfig(config).ok||
-    validateSixNativeStagingSnapshot(lock).kind!=='current'||
+    !['current','post-pkce'].includes(validateSixNativeStagingSnapshot(lock).kind)||
     config.SUITE_BUILD_SHA!==lock.central.sha)
   return fail('unreviewed_workspace_snapshot');
  let source,root;
