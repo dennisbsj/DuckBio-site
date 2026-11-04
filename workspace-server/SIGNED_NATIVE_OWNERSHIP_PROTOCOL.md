@@ -8,7 +8,7 @@ The canonical native mapping in Workspace draft #141 / #145 requires a real nati
 
 The dormant `createSignedNativeOwnershipVerifier` has one **server-configured** native client for each of the existing six app IDs. **DataDuck is explicitly excluded** until separately released.
 
-Each client requires an exact HTTPS URL, an outbound private bearer credential, a pinned Ed25519 native **public signing key**, and an exact `keyId`. The native server must guard its private verification endpoint and signing key and independently authenticate the Workspace request. Its reply proves ownership **only**, not license, role, scientific project access, or SSO login permission. Redirects, credential-bearing URLs, arbitrary query strings, non-HTTPS schemes and unregistered apps are rejected.
+Each client requires an exact HTTPS URL, an outbound private bearer credential, and a server-pinned Ed25519 native **public signing key** selected by its exact `keyId`. An opt-in configuration supports overlapping, explicitly time-bounded pinned keys during rotation. The native server must guard its private verification endpoint and signing key and independently authenticate the Workspace request. Its reply proves ownership **only**, not license, role, scientific project access, or SSO login permission. Redirects, credential-bearing URLs, arbitrary query strings, non-HTTPS schemes and unregistered apps are rejected.
 
 ## Wire protocol v1 (proposal; native endpoint not implemented)
 
@@ -64,6 +64,27 @@ The native reply is `application/json` (HTTP 200), at most 8192 bytes:
 ```
 
 Both ends must follow exactly this order and the same JSON number and string encodings. Do not sign an unordered JSON object. Nonce is random for every request, response must repeat the challenge, proof must be short-lived (maximum 30 seconds with a small time skew allowance), active, explicit and signed by the configured app's pinned Ed25519 key. Missing or extra fields, malformed signatures, unknown key IDs, invalid native status or native backend failures all fail closed. A reply cannot be reused for a later challenge, even for the same IDs.
+
+## Pinned signing-key rotation (dormant, opt-in)
+
+The original `keyId` plus `publicKeyPem` config remains supported. To rotate, **replace** both legacy fields with `signingKeys`; never mix the two modes:
+
+```javascript
+{
+  endpoint: 'https://native.example.test/private/workspace/verify-ownership',
+  token: '<server-only private bearer>',
+  signingKeys: [
+    {keyId: 'old', publicKeyPem: '<old Ed25519 SPKI PEM>',
+     notBeforeMs: 1799999900000, notAfterMs: 1800000070000},
+    {keyId: 'next', publicKeyPem: '<new Ed25519 SPKI PEM>',
+     notBeforeMs: 1800000000000, notAfterMs: 1800000900000}
+  ]
+}
+```
+
+These are UTC Unix epoch **milliseconds**, inclusive start and exclusive end. At most two **unique** pinned key IDs may be configured per app. A reply must be signed by the key matching its `keyId` and the **same app**; the Workspace verification clock and signed `issuedAt` / `expiresAt` must stay within the chosen key's window. Unknown, early, retired, mismatched, duplicate, ambiguous or malformed key configurations fail closed. A signed reply that extends past key retirement is rejected even when its own TTL is short.
+
+Deployment order: distribute the new **public** key securely to Workspace first, verify overlapping acceptance in staging, switch the private native signer inside the agreed overlap, stop signing with the retiring key before its end, then remove its pin after a verified cutover. Never bypass verification to recover from a missed cutover. This is only a dormant protocol test: native endpoint implementations, signer provisioning, secure transport and staging acceptance are still pending.
 
 ## Private API integration boundaries
 
