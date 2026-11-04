@@ -26,8 +26,10 @@ function privatePath(file){
   while(!existsSync(ancestor)&&path.dirname(ancestor)!==ancestor)ancestor=path.dirname(ancestor);
   if(invalid(realpathSync(ancestor)))fail('private_path_required');
 }
-export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveSubscriptionEvidence=null,ownerAlertsOptIn=false}){
+export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveSubscriptionEvidence=null,ownerAlertsOptIn=false,nativeProvisioningSessionEpochs=false}){
   if(typeof ownerAlertsOptIn!=='boolean')fail('invalid_owner_alerts_config');
+  if(typeof nativeProvisioningSessionEpochs!=='boolean')
+    fail('invalid_native_session_epoch_config');
   // Production must inject a PRIVATE verifier of live billing evidence.
   // Neither browser requests nor sk_test_/TEST observations are accepted here.
   if(verifyLiveSubscriptionEvidence!==null&&typeof verifyLiveSubscriptionEvidence!=='function')
@@ -59,6 +61,14 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     "CREATE TABLE IF NOT EXISTS verified_subscription_revisions(subscription_id TEXT NOT NULL REFERENCES verified_subscription_allocations(subscription_id),revision INTEGER NOT NULL CHECK(revision>0),event_key TEXT NOT NULL UNIQUE,digest TEXT NOT NULL,org TEXT NOT NULL REFERENCES organizations(id),recorded_at INTEGER NOT NULL,PRIMARY KEY(subscription_id,revision))",
     "CREATE TABLE IF NOT EXISTS owner_alert_outbox(id INTEGER PRIMARY KEY AUTOINCREMENT,audit_id INTEGER NOT NULL UNIQUE REFERENCES organization_audit(id),category TEXT NOT NULL CHECK(category IN ('organization','subscription','user','permission')),state TEXT NOT NULL CHECK(state IN ('pending','sending','sent','failed')),attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),lease_token TEXT,locked_until INTEGER,next_attempt_at INTEGER NOT NULL,sent_at INTEGER)",
     "CREATE TABLE IF NOT EXISTS stripe_live_event_log(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,object_id TEXT NOT NULL,event_created INTEGER NOT NULL,raw_digest TEXT NOT NULL,received_at INTEGER NOT NULL)"
+  ].join(';')+';');
+  // Explicitly opt-in only: historical session locks get NO trusted epoch
+  // backfill. They cannot authorize native provisioning until a new lock
+  // selection is recorded with the private revision feature enabled.
+  // The normal Workspace session UX and schema stay unchanged by default.
+  if(nativeProvisioningSessionEpochs)db.exec([
+    "CREATE TABLE IF NOT EXISTS native_provisioning_session_epochs(id INTEGER PRIMARY KEY AUTOINCREMENT,session_id TEXT NOT NULL,account TEXT NOT NULL,org TEXT NOT NULL,action TEXT NOT NULL CHECK(action IN ('selected','cleared')),recorded_at INTEGER NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS native_provisioning_session_epochs_lookup ON native_provisioning_session_epochs(session_id,id DESC)"
   ].join(';')+';');
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
@@ -373,6 +383,9 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
           return {organizationId,alreadySelected:true};
         }
         db.prepare('INSERT INTO session_organizations(session_id,account,org,selected_at) VALUES(?,?,?,?)').run(sessionId,accountId,organizationId,clock());
+        if(nativeProvisioningSessionEpochs)db.prepare(
+          "INSERT INTO native_provisioning_session_epochs(session_id,account,org,action,recorded_at) VALUES(?,?,?,'selected',?)"
+        ).run(sessionId,accountId,organizationId,clock());
         return {organizationId,alreadySelected:false};
       });
     },
@@ -382,7 +395,22 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       return row?{id:row.id,name:row.name,admin:Boolean(row.admin)}:null;
     },
     clearSessionOrganization(sessionId){
-      if(safeId(sessionId))db.prepare('DELETE FROM session_organizations WHERE session_id=?').run(sessionId);
+      if(!safeId(sessionId))return;
+      if(!nativeProvisioningSessionEpochs){
+        db.prepare('DELETE FROM session_organizations WHERE session_id=?').run(sessionId);
+        return;
+      }
+      tx(()=>{
+        const selected=db.prepare(
+          'SELECT account,org FROM session_organizations WHERE session_id=?'
+        ).get(sessionId);
+        if(!selected)return;
+        db.prepare('DELETE FROM session_organizations WHERE session_id=?')
+          .run(sessionId);
+        db.prepare(
+          "INSERT INTO native_provisioning_session_epochs(session_id,account,org,action,recorded_at) VALUES(?,?,?,'cleared',?)"
+        ).run(sessionId,selected.account,selected.org,clock());
+      });
     },
     overview(org,actor){
       requireAdmin(org,actor);
@@ -1125,16 +1153,28 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     // advance AUTOINCREMENT id even if the effective policy is later restored.
     // This is deliberately NOT a paid seat, app grant or SSO decision.
     nativeProvisioningAuditRevision({organizationId,accountId,sessionId}={}){
-      if(!safeId(organizationId)||!safeId(accountId)||!safeId(sessionId))
-        return null;
+      if(!nativeProvisioningSessionEpochs||!safeId(organizationId)||
+         !safeId(accountId)||!safeId(sessionId))return null;
       const selected=db.prepare(
         'SELECT org FROM session_organizations WHERE session_id=? AND account=?'
       ).get(sessionId,accountId);
       if(!selected||selected.org!==organizationId)return null;
+      // A monotonic persisted lock epoch survives clear + reselect on the
+      // same mocked clock tick. Old pre-opt-in sessions have no epoch and
+      // deliberately fail closed for *native provisioning only*.
+      const epoch=db.prepare(
+        'SELECT id,account,org,action FROM native_provisioning_session_epochs WHERE session_id=? ORDER BY id DESC LIMIT 1'
+      ).get(sessionId);
+      if(!epoch||epoch.action!=='selected'||epoch.account!==accountId||
+         epoch.org!==organizationId||
+         !Number.isSafeInteger(epoch.id)||epoch.id<=0)return null;
       const revision=db.prepare(
         'SELECT MAX(id) AS revision FROM organization_audit WHERE org=?'
       ).get(organizationId)?.revision;
-      return Number.isSafeInteger(revision)&&revision>0?revision:null;
+      if(!Number.isSafeInteger(revision)||revision<=0)return null;
+      return Object.freeze({
+        organizationAuditRevision:revision,sessionLockEpoch:epoch.id
+      });
     },
     accessFor({organizationId,accountId,appId}){
       if(!safeId(organizationId)||!safeId(accountId)||!byId.has(appId))return null;

@@ -43,7 +43,8 @@ async function fixture(t,{historicalOnly=false}={}){
  });
  const org=createOrganizationStore({
   databasePath:path.join(root,'private','org.sqlite'),
-  clock:()=>now,verifyLiveSubscriptionEvidence:value=>value
+  clock:()=>now,verifyLiveSubscriptionEvidence:value=>value,
+  nativeProvisioningSessionEpochs:true
  });
  let identity;
  const controller=createWorkspaceNativeLinkProvisioner({
@@ -396,20 +397,23 @@ test('ABA: issue then revoke a pending app-seat invitation during proof is denie
  }),null);
 });
 
-test('audit generation persists on reopen and is not based on wall-clock time',async t=>{
+test('audit generation advances at identical clock ticks',async t=>{
  const f=await fixture(t);
  const args={organizationId:'alpha',accountId:f.userIds.ownerA,
   sessionId:f.adminSessionA.id};
  const original=f.org.nativeProvisioningAuditRevision(args);
- assert(Number.isSafeInteger(original));
+ assert(Number.isSafeInteger(original.organizationAuditRevision));
+ assert(Number.isSafeInteger(original.sessionLockEpoch));
  const roleArgs={organizationId:'alpha',actorId:f.userIds.ownerA,
   accountId:f.userIds.member,appId,permission:'workspace.view'};
  f.org.setPermission({...roleArgs,enabled:false});
  const revoked=f.org.nativeProvisioningAuditRevision(args);
  f.org.setPermission({...roleArgs,enabled:true});
  const restored=f.org.nativeProvisioningAuditRevision(args);
- assert(revoked>original);
- assert(restored>revoked);
+ assert(revoked.organizationAuditRevision>original.organizationAuditRevision);
+ assert(restored.organizationAuditRevision>revoked.organizationAuditRevision);
+ assert.equal(original.sessionLockEpoch,revoked.sessionLockEpoch);
+ assert.equal(revoked.sessionLockEpoch,restored.sessionLockEpoch);
  assert.equal(f.now(),START,
   'all revisions must differ even when mocked timestamp is identical');
  assert.equal(f.org.nativeProvisioningAuditRevision({
@@ -417,5 +421,74 @@ test('audit generation persists on reopen and is not based on wall-clock time',a
  }),null,'foreign session-tenant mismatch cannot read a revision');
  assert.equal(f.org.nativeProvisioningAuditRevision({
   ...args,sessionId:randomUUID()
+ }),null);
+});
+
+
+test('ABA: clear/reselect same organization during signed proof invalidates exact session',async t=>{
+ const f=await fixture(t);
+ const selection={sessionId:f.adminSessionA.id,
+  accountId:f.userIds.ownerA,organizationId:'alpha'};
+ const before=f.org.nativeProvisioningAuditRevision(selection);
+ assert(before);
+ f.duringNative(()=>{
+  f.org.clearSessionOrganization(selection.sessionId);
+  f.org.selectSessionOrganization(selection);
+ });
+ await assert.rejects(f.controller.bind(f.input()),
+  /native_ownership_unverified/);
+ const after=f.org.nativeProvisioningAuditRevision(selection);
+ assert.equal(after.organizationAuditRevision,before.organizationAuditRevision);
+ assert(after.sessionLockEpoch>before.sessionLockEpoch);
+ assert.equal(f.org.currentSessionOrganization({
+  sessionId:selection.sessionId,accountId:selection.accountId
+ }).id,'alpha');
+ assert.equal(f.now(),START);
+ assert.equal(f.nativeRequests(),1);
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
+ }),null);
+});
+
+test('re-selecting an already locked organization is idempotent and does not advance epoch',async t=>{
+ const f=await fixture(t);
+ const selection={sessionId:f.adminSessionA.id,
+  accountId:f.userIds.ownerA,organizationId:'alpha'};
+ const before=f.org.nativeProvisioningAuditRevision(selection);
+ f.duringNative(()=>{
+  assert.deepEqual(f.org.selectSessionOrganization(selection),
+   {organizationId:'alpha',alreadySelected:true});
+ });
+ const result=await f.controller.bind(f.input());
+ const after=f.org.nativeProvisioningAuditRevision(selection);
+ assert.equal(after.organizationAuditRevision,before.organizationAuditRevision);
+ assert.equal(after.sessionLockEpoch,before.sessionLockEpoch);
+ assert.equal(result.applied,true);
+ assert.equal(result.link.accessGranted,false);
+ assert.equal(result.link.loginEnabled,false);
+});
+
+test('ABA: switch tenant A to B and back during native proof always denies original selection',async t=>{
+ const f=await fixture(t);
+ f.org.saveMember({organizationId:'beta',actorId:f.userIds.ownerB,
+  member:{accountId:f.userIds.ownerA,name:'ownerA',nickname:'ownerA',
+   email:'ownerA@example.test',admin:true,roles:{}}});
+ const alpha={sessionId:f.adminSessionA.id,accountId:f.userIds.ownerA,
+  organizationId:'alpha'};
+ const beta={...alpha,organizationId:'beta'};
+ const before=f.org.nativeProvisioningAuditRevision(alpha);
+ f.duringNative(()=>{
+  f.org.clearSessionOrganization(alpha.sessionId);
+  f.org.selectSessionOrganization(beta);
+  f.org.clearSessionOrganization(alpha.sessionId);
+  f.org.selectSessionOrganization(alpha);
+ });
+ await assert.rejects(f.controller.bind(f.input()),
+  /native_ownership_unverified/);
+ const after=f.org.nativeProvisioningAuditRevision(alpha);
+ assert(after.sessionLockEpoch>before.sessionLockEpoch);
+ assert.equal(after.organizationAuditRevision,before.organizationAuditRevision);
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
  }),null);
 });
