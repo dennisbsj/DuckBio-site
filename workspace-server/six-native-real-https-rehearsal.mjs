@@ -82,7 +82,7 @@ function pinnedLoopbackFetch(cert,approved,wrongCa=false){
        status:rsp.statusCode,
        headers:rsp.headers
       }));
-     }catch(reject)
+     }catch(error){reject(error)}
     });
    });
    rq.on('error',reject);
