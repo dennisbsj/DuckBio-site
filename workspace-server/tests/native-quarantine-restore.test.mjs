@@ -155,7 +155,7 @@ test('reopened copied central identity refuses existing parent session, legacy g
   assert.throws(()=>restored.createSession(f.scientist.id),/invalid_credentials/);
   assert.equal(restored.getUser(f.scientist.id).state,'disabled');
   assert.equal(restored.getUser(f.admin.id).state,'disabled');
-  assert.deepEqual(restored.listGrants(f.scientist.id),[]);
+  assert.deepEqual(restored.listAppGrants(f.scientist.id),[]);
   // Recovery preserves provenance metadata, not login authority.
   const linkDb=new DatabaseSync(
    path.join(candidate.candidateDirectory,'identity.sqlite'),{readOnly:true}
