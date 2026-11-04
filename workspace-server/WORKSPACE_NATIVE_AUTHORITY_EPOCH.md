@@ -33,7 +33,7 @@ A positive preflight now exposes a **private, non-authorizing** 64-character SHA
 
 ## Rehearsal coverage
 
-Seven real two-store SQLite tests verify: stable scoped fingerprint for unchanged authority; no cross-account/app role invalidation; permission revocation/restoration with identical final values and timestamp; app assignment remove/regrant; native mapping revoke/rebind; role ABA *during* an awaited native verifier; verified LIVE subscription renewal; missing audit generation denied. Tests continue to assert `accessGranted:false` and no active SSO.
+Eight real two-store SQLite tests verify: stable scoped fingerprint for unchanged authority; no cross-account/app role invalidation; permission revocation/restoration with identical final values and timestamp; app assignment remove/regrant; native mapping revoke/rebind; role ABA *during* an awaited native verifier; verified LIVE subscription renewal; missing audit generation denied. Tests continue to assert `accessGranted:false` and no active SSO.
 
 From `workspace-server/`:
 
