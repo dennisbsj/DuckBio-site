@@ -1,0 +1,80 @@
+name: Nov04 post-PKCE six-native version-locked staging QA
+
+on:
+  pull_request:
+    paths:
+      - 'workspace-server/six-native-post-pkce-compat-lock.json'
+      - 'workspace-server/six-native-post-pkce-qa.mjs'
+      - 'workspace-server/staging-six-native-snapshot.mjs'
+      - 'workspace-server/staging-seven-source-gate.mjs'
+      - 'workspace-server/staging-seven-proxy-plan.mjs'
+      - 'workspace-server/staging-six-native-services.mjs'
+      - 'workspace-server/staging-seven-prestart-gate.mjs'
+      - 'workspace-server/staging-seven-complete-prestart-gate.mjs'
+      - 'workspace-server/staging-workspace-seventh-unit-audit.mjs'
+      - 'workspace-server/staging-seven-genuine-runtime-audit.mjs'
+      - 'workspace-server/staging-six-native-auth-proof-audit.mjs'
+      - 'workspace-server/staging-six-native-http-sessions-audit.mjs'
+      - 'workspace-server/tests/six-native-post-pkce-qa.test.mjs'
+      - 'workspace-server/tests/staging-current-six-native-plan.test.mjs'
+      - 'workspace-server/SIX_NATIVE_POST_PKCE_QA.md'
+      - '.github/workflows/workspace-six-native-post-pkce-staging.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-server/six-native-post-pkce-compat-lock.json'
+      - 'workspace-server/six-native-post-pkce-qa.mjs'
+      - 'workspace-server/staging-six-native-snapshot.mjs'
+      - 'workspace-server/staging-seven-source-gate.mjs'
+      - 'workspace-server/staging-seven-proxy-plan.mjs'
+      - 'workspace-server/staging-six-native-services.mjs'
+      - 'workspace-server/staging-seven-prestart-gate.mjs'
+      - 'workspace-server/staging-seven-complete-prestart-gate.mjs'
+      - 'workspace-server/staging-workspace-seventh-unit-audit.mjs'
+      - 'workspace-server/staging-seven-genuine-runtime-audit.mjs'
+      - 'workspace-server/staging-six-native-auth-proof-audit.mjs'
+      - 'workspace-server/staging-six-native-http-sessions-audit.mjs'
+      - 'workspace-server/tests/six-native-post-pkce-qa.test.mjs'
+      - 'workspace-server/tests/staging-current-six-native-plan.test.mjs'
+      - 'workspace-server/SIX_NATIVE_POST_PKCE_QA.md'
+      - '.github/workflows/workspace-six-native-post-pkce-staging.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  post-pkce-reviewed-source-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Check all exact source/staging/runtime witness modules
+        working-directory: workspace-server
+        run: |
+          for script in six-native-post-pkce-qa.mjs staging-six-native-snapshot.mjs staging-seven-source-gate.mjs staging-seven-proxy-plan.mjs staging-six-native-services.mjs staging-seven-prestart-gate.mjs staging-seven-complete-prestart-gate.mjs staging-workspace-seventh-unit-audit.mjs staging-seven-genuine-runtime-audit.mjs staging-six-native-auth-proof-audit.mjs staging-six-native-http-sessions-audit.mjs; do node --check "$script"; done
+      - name: Verify Nov 4 exact native main CI records and immutable history offline
+        working-directory: workspace-server
+        run: |
+          node six-native-current-compat-audit.mjs --offline
+          node six-native-post-pkce-qa.mjs --offline
+          node --test tests/six-native-post-pkce-qa.test.mjs
+      - name: Verify generated six-native current and post-PKCE staging plans, and historical CLI regression
+        working-directory: workspace-server
+        run: |
+          node --test tests/staging-current-six-native-plan.test.mjs tests/staging-seven-source-gate.test.mjs tests/staging-seven-proxy-plan.test.mjs tests/staging-six-native-services.test.mjs tests/staging-seven-prestart-gate.test.mjs
+      - name: Preserve seventh Workspace unit exact-source and final recheck
+        working-directory: workspace-server
+        run: node --test tests/staging-workspace-seventh-unit-audit.test.mjs
+      - name: Preserve genuine process and six native broker/HTTP session fail-closed tests
+        working-directory: workspace-server
+        run: |
+          node --test tests/staging-seven-genuine-runtime-audit.test.mjs tests/staging-six-native-auth-proof-audit.test.mjs tests/staging-six-native-http-sessions-audit.test.mjs
