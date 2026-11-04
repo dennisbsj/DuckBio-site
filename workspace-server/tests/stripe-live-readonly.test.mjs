@@ -35,8 +35,9 @@ function fixture({sub=subscription(),inv=invoice(),at=now,responseChange=respons
   const isSub=url==='https://api.stripe.com/v1/subscriptions/sub_live_ABCD1234';
   const isInvoice=url==='https://api.stripe.com/v1/invoices/in_live_ABCD1234';
   if(!isSub&&!isInvoice)throw Error('Unexpected Stripe endpoint');
-  const response={ok:true,headers:{get:()=> 'application/json; charset=utf-8'},
-   text:async()=>JSON.stringify(isSub?sub:inv)};
+  const response=new Response(JSON.stringify(isSub?sub:inv),{
+   status:200,headers:{'content-type':'application/json; charset=utf-8'}
+  });
   return responseChange(response,isSub?sub:inv);
  };
  return {calls,reader:createStripeLiveBillingReader({
@@ -172,10 +173,11 @@ test('scheduled cancellation uses the earliest effective date, never an expired 
 });
 test('Stripe lookup failures and malformed responses fail closed without returning data',async()=>{
  for(const change of [
-  response=>({...response,ok:false}),
-  response=>({...response,headers:{get:()=> 'text/html'}}),
-  response=>({...response,text:async()=> 'not-json'}),
-  response=>({...response,text:async()=> 'x'.repeat(131073)}),
+  ()=>new Response('Unavailable',{status:503,
+   headers:{'content-type':'application/json'}}),
+  ()=>new Response('{}',{headers:{'content-type':'text/html'}}),
+  ()=>new Response('not-json',{headers:{'content-type':'application/json'}}),
+  ()=>new Response('x'.repeat(131073),{headers:{'content-type':'application/json'}}),
  ]){
   const f=fixture({responseChange:change});
   await assert.rejects(()=>f.reader.inspect(binding()),
