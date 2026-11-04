@@ -28,12 +28,18 @@ export function browserFiles(directory){
  return readdirSync(directory).filter(name=>name.endsWith('.test.mjs'))
   .sort().map(name=>join(directory,name));
 }
+export function validQaNodeVersion(version){
+ const parsed=/^(\d+)\.(\d+)\.\d+$/.exec(version);
+ if(!parsed)return false;
+ const major=Number(parsed[1]),minor=Number(parsed[2]);
+ return (major===22&&minor>=16)||major===24;
+}
 export function summarizeQaStage(name,outcome,durationMs){
  return {name,status:outcome.error?'blocked':outcome.ok?'passed':'failed',
   exitCode:outcome.exitCode,durationMs};
 }
 export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
- cwd=projectDir,execute=run,log=console.error
+ cwd=projectDir,execute=run,log=console.error,nodeVersion=process.versions.node
 }={}){
  const options=parseLocalQaArgs(argv);
  if(options.help){
@@ -45,7 +51,11 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const clean=Boolean(head.ok&&/^[0-9a-f]{40}$/.test(sha)&&status.ok&&!status.stdout.trim());
  const report={schema:'duckbio.workspace.local-qa.v1',sha:head.ok?sha:null,
   exactHead:clean,allowDirty:options.allowDirty,stages:[],
-  outcome:'blocked'};
+  outcome:'blocked',nodeVersion};
+ if(!validQaNodeVersion(nodeVersion)){
+  log('Workspace QA requires Node 22.16+ or Node 24.');
+  return {exitCode:2,report};
+ }
  if(!head.ok||!status.ok||!(/^[0-9a-f]{40}$/.test(sha))){
   log('Cannot resolve an exact git HEAD and working-tree status.');
   return {exitCode:2,report};
@@ -58,11 +68,11 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const stages=[['syntax',npm,['run','check']],['core',npm,['test']]];
  if(options.browser){
   const dependency=execute(process.execPath,['--input-type=module','-e',
-   "import('playwright').then(()=>process.exit(0)).catch(()=>process.exit(2))"],
+   "Promise.all([import('playwright'),import('playwright/package.json',{with:{type:'json'}})]).then(([p,v])=>import('node:fs').then(fs=>process.exit(v.default.version==='1.56.1'&&fs.existsSync(p.chromium.executablePath())?0:2))).catch(()=>process.exit(2))"],
    {cwd,timeout:15000});
   if(!dependency.ok){
    report.stages.push({name:'browser',status:'blocked',exitCode:2,durationMs:0});
-   log('Browser QA blocked: install Playwright and Chromium locally, then retry.');
+   log('Browser QA blocked: install Playwright 1.56.1 and its Chromium binary locally, then retry.');
   }else{
    let files=[];
    try{files=browserFiles(join(cwd,'browser-tests'));}

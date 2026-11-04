@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {parseLocalQaArgs,browserFiles,summarizeQaStage,runLocalWorkspaceQa} from '../scripts/local-qa.mjs';
+import {parseLocalQaArgs,browserFiles,summarizeQaStage,validQaNodeVersion,runLocalWorkspaceQa} from '../scripts/local-qa.mjs';
 
 const SHA='a'.repeat(40);
 const ok=stdout=>({ok:true,exitCode:0,stdout:stdout??'',stderr:'',error:null});
@@ -64,4 +64,16 @@ test('browser file selection uses exact test files with stable order',()=>{
   assert.deepEqual(browserFiles(dir),['a.test.mjs','b.test.mjs'].map(x=>join(dir,x)));
  }finally{rmSync(dir,{recursive:true,force:true});}
  assert.equal(summarizeQaStage('syntax',ok(),1).status,'passed');
+});
+
+test('QA restricts release-grade proof to Node 22.16+ or Node 24',()=>{
+ assert.equal(validQaNodeVersion('22.16.0'),true);
+ assert.equal(validQaNodeVersion('22.15.9'),false);
+ assert.equal(validQaNodeVersion('24.1.0'),true);
+ assert.equal(validQaNodeVersion('23.7.0'),false);
+ const f=fake();
+ const r=runLocalWorkspaceQa([],{execute:f.execute,log:()=>{},nodeVersion:'22.15.0'});
+ assert.equal(r.exitCode,2);
+ assert.equal(r.report.outcome,'blocked');
+ assert.equal(f.calls.filter(x=>x[0]!=='git').length,0);
 });
