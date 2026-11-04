@@ -2993,3 +2993,21 @@ html body img.suite-sprite.logo-cytoduck{
 html body .product-hero img.suite-sprite.logo-cytoduck{
  background-image:url("icons/duckbio-20261104/cytoduck-no-ring-1254.webp") !important;
 }
+
+
+/* 2026-11-04: intentional spacing for Pricing and Support hero copy.
+   The navigation brand is unchanged; duplicate logos inside hero markup are removed. */
+body:not(.homepage-exact) .pr-banner.duckbio-real-hero--pricing .duckbio-real-hero-desc{
+ line-height:1.22!important;
+}
+body:not(.homepage-exact) .pr-banner.duckbio-real-hero--pricing .duckbio-real-hero-cta{
+ margin-top:clamp(16px,1.6vw,25px)!important;
+}
+html body.support-faq-page .page-hero.support-hero.duckbio-real-hero--support .duckbio-real-hero-title{
+ margin-bottom:clamp(20px,1.9vw,30px)!important;
+}
+@media(max-width:850px){
+ body:not(.homepage-exact) .pr-banner.duckbio-real-hero--pricing .duckbio-real-hero-desc{line-height:1.22!important}
+ body:not(.homepage-exact) .pr-banner.duckbio-real-hero--pricing .duckbio-real-hero-cta{margin-top:18px!important}
+ html body.support-faq-page .page-hero.support-hero.duckbio-real-hero--support .duckbio-real-hero-title{margin-bottom:22px!important}
+}
