@@ -504,3 +504,110 @@ test('ABA: switch tenant A to B and back during native proof always denies origi
   userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
  }),null);
 });
+
+
+test('real SQLite write fence denies a competing organization writer DURING native identity commit',async t=>{
+ let probed=0;
+ const f=await fixture(t,{fenceProbe:({organizationDatabasePath})=>{
+  probed++;
+  const other=new DatabaseSync(organizationDatabasePath);
+  try{
+   other.exec('PRAGMA busy_timeout=0');
+   assert.throws(()=>other.exec('BEGIN IMMEDIATE'),
+    /database is locked/,
+    'other processes must not be able to change paid seats while the identity commit is fenced');
+  }finally{other.close();}
+ }});
+ const linked=await f.controller.bind(f.input());
+ assert.equal(linked.applied,true);
+ assert.equal(probed,1,'lock starts only after a successful native signature');
+ assert.equal(f.nativeRequests(),1);
+ assert.equal(linked.link.accessGranted,false);
+ const external=new DatabaseSync(f.organizationDatabasePath);
+ try{
+  external.exec('PRAGMA busy_timeout=0');
+  external.exec('BEGIN IMMEDIATE');
+  external.exec('ROLLBACK');
+ }finally{external.close();}
+ assert.equal(f.identity.orgNativeLinkAudit({
+  appId,workspaceOrganizationId:'alpha'
+ }).length,1);
+});
+
+test('a currently busy independent organization writer fails native binding closed; fresh signed retry succeeds',async t=>{
+ const f=await fixture(t);
+ const concurrent=new DatabaseSync(f.organizationDatabasePath);
+ concurrent.exec('PRAGMA busy_timeout=0');
+ concurrent.exec('BEGIN IMMEDIATE');
+ try{
+  await assert.rejects(f.controller.bind(f.input()),
+   /native_ownership_unverified/);
+  assert.equal(f.nativeRequests(),1);
+  assert.equal(f.identity.getOrganizationNativeLink({
+   userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
+  }),null);
+  assert.deepEqual(f.identity.orgNativeLinkAudit({
+   appId,workspaceOrganizationId:'alpha'
+  }),[]);
+ }finally{
+  concurrent.exec('ROLLBACK');
+  concurrent.close();
+ }
+ const retried=await f.controller.bind(f.input());
+ assert.equal(retried.applied,true,'new proof and fresh organization fence');
+ assert.equal(f.nativeRequests(),2);
+});
+
+test('SQLite identity conflict cannot leak the organization write lock',async t=>{
+ let entered=0;
+ const f=await fixture(t,{fenceProbe:({organizationDatabasePath})=>{
+  entered++;
+  const competing=new DatabaseSync(organizationDatabasePath);
+  try{
+   competing.exec('PRAGMA busy_timeout=0');
+   assert.throws(()=>competing.exec('BEGIN IMMEDIATE'),/database is locked/);
+  }finally{competing.close();}
+ }});
+ assert.equal((await f.controller.bind(f.input('alpha'))).applied,true);
+ // Second organization must not claim an identical native account ID.
+ await assert.rejects(f.controller.bind({
+  ...f.input('beta'),nativeUserId:'native-user-alpha'
+ }),/org_native_link_conflict/);
+ assert.equal(entered,2,'failed second commit was also fenced');
+ const independent=new DatabaseSync(f.organizationDatabasePath);
+ try{
+  independent.exec('PRAGMA busy_timeout=0');
+  independent.exec('BEGIN IMMEDIATE');
+  independent.exec('ROLLBACK');
+ }finally{independent.close();}
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.userIds.member,appId,workspaceOrganizationId:'beta'
+ }),null);
+});
+
+test('native deprovisioning is fenced even after paid-seat expiry and has no native network await',async t=>{
+ let probes=0;
+ const f=await fixture(t,{fenceProbe:({organizationDatabasePath})=>{
+  probes++;
+  const competing=new DatabaseSync(organizationDatabasePath);
+  try{
+   competing.exec('PRAGMA busy_timeout=0');
+   assert.throws(()=>competing.exec('BEGIN IMMEDIATE'),/database is locked/);
+  }finally{competing.close();}
+ }});
+ assert.equal((await f.controller.bind(f.input())).applied,true);
+ f.setNow(START+70_000);
+ f.org.setMemberActive({organizationId:'alpha',actorId:f.userIds.ownerA,
+  accountId:f.userIds.member,active:false});
+ const before=f.nativeRequests();
+ const removed=await f.controller.revoke({
+  sessionId:f.adminSessionA.id,userId:f.userIds.member,appId,
+  workspaceOrganizationId:'alpha'
+ });
+ assert.equal(removed.applied,true);
+ assert.equal(probes,2,'both bind and revoke held a real SQLite write fence');
+ assert.equal(f.nativeRequests(),before,'revoke must not depend on an available native endpoint');
+ assert.equal(f.identity.getOrganizationNativeLink({
+  userId:f.userIds.member,appId,workspaceOrganizationId:'alpha'
+ }),null);
+});
