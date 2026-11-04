@@ -4,6 +4,7 @@
  */
 import test from 'node:test';
 import {createPrivateKey,sign} from 'node:crypto';
+import {createServer as httpsServer} from 'node:https';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {mkdtempSync,chmodSync,rmSync,mkdirSync,symlinkSync} from 'node:fs';
@@ -17,7 +18,10 @@ import {rehearseSixNativeSignerFactories}
  from '../six-native-signer-interoperability.mjs';
 import {rehearseSixNativeOwnershipOverRealTls}
  from '../six-native-real-https-rehearsal.mjs';
-import {SIX_NATIVE_LOOKUP_MODULES,rehearseSixNativeLookupFactories,
+import {rehearseSixNativeMtlSidecars}
+ from '../six-native-mtls-sidecar-rehearsal.mjs';
+import {SIX_NATIVE_LOOKUP_MODULES,SIX_NATIVE_MTLS_SIDECAR_MODULES,rehearseSixNativeLookupFactories,
+ verifySixNativeMtlSidecarSources,
  verifySixNativeLookupSources,auditSixGenuineNativeLookups}
  from '../six-native-ownership-lookup-interoperability.mjs';
 
@@ -254,4 +258,95 @@ test('real TLS integration refuses missing app/mapping controls or unsupported c
   signerFactories:signer,nativeLookups:new Map(),syntheticControls:new Map(),now:0
  });
  assert.equal(badClock.ok,false);
+});
+
+// Synthetic sidecar factories for public CI. The operator-only CLI loads
+// the genuine six native sidecars from their exact private Git commits.
+function syntheticSidecarFactories(){
+ return new Map(APPS.map(id=>[id,({
+  keyPem,certPem,clientCaPem,clientFingerprint256,bearerToken,
+  expectedHostname,signer
+ })=>{
+  const used=new Set();
+  const server=httpsServer({
+   key:keyPem,cert:certPem,ca:clientCaPem,
+   requestCert:true,rejectUnauthorized:true,minVersion:'TLSv1.3'
+  },async(req,res)=>{
+   const reject=(status=403)=>{res.writeHead(status,{
+    'content-type':'application/json','cache-control':'no-store'
+   });res.end(JSON.stringify({error:'denied'}))};
+   if(String(req.headers.host||'').split(':')[0]!==expectedHostname||
+      req.socket.servername!==expectedHostname)return reject(421);
+   if(req.method!=='POST'||req.url!=='/private/v1/native-ownership')
+    return reject(404);
+   if(!req.socket.authorized||
+      req.socket.getPeerCertificate().fingerprint256!==clientFingerprint256||
+      req.headers.authorization!=='Bearer '+bearerToken)
+    return reject(401);
+   try{
+    const chunks=[];let bytes=0;
+    for await(const chunk of req){
+     bytes+=chunk.byteLength;
+     if(bytes>2048)return reject(413);
+     chunks.push(chunk);
+    }
+    const body=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    if(body.appId!==id||body.version!=='duckbio.native-ownership.v1'||
+       typeof body.nonce!=='string'||body.nonce.length!==43)
+     return reject(400);
+    if(used.has(body.nonce))return reject(409);
+    used.add(body.nonce);
+    const envelope=await signer.prove(body);
+    if(!envelope)return reject(403);
+    res.writeHead(200,{'content-type':'application/json',
+     'cache-control':'no-store'});
+    res.end(JSON.stringify(envelope));
+   }catch{return reject(400)}
+  });
+  const originalListen=server.listen.bind(server);
+  server.listen=function(port,host,...rest){
+   if(host!=='127.0.0.1')throw Error('private_mtls_loopback_only');
+   return originalListen(port,host,...rest);
+  };
+  return server;
+ }]));
+}
+
+test('six distinct real mutual TLS listeners validate Workspace client certificate, bearer and native signed ownership',async()=>{
+ let attestation=null;
+ const result=await rehearseSixNativeLookupFactories({
+  factories:factories(),
+  onVerifiedLookups:async(lookups,controls)=>{
+   attestation=await rehearseSixNativeMtlSidecars({
+    sidecarFactories:syntheticSidecarFactories(),
+    signerFactories:nativeSignerFactories(),
+    nativeLookups:lookups,syntheticControls:controls
+   });
+   return attestation;
+  }
+ });
+ assert.equal(result.ok,true,JSON.stringify({result,attestation}));
+ assert.equal(result.deploymentAuthorized,false);
+ assert.equal(attestation.ok,true,JSON.stringify(attestation));
+ assert.equal(attestation.category,
+  'six-real-loopback-mutual-tls-native-sidecars-only');
+ assert.equal(attestation.deploymentAuthorized,false);
+ assert.deepEqual(attestation.checks.map(x=>x.id),APPS);
+});
+
+test('native mTLS sidecar matrix cannot promote absent clients and requires actual private source provenance',async t=>{
+ assert.deepEqual(SIX_NATIVE_MTLS_SIDECAR_MODULES.map(x=>x.id),APPS);
+ for(const row of SIX_NATIVE_MTLS_SIDECAR_MODULES){
+  assert(Object.isFrozen(row));
+  assert.match(row.file,/^server\/workspace-native-ownership-https\.(?:js|cjs)$/);
+ }
+ const root=privateRoot(t);
+ assert.equal(verifySixNativeMtlSidecarSources(root).ok,false);
+ const wrong=await rehearseSixNativeMtlSidecars({
+  sidecarFactories:new Map(),signerFactories:nativeSignerFactories(),
+  nativeLookups:new Map(),syntheticControls:new Map()
+ });
+ assert.equal(wrong.ok,false);
+ assert.equal(wrong.reason,'invalid_six_native_mtls_fixture');
+ assert.equal(wrong.deploymentAuthorized,false);
 });
