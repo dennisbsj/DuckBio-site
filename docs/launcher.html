@@ -743,7 +743,7 @@ html:not([data-theme="dark"]) .settings-panel button:hover{background:#e5f6fa}
 <details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button><button type="button" data-open-user-admin>User administration</button></div></details></div></div>
 <div class="shell">
 <main>
-<div class="main-title"><div><span class="kicker">MY APPS</span><h1>Your DuckBio workspace</h1><p>Click or tap a card below to open that app’s product page.</p></div><span class="count" id="workspace-app-count" aria-live="polite" aria-label="Preview: 6 of 6 available apps, not actual purchases" title="Preview only: six example apps are shown. Purchases are not connected yet.">6/6 apps</span></div>
+<div class="main-title"><div><span class="kicker">MY APPS</span><h1>Your DuckBio workspace</h1><p>Click or tap a card below to open that app’s product page.</p></div><span class="count" id="workspace-app-count" aria-live="polite" aria-label="Preview: seven public product cards, not actual purchases or access entitlements" title="Preview only: seven product cards are shown. Purchases and DataDuck integration are not connected.">7 apps</span></div>
 <div class="grid">
 <a class="app" href="labduck.html" target="_top" aria-label="Open LabDuck product page"><img class="sprite s1 icon" src="assets/icons/duckbio-20261103/labduck-448.webp" width="448" height="448" alt="LabDuck 3D app illustration" loading="eager"><span class="launcher-app-category"><b>LAB</b>ORATORY INFORMATION MANAGEMENT SYSTEM</span><strong class="launcher-app-name"><b>Lab</b>Duck</strong><small>Track samples, inventory, batches and laboratory results with role-based review.</small><span class="action">Learn more ↗</span></a>
 <a class="app" href="cytoduck.html" target="_top" aria-label="Open CytoDuck product page"><img class="sprite s5 icon" src="assets/icons/transparent.svg" alt="CytoDuck logo"><span class="launcher-app-category">FLOW <b>CYTO</b>METRY ANALYSIS</span><strong class="launcher-app-name"><b>Cyto</b>Duck</strong><small>Explore FCS data with flexible plots, gating and analysis reports.</small><span class="action">Learn more ↗</span></a>
@@ -751,6 +751,7 @@ html:not([data-theme="dark"]) .settings-panel button:hover{background:#e5f6fa}
 <a class="app" href="eel.html" target="_top" aria-label="Open DuckNote product page"><img class="sprite s2 icon" src="assets/icons/duckbio-20261103/ducknote-448.webp" width="448" height="448" alt="DuckNote 3D app illustration" loading="eager"><span class="launcher-app-category">ELECTRONIC LAB <b>NOTE</b>BOOK</span><strong class="launcher-app-name">Duck<b>Note</b></strong><small>Record experiments, revisit versions and organise scientific documentation.</small><span class="action">Learn more ↗</span></a>
 <a class="app" href="duckman.html" target="_top" aria-label="Open DuckMan product page"><img class="sprite s6 icon" src="assets/icons/duckbio-20261103/duckman-448.webp" width="448" height="448" alt="DuckMan 3D app illustration" loading="eager"><span class="launcher-app-category"><b>DUCK</b>UMENT MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Man</b></strong><small>Control document versions, reviews, approvals and release histories.</small><span class="action">Learn more ↗</span></a>
 <a class="app" href="mantrain.html" target="_top" aria-label="Open DuckTrain product page"><img class="sprite s3 icon" src="assets/icons/duckbio-20261103/ducktrain-448.webp" width="448" height="448" alt="DuckTrain 3D app illustration" loading="eager"><span class="launcher-app-category"><b>TRAIN</b>ING &amp; QUALIFICATION MANAGEMENT</span><strong class="launcher-app-name">Duck<b>Train</b></strong><small>Assign training, track qualifications and maintain competency records.</small><span class="action">Learn more ↗</span></a>
+<a class="app" href="dataduck.html" target="_top" aria-label="Open DataDuck product page (integration preview)"><img class="icon" src="assets/icons/duckbio-20261103/dataduck-thumbnail-448.webp" width="448" height="448" alt="DataDuck 3D app illustration" loading="eager"><span class="launcher-app-category">SCIENTIFIC <b>DATA</b> ANALYSIS</span><strong class="launcher-app-name"><b>Data</b>Duck</strong><small>Explore datasets, charts and results in a dedicated analysis workspace. Integration in progress.</small><span class="action">Learn more ↗</span></a>
 </div>
 <div class="notice">Preview only. These links open public product pages, not authenticated apps. Access controls, billing and workspace accounts will be connected separately when implemented.</div>
 </main></div>
@@ -779,7 +780,7 @@ html:not([data-theme="dark"]) .settings-panel button:hover{background:#e5f6fa}
  </div>
  <div role="tabpanel" id="perm-my" aria-labelledby="perm-my-tab" class="perm-pane">
  <h3>Example app access</h3><p class="perm-caption">The preview shows an illustrative member role, not data from a signed-in account.</p>
- <ul class="permission-list"><li><strong>LabDuck</strong><span>View, create, edit</span></li><li><strong>CytoDuck</strong><span>View, analyse</span></li><li><strong>DuckPipe</strong><span>View, create</span></li><li><strong>DuckNote</strong><span>View, create, edit</span></li><li><strong>DuckMan</strong><span>View only</span></li><li><strong>DuckTrain</strong><span>View, complete training</span></li></ul>
+ <ul class="permission-list"><li><strong>LabDuck</strong><span>View, create, edit</span></li><li><strong>CytoDuck</strong><span>View, analyse</span></li><li><strong>DuckPipe</strong><span>View, create</span></li><li><strong>DuckNote</strong><span>View, create, edit</span></li><li><strong>DuckMan</strong><span>View only</span></li><li><strong>DuckTrain</strong><span>View, complete training</span></li><li><strong>DataDuck</strong><span>Integration pending — no access granted</span></li></ul>
  </div>
  <div role="tabpanel" id="perm-matrix" aria-labelledby="perm-matrix-tab" class="perm-pane" hidden>
  <h3>Illustrative permission matrix</h3><p class="perm-caption">Example permissions for a member role. Real permissions must come from authenticated backend roles and licensing.</p>
@@ -790,6 +791,7 @@ html:not([data-theme="dark"]) .settings-panel button:hover{background:#e5f6fa}
  <tr><th scope="row">DuckNote</th><td>✓</td><td>✓</td><td>✓</td><td>—</td><td>—</td></tr>
  <tr><th scope="row">DuckMan</th><td>✓</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
  <tr><th scope="row">DuckTrain</th><td>✓</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+ <tr><th scope="row">DataDuck (pending)</th><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
  </tbody></table></div>
  </div>
  <div role="tabpanel" id="perm-org" aria-labelledby="perm-org-tab" class="perm-pane" hidden>
@@ -1017,25 +1019,25 @@ tabs.forEach((tab,index)=>{
 setTab("my");
 /* Fictional, read-only organisation members for the interactive preview.
    Real permissions must only come from an authorised server-side endpoint. */
-const previewApps=["LabDuck","CytoDuck","DuckPipe","DuckNote","DuckMan","DuckTrain"];
+const previewApps=["LabDuck","CytoDuck","DuckPipe","DuckNote","DuckMan","DuckTrain","DataDuck (pending)"];
 const exampleMembers={
  scientist:{
   label:"Example member A — Scientist",department:"Research team",
   rights:[
    [1,1,1,0,0],[1,1,1,0,0],[1,1,1,0,0],
-   [1,1,1,0,0],[1,0,0,0,0],[1,0,0,0,0]
+   [1,1,1,0,0],[1,0,0,0,0],[1,0,0,0,0],[0,0,0,0,0]
   ]
  },
  reviewer:{
   label:"Example member B — Quality reviewer",department:"Quality team",
   rights:[
    [1,0,0,1,0],[1,0,0,0,0],[1,0,0,1,0],
-   [1,0,0,1,0],[1,0,0,1,0],[1,0,0,1,0]
+   [1,0,0,1,0],[1,0,0,1,0],[1,0,0,1,0],[0,0,0,0,0]
   ]
  },
  admin:{
   label:"Example member C — Organisation admin",department:"Organisation administration",
-  rights:previewApps.map(()=>[1,1,1,1,1])
+  rights:previewApps.map((app)=>app.startsWith("DataDuck")?[0,0,0,0,0]:[1,1,1,1,1])
  }
 };
 const memberSelect=get("perm-member-select");
