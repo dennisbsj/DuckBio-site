@@ -236,3 +236,14 @@ test('UTF-8 bytes and truncated or malformed upstream data fail closed',async()=
   assert.equal(f.calls.length,1);
  }
 });
+
+test('interrupted Stripe LIVE streaming body cannot return a positive result',async()=>{
+ const stream=new ReadableStream({
+  pull(controller){controller.error(Error('upstream connection lost'));}
+ });
+ const f=fixture({responseChange:()=>new Response(stream,{
+  headers:{'content-type':'application/json'}
+ })});
+ await assert.rejects(()=>f.reader.inspect(binding()),/upstream connection lost/);
+ assert.equal(f.calls.length,1);
+});
