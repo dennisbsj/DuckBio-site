@@ -98,10 +98,10 @@ if(invoked){
  const args=process.argv.slice(2);
  const historical=args.length===5&&args[4]==='--confirm-offline-sources';
  const current=args.length===7&&args[4]==='--snapshot'&&
-  ['current','post-pkce'].includes(args[5])&&args[6]==='--confirm-offline-sources';
+  ['current','post-pkce','ownership-mtls'].includes(args[5])&&args[6]==='--confirm-offline-sources';
  if((!historical&&!current)||args[0]!=='--config'||
     args[2]!=='--sources-root'){
-  console.error('Usage: node staging-seven-source-gate.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS [--snapshot current|post-pkce] --confirm-offline-sources');
+  console.error('Usage: node staging-seven-source-gate.mjs --config PRIVATE_STAGING_JSON --sources-root PRIVATE_SEVEN_CHECKOUTS [--snapshot current|post-pkce|ownership-mtls] --confirm-offline-sources');
   process.exitCode=2;
  }else{
   try{
