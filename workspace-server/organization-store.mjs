@@ -36,6 +36,9 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
   mkdirSync(path.dirname(databasePath),{recursive:true,mode:0o700});
   const db=new DatabaseSync(databasePath);
   db.exec('PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON');
+  // Migrate pre-epoch private databases only once. A missing epoch in a database
+  // that already has this table is corruption and must deny, not be reseeded.
+  const legacySessionEpochMigration=!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_organization_versions'").get();
   db.exec([
     'CREATE TABLE IF NOT EXISTS organizations(id TEXT PRIMARY KEY,name TEXT NOT NULL)',
     'CREATE TABLE IF NOT EXISTS members(org TEXT NOT NULL REFERENCES organizations(id),account TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,email TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),PRIMARY KEY(org,account),UNIQUE(org,email))',
@@ -43,6 +46,9 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     'CREATE TABLE IF NOT EXISTS assignments(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,role TEXT NOT NULL,PRIMARY KEY(org,account,app),FOREIGN KEY(org,account) REFERENCES members(org,account) ON DELETE CASCADE)',
     'CREATE TABLE IF NOT EXISTS receipts(reference TEXT PRIMARY KEY,org TEXT NOT NULL,digest TEXT NOT NULL,recorded_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS session_organizations(session_id TEXT PRIMARY KEY,account TEXT NOT NULL,org TEXT NOT NULL,selected_at INTEGER NOT NULL)',
+    // Tombstones persist after clear: deleting + reselecting the same org must
+    // never restore an in-flight preflight's previous selection revision.
+    'CREATE TABLE IF NOT EXISTS session_organization_versions(session_id TEXT PRIMARY KEY,revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991))',
     'CREATE TABLE IF NOT EXISTS permission_overrides(org TEXT NOT NULL,account TEXT NOT NULL,app TEXT NOT NULL,permission TEXT NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),PRIMARY KEY(org,account,app,permission),FOREIGN KEY(org,account,app) REFERENCES assignments(org,account,app) ON DELETE CASCADE)',
     'CREATE TABLE IF NOT EXISTS organization_roles(org TEXT NOT NULL REFERENCES organizations(id),app TEXT NOT NULL,role TEXT NOT NULL,custom INTEGER NOT NULL CHECK(custom IN (0,1)),permissions TEXT NOT NULL CHECK(json_valid(permissions)),updated_at INTEGER NOT NULL,PRIMARY KEY(org,app,role))',
     'CREATE TABLE IF NOT EXISTS organization_invites(token_hash TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES organizations(id),issued_by TEXT NOT NULL,email TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),expires_at INTEGER NOT NULL,UNIQUE(org,email))',
@@ -60,6 +66,12 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     "CREATE TABLE IF NOT EXISTS owner_alert_outbox(id INTEGER PRIMARY KEY AUTOINCREMENT,audit_id INTEGER NOT NULL UNIQUE REFERENCES organization_audit(id),category TEXT NOT NULL CHECK(category IN ('organization','subscription','user','permission')),state TEXT NOT NULL CHECK(state IN ('pending','sending','sent','failed')),attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),lease_token TEXT,locked_until INTEGER,next_attempt_at INTEGER NOT NULL,sent_at INTEGER)",
     "CREATE TABLE IF NOT EXISTS stripe_live_event_log(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,object_id TEXT NOT NULL,event_created INTEGER NOT NULL,raw_digest TEXT NOT NULL,received_at INTEGER NOT NULL)"
   ].join(';')+';');
+  if(legacySessionEpochMigration){
+    // Existing selected sessions get their initial epoch; only a truly legacy
+    // database may be backfilled. Never repair missing records automatically
+    // after the epoch table has been established.
+    db.prepare('INSERT INTO session_organization_versions(session_id,revision) SELECT session_id,1 FROM session_organizations').run();
+  }
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
   // Older private SQLite databases created before lifecycle diagnostics have no column.
@@ -68,6 +80,19 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
 
   for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))chmodSync(databasePath+suffix,0o600);
   const tx=work=>{db.exec('BEGIN IMMEDIATE');try{const result=work();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
+  const sessionSelectionRevision=sessionId=>{
+    const revision=db.prepare('SELECT revision FROM session_organization_versions WHERE session_id=?').get(sessionId)?.revision;
+    return Number.isSafeInteger(revision)&&revision>0?revision:null;
+  };
+  const advanceSessionSelectionRevision=sessionId=>{
+    // The independent tombstone is updated in the SAME IMMEDIATE transaction
+    // as the selection mutation. Overflow fails closed and rolls back both.
+    const revision=db.prepare(`INSERT INTO session_organization_versions(session_id,revision)
+      VALUES(?,1) ON CONFLICT(session_id) DO UPDATE SET revision=revision+1
+      RETURNING revision`).get(sessionId)?.revision;
+    if(!Number.isSafeInteger(revision)||revision<=0)fail('session_revision_unavailable');
+    return revision;
+  };
   const liveEventLedger=createStripeLiveEventLedger({db,clock});
 
   // Organization-scoped app role policies. Built-in role edits are stored as
@@ -370,19 +395,34 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         const selected=db.prepare('SELECT account,org FROM session_organizations WHERE session_id=?').get(sessionId);
         if(selected){
           if(selected.account!==accountId||selected.org!==organizationId)fail('organization_locked');
+          if(!sessionSelectionRevision(sessionId))fail('session_revision_unavailable');
           return {organizationId,alreadySelected:true};
         }
+        advanceSessionSelectionRevision(sessionId);
         db.prepare('INSERT INTO session_organizations(session_id,account,org,selected_at) VALUES(?,?,?,?)').run(sessionId,accountId,organizationId,clock());
         return {organizationId,alreadySelected:false};
       });
     },
     currentSessionOrganization({sessionId,accountId}){
       if(!safeId(sessionId)||!safeId(accountId))return null;
-      const row=db.prepare('SELECT o.id,o.name,m.admin FROM session_organizations s JOIN organizations o ON o.id=s.org JOIN members m ON m.org=s.org AND m.account=s.account AND m.active=1 WHERE s.session_id=? AND s.account=?').get(sessionId,accountId);
-      return row?{id:row.id,name:row.name,admin:Boolean(row.admin)}:null;
+      const row=db.prepare(`SELECT o.id,o.name,m.admin,v.revision AS sessionSelectionRevision
+        FROM session_organizations s
+        JOIN session_organization_versions v ON v.session_id=s.session_id
+        JOIN organizations o ON o.id=s.org
+        JOIN members m ON m.org=s.org AND m.account=s.account AND m.active=1
+        WHERE s.session_id=? AND s.account=?`).get(sessionId,accountId);
+      return row&&Number.isSafeInteger(row.sessionSelectionRevision)&&row.sessionSelectionRevision>0?
+        {id:row.id,name:row.name,admin:Boolean(row.admin),sessionSelectionRevision:row.sessionSelectionRevision}:null;
     },
     clearSessionOrganization(sessionId){
-      if(safeId(sessionId))db.prepare('DELETE FROM session_organizations WHERE session_id=?').run(sessionId);
+      if(!safeId(sessionId))return;
+      return tx(()=>{
+        const selected=db.prepare('SELECT 1 FROM session_organizations WHERE session_id=?').get(sessionId);
+        if(!selected)return; // idempotent cleanup does not invent revisions.
+        if(!sessionSelectionRevision(sessionId))fail('session_revision_unavailable');
+        advanceSessionSelectionRevision(sessionId);
+        db.prepare('DELETE FROM session_organizations WHERE session_id=?').run(sessionId);
+      });
     },
     overview(org,actor){
       requireAdmin(org,actor);
