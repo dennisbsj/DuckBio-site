@@ -198,12 +198,19 @@ test('combined seven-service gate passes only six genuine audited units PLUS sou
   ok:true,checked:5,deploymentAuthorized:false,
   checks:Array.from({length:5},(_,i)=>({name:'synthetic-'+i,ok:true}))
  });
+ const sourceGate=({sourcesRoot,workspaceBuildSha,lock:reviewed})=>{
+  assert.equal(sourcesRoot,f.sourcesRoot);
+  assert.equal(workspaceBuildSha,lock.central.sha);
+  assert.deepEqual(reviewed,lock);
+  return {ok:true,verified:7,errors:[]};
+ };
  const p=auditSevenCompleteUninstalledPrestart({...opts,
-  sixGate,workspaceGate:f.audit});
+  sixGate,workspaceGate:f.audit,sourceGate});
  assert.equal(p.ok,true);
  assert.equal(p.deploymentAuthorized,false);
  assert.deepEqual(p.checks.map(c=>c.name),
-  ['six-native-source-prestart','seventh-workspace-service-unit']);
+  ['six-native-source-prestart','seventh-workspace-service-unit',
+   'seven-final-source-recheck']);
  const broken=()=>({...f.audit(),unitVerified:false});
  assert.equal(auditSevenCompleteUninstalledPrestart({...opts,
   sixGate,workspaceGate:broken}).ok,false);
@@ -212,6 +219,50 @@ test('combined seven-service gate passes only six genuine audited units PLUS sou
  assert.equal(auditSevenCompleteUninstalledPrestart({
   ...opts,lock:historical,sixGate,workspaceGate:f.audit
  }).ok,false);
+});
+test('combined prestart denies a source swap during seventh unit/UI scan even if both prior gates passed',t=>{
+ const f=fixtures(t);
+ let sawWorkspace=false,finalChecks=0;
+ const audit=auditSevenCompleteUninstalledPrestart({
+  config:f.config,lock,sourcesRoot:f.sourcesRoot,
+  sixGate:()=>({ok:true,checked:5,deploymentAuthorized:false,
+   checks:Array.from({length:5},(_,i)=>({name:'gate-'+i,ok:true}))}),
+  workspaceGate:()=>{
+   const inspected=f.audit();
+   assert.equal(inspected.ok,true);
+   sawWorkspace=true;
+   return inspected;
+  },
+  sourceGate:()=>{
+   assert.equal(sawWorkspace,true,'the final Git source scan must run AFTER reading the UI');
+   finalChecks++;
+   // A checkout was edited after the first source-locked native prestart.
+   return {ok:false,verified:6,errors:['unverified_workspace_source_checkout']};
+  }
+ });
+ assert.equal(finalChecks,1);
+ assert.equal(audit.ok,false);
+ assert.equal(audit.deploymentAuthorized,false);
+ assert.equal(audit.checks.at(-1).name,'seven-final-source-recheck');
+});
+test('combined prestart fails closed when the final source audit is unavailable or incomplete',t=>{
+ const f=fixtures(t),okSix=()=>({
+  ok:true,checked:5,deploymentAuthorized:false,
+  checks:Array.from({length:5},(_,i)=>({name:'gate-'+i,ok:true}))
+ });
+ for(const sourceGate of [
+  ()=>{throw Error('Git unexpectedly unavailable')},
+  ()=>({ok:true,verified:6,errors:[]}),
+  ()=>({ok:true,verified:7,errors:['untrusted_source']}),
+  ()=>({ok:true,verified:7})
+ ]){
+  const result=auditSevenCompleteUninstalledPrestart({
+   config:f.config,lock,sourcesRoot:f.sourcesRoot,
+   sixGate:okSix,workspaceGate:f.audit,sourceGate
+  });
+  assert.equal(result.ok,false);
+  assert.equal(result.checks.at(-1).name,'seven-final-source-recheck');
+ }
 });
 test('combined opt-in CLI without required explicit confirmation cannot inspect real host',()=>{
  const script=fileURLToPath(new URL(
