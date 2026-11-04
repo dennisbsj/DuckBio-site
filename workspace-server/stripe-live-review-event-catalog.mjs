@@ -62,3 +62,16 @@ export const stripeLiveReviewCategory=type=>
  Object.hasOwn(REVIEW_CATEGORIES,type)?REVIEW_CATEGORIES[type]:null;
 export const stripeLiveReviewObjectType=type=>
  Object.hasOwn(REVIEW_OBJECT_TYPES,type)?REVIEW_OBJECT_TYPES[type]:null;
+ 
+// Stripe Dispute IDs are seen with the older dp_ prefix and the du_ prefix
+// shown in current Stripe dispute API examples. Accept either ONLY for
+// allowlisted charge.dispute.* objects; all other prefixes stay exact.
+export const stripeLiveEventIdMatches=(type,id)=>{
+ const prefix=Object.hasOwn(STRIPE_LIVE_EVENT_PREFIXES,type)
+  ?STRIPE_LIVE_EVENT_PREFIXES[type]:null;
+ if(!prefix||typeof id!=='string')return false;
+ const accepted=type.startsWith('charge.dispute.')
+  ?['dp_','du_']:[prefix];
+ return accepted.some(candidate=>id.startsWith(candidate)&&
+   /^[A-Za-z0-9_]{4,128}$/.test(id.slice(candidate.length)));
+};
