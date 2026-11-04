@@ -62,7 +62,10 @@ export function createWorkspaceNativeAccessInspector({
      policy.accessGranted!==false||policy.nativeEnforcementRequired!==true||
      policy.appId!==appId||policy.accountId!==parent.subject||
      policy.organizationId!==organizationId||policy.permission!==permission||
-     !safeRole(policy.role)||!Number.isSafeInteger(policy.verifiedPaidThroughMs)||
+     !safeRole(policy.role)||
+     !Number.isSafeInteger(policy.authorizationAuditRevision)||
+     policy.authorizationAuditRevision<1||
+     !Number.isSafeInteger(policy.verifiedPaidThroughMs)||
      policy.verifiedPaidThroughMs<=clock())return null;
   // Never fall back to legacy (user,app) grants across organizations.
   // Missing explicit (user,session-locked org,app) binding always denies.
@@ -109,7 +112,9 @@ export function createWorkspaceNativeAccessInspector({
       first.nativeUserId!==second.nativeUserId||
       first.nativeOrganizationId!==second.nativeOrganizationId||
       first.linkRevision!==second.linkRevision||
-      first.policy.role!==second.policy.role)
+      first.policy.role!==second.policy.role||
+      first.policy.authorizationAuditRevision!==second.policy.authorizationAuditRevision||
+      first.policy.verifiedPaidThroughMs!==second.policy.verifiedPaidThroughMs)
      return deny('access_changed_during_verification');
    return Object.freeze({candidateReady:true,accessGranted:false,
     licensesGranted:false,loginEnabled:false,appId,permission,
@@ -119,6 +124,8 @@ export function createWorkspaceNativeAccessInspector({
     role:second.policy.role,
     validAt:clock(),
     verifiedPaidThroughMs:second.policy.verifiedPaidThroughMs,
+    // Diagnostic only; this cursor is not a native authorization decision.
+    authorizationAuditRevision:second.policy.authorizationAuditRevision,
     nativeEnforcementRequired:true});
   }
  });
