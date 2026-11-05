@@ -168,8 +168,8 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
   ?join(process.env.SystemRoot||'C:\\Windows','System32','cmd.exe')
   :'/bin/sh';
  const stages=[
-  ['syntax',npm,['--script-shell='+scriptShell,'run','check']],
-  ['core',npm,['--script-shell='+scriptShell,'test']]
+  ['syntax',npm,['--script-shell='+scriptShell,'--node-options=','run','check']],
+  ['core',npm,['--script-shell='+scriptShell,'--node-options=','test']]
  ];
  if(options.browser){
   const dependency=execute(process.execPath,['--input-type=module','-e',
