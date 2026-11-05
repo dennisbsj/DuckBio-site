@@ -1,7 +1,9 @@
 // Private same-origin Workspace UI. Server owns roles, license counts and identity.
 const $=id=>document.getElementById(id);
 const state={csrf:'',orgs:[],selected:null,overview:null,matrix:null,rolePolicies:null,busy:false,inviteToken:null,inviteDetails:null};
-const errorMessage=(status)=>status===401?'Sign in again.':status===403?'Your role does not allow this action.':status===409?'There are not enough app licences, or the data changed. Reload the organization.':status===400?'Check the account, email and app roles.':'The private Workspace service is unavailable.';
+const errorMessage=(status,code)=>code==='invitation_revoked'
+ ?'The invitation was canceled while email was being sent. Ask an active organization administrator to create a new invitation.'
+ :status===401?'Sign in again.':status===403?'Your role does not allow this action.':status===409?'There are not enough app licences, or the data changed. Reload the organization.':status===400?'Check the account, email and app roles.':'The private Workspace service is unavailable.';
 function status(message){$('status').textContent=message;}
 function el(tag,text,cls){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
 function button(text,fn){const b=el('button',text);b.type='button';b.addEventListener('click',fn);return b;}
@@ -26,7 +28,7 @@ function appRolePicker(pickerId,fieldsId){
 async function request(route,data){
  const res=await fetch(route,{method:data===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers:data===undefined?{}:{'Content-Type':'application/json','X-CSRF-Token':state.csrf},body:data===undefined?undefined:JSON.stringify(data)});
  let body={};try{body=await res.json();}catch{}
- if(!res.ok)throw Object.assign(new Error(errorMessage(res.status)),{status:res.status});
+ if(!res.ok)throw Object.assign(new Error(errorMessage(res.status,body.error)),{status:res.status});
  return body;
 }
 function showPortal(visible){$('portal').hidden=!visible;$('sign-in').hidden=visible;$('organization-choice').hidden=true;$('invite-accept-panel').hidden=true;$('logout').hidden=!visible;}
@@ -57,11 +59,18 @@ async function csrf(){
  state.csrf=body.csrfToken||'';
  if(!state.csrf)throw new Error('Session protection is unavailable.');
 }
+// Per-app calculation only; there is deliberately no organization-wide
+// user-seat pool. This display is not authorization for a native app.
+function appSeatSummary(app){
+ const remaining=app.purchased-app.assigned-(app.reserved||0);
+ if(!Number.isSafeInteger(remaining))return 'Seat capacity unavailable';
+ return remaining<0?'Over capacity by '+(-remaining)+' app seats':remaining+' available app seats';
+}
 function renderSeats(){
  const root=$('seats');root.replaceChildren();
  const subscriptions=$('subscription-seats');subscriptions.replaceChildren();
  for(const app of state.overview.apps){
-  const card=el('div',undefined,'seat-card');card.append(el('div',app.name),el('strong',app.assigned+' / '+app.purchased),el('small','Assigned / purchased · '+(app.reserved||0)+' pending reservations'));
+  const card=el('div',undefined,'seat-card');card.append(el('div',app.name),el('strong',app.assigned+' / '+app.purchased),el('small','Assigned / purchased · '+(app.reserved||0)+' pending reservations · '+appSeatSummary(app)+' (Workspace assignments only)'));
   root.append(card);
   const copy=card.cloneNode(true);subscriptions.append(copy);
  }
@@ -143,16 +152,21 @@ async function revokeInvitation(invite){
 }
 async function changeUserStatus(user){
  const verb=user.active?'deactivate':'reactivate';
- if(!window.confirm('Do you want to '+verb+' '+user.name+' in this organization? Their other organization memberships are unaffected.'))return;
+ const inviteEffect=user.active&&user.admin
+  ?' Pending invitations issued by this administrator will be revoked and their reserved app seats released.':'';
+ if(!window.confirm('Do you want to '+verb+' '+user.name+' in this organization? Their other organization memberships are unaffected.'+inviteEffect))return;
  try{
   await request('/api/suite/organization/user/active',{organizationId:state.selected,accountId:user.accountId,active:!user.active});
   await overview(state.selected);
-  status(user.name+(user.active?' deactivated. Existing app seats remain reserved.':' reactivated.') );
+  status(user.name+(user.active
+   ?' deactivated. Their assigned app seats remain reserved.'+
+    (user.admin?' Pending invitations they issued were revoked.':'')
+   :' reactivated.'));
  }catch(e){status(e.message);}
 }
 async function removeUser(user){
- if(!window.confirm('Remove '+user.name+' from '+state.overview.organization.name+'? This does not delete their DuckBio account or any other organization memberships.'))return;
- try{await request('/api/suite/organization/user/remove',{organizationId:state.selected,accountId:user.accountId});await overview(state.selected);status('Removed '+user.name+' from this organization.');}
+ if(!window.confirm('Remove '+user.name+' from '+state.overview.organization.name+'? This does not delete their DuckBio account or any other organization memberships. Pending invitations issued by this member will be revoked.'))return;
+ try{await request('/api/suite/organization/user/remove',{organizationId:state.selected,accountId:user.accountId});await overview(state.selected);status('Removed '+user.name+' from this organization. Any pending invitations issued by this member were revoked.');}
  catch(e){status(e.message);}
 }
 function roleFields(user){
@@ -255,8 +269,11 @@ $('member-form').addEventListener('submit',async e=>{
  e.preventDefault();if(state.busy||!e.currentTarget.reportValidity())return;
  const roles={};for(const select of $('role-fields').querySelectorAll('select'))if(select.value)roles[select.name]=select.value;
  const member={accountId:$('account-id').value.trim(),name:$('name').value.trim(),nickname:$('nickname').value.trim(),email:$('member-email').value.trim(),admin:$('org-admin').checked,roles};
+ const existing=state.overview?.users.find(user=>user.accountId===member.accountId);
+ const demoted=Boolean(existing?.admin&&!member.admin);
+ if(demoted&&!window.confirm('Removing organization administrator status also revokes any pending invitations issued by this member. Continue?'))return;
  state.busy=true;
- try{await request('/api/suite/organization/user/save',{organizationId:state.selected,member});await overview(state.selected);status('App permissions updated. Native app-account mapping remains separately controlled.');}
+ try{await request('/api/suite/organization/user/save',{organizationId:state.selected,member});await overview(state.selected);status('App permissions updated. Native app-account mapping remains separately controlled.'+(demoted?' Pending invitations issued by the former administrator were revoked.':''));}
  catch(err){status(err.message);}finally{state.busy=false;}
 });
 

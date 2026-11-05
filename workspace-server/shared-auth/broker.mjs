@@ -178,6 +178,13 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
       throw new BrokerError(401, 'invalid_credentials');
     const code = opaque();
     await store.putCode(digest(code), { clientId: target.client.id, appId: target.client.appId, parentSessionId: parent.id, subject: parent.subject, state: target.state, challenge: target.challenge, redirectUri: target.redirectUri, returnPath: target.returnPath, localIdentity: initialAccess.localIdentity, bindingRevision: initialAccess.bindingRevision, expiresAt: Math.min(authorizedAt + 60_000, parent.expiresAt) });
+    // Durable SQLite writes can also await or contend with another connection.
+    // An expired authorization must never yield a positive browser redirect.
+    // A stale stored code cannot be redeemed: consumeCode also checks its TTL.
+    const persistedAt = clock();
+    if (!Number.isFinite(persistedAt) || parent.expiresAt <= persistedAt ||
+        Math.min(authorizedAt + 60_000, parent.expiresAt) <= persistedAt)
+      throw new BrokerError(401, 'invalid_credentials');
     const redirect = new URL(target.redirectUri);
     redirect.searchParams.set('code', code); redirect.searchParams.set('state', target.state);
     return { redirectUrl: redirect.href };
@@ -305,7 +312,15 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
                   Math.min(record.expiresAt, parent.expiresAt) <= exchangeNow)
                 throw new BrokerError(401, 'invalid_grant');
               const sessionToken = opaque(); const expiresAt = Math.min(parent.expiresAt, exchangeNow + 8 * 60 * 60_000);
-              await store.putProof(digest(sessionToken), { clientId: client.id, appId: client.appId, parentSessionId: parent.id, subject: parent.subject, localIdentity, bindingRevision: granted.bindingRevision, expiresAt });
+              const proofKey = digest(sessionToken);
+              await store.putProof(proofKey, { clientId: client.id, appId: client.appId, parentSessionId: parent.id, subject: parent.subject, localIdentity, bindingRevision: granted.bindingRevision, expiresAt });
+              // A slow proof write must not return an already-expired token.
+              // Remove the unusable proof before returning a denial.
+              const persistedAt = clock();
+              if (!Number.isFinite(persistedAt) || expiresAt <= persistedAt) {
+                await store.deleteProof(proofKey);
+                throw new BrokerError(401, 'invalid_grant');
+              }
               json(res, 200, { issuer, audience: client.id, subject: parent.subject, displayName: parent.displayName, localIdentity, expiresAt, sessionToken, returnPath: record.returnPath });
             } else if (route === 'introspect') {
               const proof = await liveProof(client, body.sessionToken);
