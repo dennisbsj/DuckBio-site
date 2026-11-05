@@ -53,7 +53,7 @@
     <div id="tab-users">
     <section class="panel toolbar">
       <label>Current organization<select id="organizations" aria-label="Current organization" disabled></select></label><small>To change organization, sign out and sign in again.</small>
-      <div class="actions"><button type="button" id="create" class="primary">Add existing account</button><button type="button" id="invite" class="primary">Invite user</button><button type="button" id="buy">Buy users</button></div>
+      <div class="actions"><button type="button" id="invite" class="primary">Create account</button><button type="button" id="create">Add existing account</button><button type="button" id="buy">Buy users</button></div>
     </section>
     <section class="panel">
       <h2 id="organization-name">Organization</h2>
@@ -93,15 +93,15 @@
       </form>
     </section>
     <section id="invite-panel" class="panel" hidden>
-      <h2>Invite a user</h2>
-      <p>Invite a new or existing DuckBio account. Selected app roles reserve purchased licences while the invitation is pending. No app access is activated until acceptance.</p>
+      <h2>Create account</h2>
+      <p>Set up a new account through a secure invitation. The person receiving the invitation creates their own password. Existing DuckBio users can accept with their current account. Selected app roles reserve purchased licences while the invitation is pending; app access remains disabled until acceptance.</p>
       <form id="invite-form" class="fields">
         <label>Name<input id="invite-name" maxlength="120" required></label>
         <label>Nickname<input id="invite-nickname" maxlength="120" required></label>
         <label>Email<input id="invite-email" type="email" maxlength="254" required></label>
         <label class="inline"><input id="invite-admin" type="checkbox"> Organization administrator</label>
         <div class="wide-field"><h3>App access and roles</h3><label>Choose application<select id="invite-app-picker" aria-label="Choose application for invitation"></select></label><p>App roles are saved together; changing this filter does not remove other selections.</p><div id="invite-role-fields" class="roles"></div></div>
-        <div class="actions"><button type="submit" class="primary">Create invitation</button><button type="button" id="close-invite">Cancel</button></div>
+        <div class="actions"><button type="submit" class="primary">Create account invitation</button><button type="button" id="close-invite">Cancel</button></div>
       </form>
       <div id="invite-result" hidden>
         <p>Share this one-time activation link securely with the invited person. It expires after seven days.</p>
