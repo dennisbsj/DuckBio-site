@@ -47,3 +47,11 @@ node scripts/local-qa.mjs --browser --expect-head=<verified-40-hex-head> --json
 Review the actual JSON report from the runner, including `exactHead:true`, every test stage `passed`, and the expected SHA, rather than relying only on shell exit code. The tool must refuse an inherited custom npm script shell. `npm run qa:local` remains a developer convenience but **must not** be presented as a fully attested release gate in an untrusted npm environment.
 
 The direct Node runner still invokes `npm run check` and `npm test` internally, using cleaned child environment. A malicious global npm configuration or compromised local executable is outside the guarantees of an application-level guard; require a controlled, reviewed operator machine.
+
+## npm user configuration: explicit script shell
+
+The directly invoked QA runner still uses npm for the checked-in `check` and `test` scripts. A user-level/global `.npmrc` can define a different `script-shell` even when the environment variable is absent. The runner now explicitly passes the reviewed platform shell as an npm CLI option for both scripts: `/bin/sh` on Unix and the operating system's `System32/cmd.exe` on Windows. npm CLI configuration takes precedence over the user/global `.npmrc`.
+
+An isolated Unix npm fixture verified that an explicit shell option restores the nonzero exit code of a deliberately failing script even when an inherited npm shell override was configured. This is a focused primitive test, **not** the full Workspace CI test. A compromised shell executable or manipulated host system is outside the local QA runner's security boundary.
+
+The release operator still needs to invoke `node scripts/local-qa.mjs` directly and inspect the actual JSON report. The `npm run qa:local` wrapper must not be treated as release proof on an uncontrolled machine.
