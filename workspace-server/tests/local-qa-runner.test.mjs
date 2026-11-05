@@ -549,7 +549,7 @@ test('modified tracked parent policy blocks QA before npm from a workspace child
  writeFileSync(join(root,'suite-permissions.json'),'{"enabled":true}\\n');
  assert.match(git(workspace,'status','--porcelain'),/suite-permissions\.json/,
   'Git status from a child directory reports tracked parent changes without a pathspec');
- assert.match(git(root,'status','--porcelain'),/suite-permissions\\.json/);
+ assert.match(git(root,'status','--porcelain'),/suite-permissions\.json/);
  let nonGitCalls=0;
  const result=runLocalWorkspaceQa(['--expect-head='+head],{
   cwd:workspace,nodeVersion:'22.16.0',log:()=>{},
