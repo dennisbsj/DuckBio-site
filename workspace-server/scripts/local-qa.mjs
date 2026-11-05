@@ -161,7 +161,16 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
   return {exitCode:2,report};
  }
  const npm=process.platform==='win32'?'npm.cmd':'npm';
- const stages=[['syntax',npm,['run','check']],['core',npm,['test']]];
+ // Explicit shell overrides even a user/global npmrc script-shell. The
+ // operator must launch THIS runner directly with trusted Node, not via an
+ // untrusted npm wrapper that can bypass executing the runner itself.
+ const scriptShell=process.platform==='win32'
+  ?join(process.env.SystemRoot||'C:\\Windows','System32','cmd.exe')
+  :'/bin/sh';
+ const stages=[
+  ['syntax',npm,['--script-shell='+scriptShell,'run','check']],
+  ['core',npm,['--script-shell='+scriptShell,'test']]
+ ];
  if(options.browser){
   const dependency=execute(process.execPath,['--input-type=module','-e',
    "Promise.all([import('playwright'),import('playwright/package.json',{with:{type:'json'}})]).then(([p,v])=>import('node:fs').then(fs=>process.exit(v.default.version==='1.56.1'&&fs.existsSync(p.chromium.executablePath())?0:2))).catch(()=>process.exit(2))"],
