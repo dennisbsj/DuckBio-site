@@ -11,7 +11,7 @@ import {createOrganizationStore} from '../organization-store.mjs';
 import {createCommunicationsStore} from '../communications-store.mjs';
 import {createAccountService} from '../shared-auth/account-service.mjs';
 
-test('native app can read only its validated central identity unread counters, never arbitrary users',async t=>{
+test('org-mode native unread refuses legacy global mapping even if user is member with assigned app role',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'duckbio-native-communications-'));
  const identity=createIdentityStore({databasePath:join(dir,'identity.sqlite')});
  const auth=createSqliteAuthStores({databasePath:join(dir,'auth.sqlite')});
@@ -70,70 +70,41 @@ test('native app can read only its validated central identity unread counters, n
   .find(value=>value.includes('suite_identity')).split(';')[0];
  const verifier=randomBytes(32).toString('base64url');
  const state=randomBytes(32).toString('base64url');
+ const basic='Basic '+Buffer.from(client.id+':'+client.secret).toString('base64');
+ const request={appId:'eel',redirectUri:client.redirectUris[0],
+  codeChallenge:createHash('sha256').update(verifier).digest('base64url'),
+  codeChallengeMethod:'S256',state,returnPath:'/'};
  const authorize=await fetch(origin+'/api/suite/auth/authorize',{method:'POST',
   headers:{...browserHeaders,Cookie:csrfCookie+'; '+identityCookie},
-  body:JSON.stringify({appId:'eel',redirectUri:client.redirectUris[0],
-   codeChallenge:createHash('sha256').update(verifier).digest('base64url'),
-   codeChallengeMethod:'S256',state,returnPath:'/'})});
- assert.equal(authorize.status,200);
- const code=new URL((await authorize.json()).redirectUrl).searchParams.get('code');
- const basic='Basic '+Buffer.from(client.id+':'+client.secret).toString('base64');
- const exchange=await fetch(origin+'/api/suite/auth/exchange',{method:'POST',
-  headers:{Authorization:basic,'Content-Type':'application/json'},
-  body:JSON.stringify({clientId:client.id,code,state,codeVerifier:verifier,
-   redirectUri:client.redirectUris[0]})});
- assert.equal(exchange.status,200);
- const token=(await exchange.json()).sessionToken;
- assert.match(token,/^[A-Za-z0-9_-]{32,128}$/);
+  body:JSON.stringify(request)});
+ assert.equal(authorize.status,403,
+  'a global mapping must not create an org-mode child even when native IDs match');
+ assert.deepEqual(await authorize.json(),{error:'access_denied'});
  const native=async(body,{authorization=basic,extraHeaders={}}={})=>
   fetch(origin+'/api/suite/native/communications/unread',{method:'POST',
    headers:{Authorization:authorization,'Content-Type':'application/json',...extraHeaders},
    body:JSON.stringify(body)});
- const good=await native({sessionToken:token});
- assert.equal(good.status,200);
- assert.deepEqual(await good.json(),{counts:{chat:1,mail:1,notifications:1}});
- assert.match(good.headers.get('cache-control'),/no-store/);
- assert.equal(good.headers.get('set-cookie'),null);
- assert.equal((await native({sessionToken:token,accountId:owner.id})).status,400);
- assert.equal((await native({sessionToken:'A'.repeat(43)})).status,401);
- assert.equal((await native({sessionToken:token},{
+ const nonexistentToken=randomBytes(32).toString('base64url');
+ assert.equal((await native({sessionToken:nonexistentToken})).status,401);
+ assert.equal((await native({sessionToken:nonexistentToken,accountId:owner.id})).status,400,
+  'a native client cannot choose arbitrary central users');
+ assert.equal((await native({sessionToken:nonexistentToken},{
   authorization:'Basic '+Buffer.from('eel:wrong-secret').toString('base64')})).status,401);
- assert.equal((await native({sessionToken:token},{
+ assert.equal((await native({sessionToken:nonexistentToken},{
   extraHeaders:{Origin:origin}})).status,401);
- assert.equal((await native({sessionToken:token},{
+ assert.equal((await native({sessionToken:nonexistentToken},{
   extraHeaders:{Cookie:identityCookie}})).status,401);
  assert.equal((await fetch(origin+'/api/suite/native/communications/unread')).status,405);
- org.saveMember({organizationId:'lab-a',actorId:owner.id,member:{
-  accountId:worker.id,name:'Worker',nickname:'Worker',
-  email:'worker@example.test',admin:false,roles:{}}});
- assert.equal((await native({sessionToken:token})).status,403,
-  'revoking the current organization app role blocks unread counts');
- org.saveMember({organizationId:'lab-a',actorId:owner.id,member:{
-  accountId:worker.id,name:'Worker',nickname:'Worker',
-  email:'worker@example.test',admin:false,roles:{eel:'scientist'}}});
- assert.equal((await native({sessionToken:token})).status,200);
+ assert.equal((await native({sessionToken:nonexistentToken})).status,401);
+ // Neither revoking nor re-granting a global grant can mint an org-scoped
+ // native session when the actual private organization broker remains dormant.
  identity.revokeAppAccess(worker.id,'eel');
- assert.equal((await native({sessionToken:token})).status,401,
-  'revoking the app mapping immediately invalidates the native proof');
-
- // A fresh, valid broker proof without a bound organization must not be
- // allowed to borrow this user's otherwise active DuckNote organization role.
- identity.grantAppAccess({userId:worker.id,appId:'eel',localUserId:'native-worker'});
- const secondVerifier=randomBytes(32).toString('base64url');
- const secondState=randomBytes(32).toString('base64url');
- const secondAuthorize=await fetch(origin+'/api/suite/auth/authorize',{method:'POST',
+ identity.grantAppAccess({userId:worker.id,appId:'eel',
+  localUserId:'native-worker',organizationId:'lab-a'});
+ assert.equal((await native({sessionToken:nonexistentToken})).status,401);
+ const second=await fetch(origin+'/api/suite/auth/authorize',{method:'POST',
   headers:{...browserHeaders,Cookie:csrfCookie+'; '+identityCookie},
-  body:JSON.stringify({appId:'eel',redirectUri:client.redirectUris[0],
-   codeChallenge:createHash('sha256').update(secondVerifier).digest('base64url'),
-   codeChallengeMethod:'S256',state:secondState,returnPath:'/'})});
- assert.equal(secondAuthorize.status,200);
- const secondCode=new URL((await secondAuthorize.json()).redirectUrl).searchParams.get('code');
- const secondExchange=await fetch(origin+'/api/suite/auth/exchange',{method:'POST',
-  headers:{Authorization:basic,'Content-Type':'application/json'},
-  body:JSON.stringify({clientId:client.id,code:secondCode,state:secondState,
-   codeVerifier:secondVerifier,redirectUri:client.redirectUris[0]})});
- assert.equal(secondExchange.status,200);
- const unboundToken=(await secondExchange.json()).sessionToken;
- assert.equal((await native({sessionToken:unboundToken})).status,403,
-  'an unbound native grant may not inherit unrelated organization access');
+  body:JSON.stringify({...request,state:randomBytes(32).toString('base64url')})});
+ assert.equal(second.status,403);
+ assert.deepEqual(await second.json(),{error:'access_denied'});
 });

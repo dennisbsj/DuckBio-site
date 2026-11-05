@@ -1,0 +1,9 @@
+# Native permission candidate consistency barrier — source-only
+
+**Risk:** `verifiedNativePermissionCandidate` looks up member/role, paid live seats, pending reservations, paid term and effective permissions in multiple SQLite reads. Another authorized Workspace process can commit a revoke/regrant between those reads even when the final role/permission is identical. The existing outer native inspector already compares `authorizationAuditRevision` before and after an awaited native verifier, but this does not itself establish a coherent **single candidate evaluation**.
+
+**Change:** the organization-scoped monotonically increasing audit cursor is read before any candidate policy lookups and again after the final permission result. Any absent/invalid/changed cursor denies `null`, including ABA. This reuses the existing #187 `authorizationAuditRevision` without another table, hash, second permission engine or broader lock. The current #192 session-org epoch remains unchanged.
+
+**Tests:** a disposable SQLite pair of Workspace organization connections issues role/permission revoke and restore during a synchronous candidate evaluation by a controlled test clock; the mixed-epoch candidate must deny even after values are restored. A tenant-B policy audit does not invalidate a tenant-A candidate. All positive results remain `accessGranted:false`, `licensesGranted:false`, `nativeEnforcementRequired:true`. DataDuck and `*` remain denied.
+
+**Limit:** the cursor barrier is NOT an atomic authorization transaction across native servers, nor a production grant. An update committed after the second read is handled at the higher-level awaited native preflight recheck and ultimately must be rechecked by every native resource handler. This does not enable Stripe LIVE purchases, SSO, DataDuck, staging or production. 

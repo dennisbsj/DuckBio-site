@@ -833,7 +833,7 @@ test('Chromium Remember me uses a persistent expiring cookie only when explicitl
 
 // A content reference must survive central login, but must never provide direct
 // access to native app data or allow a caller-controlled redirect origin.
-test('Chromium global content ID continues after login through the protected gateway',{timeout:45000},async t=>{
+test('Chromium global content ID reaches the gateway but denies without paid scoped native authority',{timeout:45000},async t=>{
  const calls=[];
  const f=await fixture(t,{resolveContentResource:async args=>{
   calls.push(args);
@@ -858,14 +858,13 @@ test('Chromium global content ID continues after login through the protected gat
  await page.waitForURL(origin+'/content/dn000001');
  assert.equal(await page.locator('h1').textContent(),'Protected gateway requested');
  assert.equal(calls.length,0,'browser interception must not call the real resolver');
- // The real authenticated gateway is checked separately without following the
- // external native redirect or pretending that an app session exists.
+ // Browser continuation reaches only the private gateway. A legacy
+ // membership/role and an apparently approved resolver URL alone cannot
+ // bypass current verified LIVE seats or exact scoped native identity.
  const verified=await page.request.get(origin+'/content/dn000001',{maxRedirects:0});
- assert.equal(verified.status(),303);
- assert.equal(verified.headers().location,'https://example.invalid/content/dn000001');
- assert.equal(calls.length,1);
- assert.equal(calls[0].viewerId,worker.id);
- assert.equal(calls[0].appId,'eel');
+ assert.equal(verified.status(),404);
+ assert.equal(calls.length,0,
+  'central authority must deny before native resource lookup');
  assert.equal((await context.cookies('https://example.invalid')).length,0,
   'central login does not install any native app session cookie');
 });
@@ -954,7 +953,7 @@ test('Chromium mail mention notification opens the exact authorized inbox messag
  assert(sizes.width<=sizes.viewport+2,'mentioned mail remains usable on mobile: '+JSON.stringify(sizes));
 });
 
-test('native connect page completes real CSRF, PKCE and app-bound browser login without exposing credentials',{timeout:65000},async t=>{
+test('native Connect denies legacy global grant in org-mode without a PKCE callback, while browser login remains protected',{timeout:45000},async t=>{
  const {page,origin,identity,worker,registrations,context}=await fixture(t);
  identity.grantAppAccess({userId:worker.id,appId:'eel',localUserId:'native-worker',
   organizationId:'lab-a'});
@@ -964,96 +963,76 @@ test('native connect page completes real CSRF, PKCE and app-bound browser login 
  const challenge=(await import('node:crypto')).createHash('sha256').update(verifier).digest('base64url');
  const query=new URLSearchParams({appId:'eel',redirectUri:client.redirectUris[0],state,codeChallenge:challenge});
  await context.route('https://example.invalid/**',route=>
-  route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Native callback fixture</title>'}));
+  route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Unreachable native callback</title>'}));
  const bad=new URLSearchParams(query);bad.append('state',state);
  const failed=await fetch(origin+'/connect?'+bad);
  assert.equal(failed.status,400,'duplicate state cannot reach the connect UI');
- assert.match(failed.headers.get('cache-control'),/no-store/);
  await page.goto(origin+'/connect?'+query);
  await page.locator('#login:not([hidden])').waitFor();
- assert.equal(await page.locator('#app-name').textContent(),'DuckNote');
  await page.locator('#email').fill('worker@example.test');
  await page.locator('#password').fill('Worker passphrase 123456');
  await page.getByRole('button',{name:'Sign in and continue'}).click();
- await page.waitForURL(/https:\/\/example\.invalid\/eel\/auth\/callback\?/);
- const callback=new URL(page.url());
- assert.equal(callback.searchParams.get('state'),state);
- const code=callback.searchParams.get('code');
- assert.match(code,/^[A-Za-z0-9_-]{32,128}$/);
- assert.equal(callback.searchParams.size,2,'no credentials or client tokens leak to the app callback');
- const sessionCookie=(await context.cookies(origin)).find(cookie=>cookie.name.includes('suite_identity'));
- assert(sessionCookie,'Connect login must create a central identity cookie');
- assert(sessionCookie.expires<0,'Connect login without Remember me must use a browser-session cookie');
- assert(sessionCookie.httpOnly,'Connect login must never expose the identity cookie to JavaScript');
- const exchanged=await fetch(origin+'/api/suite/auth/exchange',{method:'POST',
+ await page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('could not be authorized'));
+ assert(page.url().startsWith(origin+'/connect?'));
+ assert(!page.url().includes('/auth/callback'));
+ const cookie=(await context.cookies(origin)).find(cookie=>cookie.name.includes('suite_identity'));
+ assert(cookie?.httpOnly,'central browser session remains HttpOnly');
+ const probe=await fetch(origin+'/api/suite/auth/exchange',{method:'POST',
   headers:{Authorization:'Basic '+Buffer.from(client.id+':'+client.secret).toString('base64'),
    'Content-Type':'application/json'},
   body:JSON.stringify({clientId:client.id,redirectUri:client.redirectUris[0],
-   code,state,codeVerifier:verifier})});
- assert.equal(exchanged.status,200);
- const proof=await exchanged.json();
- assert.equal(proof.localIdentity.userId,'native-worker');
- assert.equal(proof.localIdentity.organizationId,'lab-a');
- assert.equal(proof.subject,worker.id);
- const replay=await fetch(origin+'/api/suite/auth/exchange',{method:'POST',
-  headers:{Authorization:'Basic '+Buffer.from(client.id+':'+client.secret).toString('base64'),
-   'Content-Type':'application/json'},
-  body:JSON.stringify({clientId:client.id,redirectUri:client.redirectUris[0],
-   code,state,codeVerifier:verifier})});
- assert.equal(replay.status,401,'browser authorization code cannot be reused');
+   code:randomBytes(32).toString('base64url'),state,codeVerifier:verifier})});
+ assert.equal(probe.status,401,'no PKCE code was minted for the unauthorized app');
 });
 
-test('native Connect Remember me opt-in produces a bounded 14-day HttpOnly Workspace session',{timeout:65000},async t=>{
+test('org-mode denied Connect Remember me still produces only a finite HttpOnly central session',{timeout:45000},async t=>{
  const {page,origin,identity,worker,registrations,context}=await fixture(t);
  identity.grantAppAccess({userId:worker.id,appId:'eel',localUserId:'native-worker',
   organizationId:'lab-a'});
  const client=registrations.find(x=>x.appId==='eel');
- const verifier=randomBytes(32).toString('base64url');
  const state=randomBytes(32).toString('base64url');
- const challenge=(await import('node:crypto')).createHash('sha256').update(verifier).digest('base64url');
+ const challenge=randomBytes(32).toString('base64url');
  const query=new URLSearchParams({appId:'eel',redirectUri:client.redirectUris[0],state,codeChallenge:challenge});
- await context.route('https://example.invalid/**',route=>
-  route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Native callback fixture</title>'}));
  await page.goto(origin+'/connect?'+query);
  await page.locator('#login:not([hidden])').waitFor();
- assert.equal(await page.locator('#remember-me').isChecked(),false,'Remember me is never preselected');
+ assert.equal(await page.locator('#remember-me').isChecked(),false);
  await page.locator('#remember-me').check();
  await page.locator('#email').fill('worker@example.test');
  await page.locator('#password').fill('Worker passphrase 123456');
  await page.getByRole('button',{name:'Sign in and continue'}).click();
- await page.waitForURL(/https:\/\/example\.invalid\/eel\/auth\/callback\?/);
- assert.equal(new URL(page.url()).searchParams.get('state'),state);
- const sessionCookie=(await context.cookies(origin)).find(cookie=>cookie.name.includes('suite_identity'));
- assert(sessionCookie,'remembered Connect session must create a central identity cookie');
- assert(sessionCookie.httpOnly,'remembered session remains inaccessible to JavaScript');
- assert(sessionCookie.expires>Date.now()/1000+12*86400,'remembered session lasts beyond twelve days');
- assert(sessionCookie.expires<Date.now()/1000+15*86400,'remembered session cannot outlive fourteen days');
+ await page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('could not be authorized'));
+ const cookie=(await context.cookies(origin)).find(cookie=>cookie.name.includes('suite_identity'));
+ assert(cookie?.httpOnly);
+ assert(cookie.expires>Date.now()/1000+12*86400);
+ assert(cookie.expires<Date.now()/1000+15*86400);
+ assert(page.url().startsWith(origin+'/connect?'));
  const next=new URLSearchParams(query);
  next.set('state',randomBytes(32).toString('base64url'));
  next.set('codeChallenge',randomBytes(32).toString('base64url'));
  await page.goto(origin+'/connect?'+next);
  await page.locator('#active:not([hidden])').waitFor();
  assert.match(await page.locator('#identity').textContent(),/Lab worker/);
- assert.equal(await page.locator('#login').isVisible(),false,'existing signed-in session requires no new credentials');
+ await page.getByRole('button',{name:'Continue to DuckNote'}).click();
+ await page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('could not be authorized'));
+ assert(page.url().startsWith(origin+'/connect?'));
 });
 
-test('native connect page confirms an existing Workspace session before issuing an app code',{timeout:55000},async t=>{
+test('a signed-in organization administrator cannot issue native PKCE code from an old global grant',{timeout:45000},async t=>{
  const {page,origin,identity,owner,registrations,context}=await fixture(t);
  identity.grantAppAccess({userId:owner.id,appId:'eel',localUserId:'native-owner',
   organizationId:'lab-a'});
  await signIn(page);
  const client=registrations.find(x=>x.appId==='eel');
- const verifier=randomBytes(32).toString('base64url');
  const state=randomBytes(32).toString('base64url');
- const challenge=(await import('node:crypto')).createHash('sha256').update(verifier).digest('base64url');
+ const challenge=randomBytes(32).toString('base64url');
  const query=new URLSearchParams({appId:'eel',redirectUri:client.redirectUris[0],state,codeChallenge:challenge});
  await context.route('https://example.invalid/**',route=>
-  route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Native callback fixture</title>'}));
+  route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Should not navigate</title>'}));
  await page.goto(origin+'/connect?'+query);
  await page.locator('#active:not([hidden])').waitFor();
  assert.equal(await page.locator('#login').isVisible(),false);
  assert.match(await page.locator('#identity').textContent(),/Lab owner/);
  await page.getByRole('button',{name:'Continue to DuckNote'}).click();
- await page.waitForURL(/https:\/\/example\.invalid\/eel\/auth\/callback\?/);
- assert.equal(new URL(page.url()).searchParams.get('state'),state);
+ await page.waitForFunction(()=>document.getElementById('status')?.textContent.includes('could not be authorized'));
+ assert(page.url().startsWith(origin+'/connect?'));
 });
