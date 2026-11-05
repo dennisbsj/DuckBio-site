@@ -11,6 +11,7 @@ In an isolated **real Node.js 22.16** test with a deliberately failing assertion
 - `node --test sample.test.mjs`: **exit code 1**, test fails as expected.
 - `NODE_OPTIONS='--test-name-pattern=not-a-test' node --test sample.test.mjs`: **exit code 0**, with `1..0` inside the TAP output: no actual named security tests ran, although the outer file runner reports one passing file.
 - `npm_config_node_options='--test-name-pattern=not-a-test' npm test`: also **exit code 0** on the same failing fixture.
+- A custom `npm_config_script_shell` can also return success without invoking the test command. A separate isolated Unix npm fixture reproduced exit code 0 despite a deliberately failing security test.
 
 An exact Git commit alone cannot protect against test suppression injected by the local Node/npm process environment. The result could be labeled green despite failing native/tenant/security tests.
 
@@ -18,7 +19,7 @@ An exact Git commit alone cannot protect against test suppression injected by th
 
 `scripts/local-qa.mjs` now:
 
-1. Rejects any **nonempty inherited** `NODE_OPTIONS`, `NODE_PATH` or `npm_config_node_options` (including uppercase/lowercase aliases), before executing any `npm` or browser test stage.
+1. Rejects any **nonempty inherited** `NODE_OPTIONS`, `NODE_PATH`, `npm_config_node_options` or `npm_config_script_shell` (including uppercase/lowercase aliases), before executing any `npm` or browser test stage.
 2. Also removes those Node/npm overrides and all `GIT_*` overrides from **every spawned child** (including `npm`, `node` and `git`) to prevent module preloads, inherited Node test-name filters and alternate Git worktree/index selection.
 3. Does not permit `--allow-dirty` to bypass the environment check. An operator must run from a clean, authorized environment and can then obtain meaningful exact-head attestation.
 
