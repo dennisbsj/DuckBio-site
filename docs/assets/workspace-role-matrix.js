@@ -172,10 +172,21 @@
       buttons.append(detail);
       if(!role.standard){
         const edit=textNode("button","Edit","ua-secondary");edit.type="button";edit.addEventListener("click",()=>openEditor(currentApp,role));
-        const remove=textNode("button","Delete","ua-secondary");remove.type="button";remove.addEventListener("click",()=>{
-          if(isAssigned(currentApp,role.name)){issueError(status,"Cannot delete “"+role.name+"” while it is assigned to a user. Remove the assignment in User administration first.");return;}
-          if(!window.confirm("Delete custom role “"+role.name+"” from "+currentApp+"?"))return;
-          custom[currentApp].delete(role.name);renderRoles();clearError(status,"Custom role deleted from this preview.");
+        const remove=textNode("button","Delete","ua-secondary");remove.type="button";remove.addEventListener("click",async()=>{
+          const selectedApp=currentApp;
+          const roleToDelete=role.name;
+          if(isAssigned(selectedApp,roleToDelete)){issueError(status,"Cannot delete “"+roleToDelete+"” while it is assigned to a user. Remove the assignment in User administration first.");return;}
+          const confirmed=await window.DuckBioWorkspaceConfirm({
+            title:"Delete custom role?",
+            description:"Delete “"+roleToDelete+"” from "+selectedApp+"? This cannot be undone in this preview.",
+            confirmLabel:"Delete role"
+          });
+          if(!confirmed)return;
+          if(isAssigned(selectedApp,roleToDelete)){issueError(status,"This role is now assigned to a user and cannot be deleted.");return;}
+          if(!custom[selectedApp].has(roleToDelete)){issueError(status,"This role no longer exists.");return;}
+          custom[selectedApp].delete(roleToDelete);
+          if(currentApp===selectedApp)renderRoles();
+          clearError(status,"Custom role deleted from this preview.");
           window.dispatchEvent(new Event("duckbio-preview-roles-changed"));
         });
         buttons.append(edit,remove);
