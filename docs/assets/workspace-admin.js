@@ -73,9 +73,9 @@
       const summaryText=summary(member);
       apps.textContent=summaryText || "No app access";
       const controls=el("td");
-      const edit=el("button","ua-secondary","Edit permissions");
+      const edit=el("button","ua-secondary","Edit");
       edit.type="button";
-      edit.setAttribute("aria-label","Edit " + member.name + "'s account and app permissions");
+      edit.setAttribute("aria-label","Edit " + member.name);
       edit.addEventListener("click",()=>openAccount(member));
       controls.append(edit);
       tr.append(name,nickname,roleCell,apps,controls);
@@ -121,18 +121,22 @@
     });
   }
   function openAccount(member) {
-    if(!member)return;
-    state.editId=member.id;
+    state.editId=member?.id ?? null;
     fields.reset();
-    buildRoles(); // Refresh dropdowns after custom roles are defined in Permission matrix.
-    byId("ua-account-heading").textContent="Edit app permissions";
-    action.textContent="Save permissions";
-    for(const key of ["name","nickname","email"]) {
+    // Include the latest custom roles created in Permission matrix.
+    buildRoles();
+    const isEdit=Boolean(member);
+    byId("ua-account-heading").textContent=isEdit?"Edit user":"Create account";
+    action.textContent=isEdit?"Save changes":"Create account";
+    const deleteButton=byId("ua-delete-user");
+    deleteButton.hidden=!isEdit;
+    for(const key of ["name","nickname","email"]){
       const input=fields.elements.namedItem(key);
-      input.value=member[key];input.readOnly=true;
+      input.readOnly=false;
+      input.value=isEdit?member[key]:"";
     }
-    fields.elements.namedItem("organisationAdmin").checked=member.admin;
-    selectMap.forEach((select,app)=>{select.value=member.roles[app]||"";});
+    fields.elements.namedItem("organisationAdmin").checked=isEdit?member.admin:false;
+    selectMap.forEach((select,app)=>{select.value=isEdit?(member.roles[app]||""):"";});
     showPanel("account");
   }
   function checkCapacity(roles,original) {
@@ -144,24 +148,60 @@
   }
   function saveAccount(event) {
     event.preventDefault();
-    const original=state.members.find(x=>x.id===state.editId);
-    if(!original) {setMessage(message,"Select an existing user.",true);return;}
+    if(!fields.reportValidity())return;
+    const original=state.editId===null?null:state.members.find(x=>x.id===state.editId);
+    if(state.editId!==null&&!original){
+      setMessage(message,"This user no longer exists. Return to the user list.",true);return;
+    }
+    const name=fields.elements.namedItem("name").value.trim();
+    const nickname=fields.elements.namedItem("nickname").value.trim();
+    const email=fields.elements.namedItem("email").value.trim().toLowerCase();
     const admin=fields.elements.namedItem("organisationAdmin").checked;
     const roles={};
     selectMap.forEach((select,app)=>{if(select.value)roles[app]=select.value;});
+    if(!name||!nickname||!email){
+      setMessage(message,"Name, nickname and email are required.",true);return;
+    }
+    if(state.members.some(user=>user.email===email&&user.id!==state.editId)){
+      setMessage(message,"An account with this email already exists.",true);return;
+    }
+    // New users need at least one licensed app; editing can revoke every app.
+    if(!original&&Object.keys(roles).length===0){
+      setMessage(message,"Select at least one app role, then create the account.",true);return;
+    }
     for(const [app,role] of Object.entries(roles)){
       const catalog=window.DuckBioPreviewRoles;
       const valid=catalog?Boolean(catalog.getRole(app,role)):Boolean(appRoles.find(x=>x.name===app)?.roles.includes(role));
-      if(!valid){setMessage(message,"Unknown role for "+app+". Please reselect the app role.",true);return;}
+      if(!valid){
+        setMessage(message,"Unknown role for "+app+". Please reselect the app role.",true);return;
+      }
     }
-    if(original.admin&&!admin&&state.members.filter(x=>x.admin).length===1){
+    if(original?.admin&&!admin&&state.members.filter(user=>user.admin).length===1){
       setMessage(message,"The organisation must retain at least one administrator.",true);return;
     }
     const blocked=checkCapacity(roles,original);
-    if(blocked){setMessage(message,"No available "+blocked+" licence. Choose Buy users before granting access to this app.",true);return;}
-    Object.assign(original,{admin,roles});
+    if(blocked){
+      setMessage(message,"No unassigned "+blocked+" licence. Use Buy users before granting this app access.",true);return;
+    }
+    if(original)Object.assign(original,{name,nickname,email,admin,roles});
+    else state.members.push({id:state.nextId++,name,nickname,email,admin,roles});
     showPanel("list");
-    setMessage(byId("ua-list-message"),"Example role assignments updated. No real app access was changed.",false);
+    setMessage(byId("ua-list-message"),original?"Example user updated.":"Example account created. No real account was created.",false);
+    window.dispatchEvent(new Event("duckbio-preview-users-changed"));
+  }
+  function deleteEditedUser() {
+    const member=state.members.find(user=>user.id===state.editId);
+    if(!member){
+      setMessage(message,"This user is no longer available.",true);return;
+    }
+    if(member.admin&&state.members.filter(user=>user.admin).length<=1){
+      setMessage(message,"You cannot delete the organisation's last administrator.",true);return;
+    }
+    if(!window.confirm("Delete "+member.name+" and remove their app access from this preview?"))return;
+    state.members=state.members.filter(user=>user.id!==member.id);
+    state.editId=null;
+    showPanel("list");
+    setMessage(byId("ua-list-message"),"Example user deleted. No real account was changed.",false);
     window.dispatchEvent(new Event("duckbio-preview-users-changed"));
   }
   function buildBuy() {
@@ -247,36 +287,20 @@
   }
 
   window.DuckBioWorkspacePreviewAdmin=Object.freeze({
-    listUsers:()=>state.members.map(member=>({...member,roles:{...member.roles}})),
-    isRoleAssigned:(app,role)=>state.members.some(member=>member.roles[app]===role),
-    createUser:({name,nickname,email,admin=false})=>{
-      name=String(name||"").trim();nickname=String(nickname||"").trim();
-      email=String(email||"").trim().toLowerCase();
-      if(!name||!nickname||!email||!email.includes("@"))return {error:"Name, nickname and a valid email are required."};
-      if(state.members.some(member=>member.email===email))return {error:"A user with this email already exists."};
-      const member={id:state.nextId++,name,nickname,email,admin:Boolean(admin),roles:{}};
-      state.members.push(member);renderList();
-      window.dispatchEvent(new Event("duckbio-preview-users-changed"));
-      return {userId:member.id};
-    },
-    deleteUser:id=>{
-      const user=state.members.find(member=>member.id===id);
-      if(!user)return {error:"User not found."};
-      if(user.admin&&state.members.filter(member=>member.admin).length<=1)return {error:"The last organisation administrator cannot be deleted."};
-      state.members=state.members.filter(member=>member.id!==id);
-      renderList();window.dispatchEvent(new Event("duckbio-preview-users-changed"));
-      return {deleted:true};
-    }
+    listUsers:()=>state.members.map(user=>({...user,roles:{...user.roles}})),
+    isRoleAssigned:(app,role)=>state.members.some(user=>user.roles[app]===role)
   });
   buildRoles();buildBuy();renderList();
   document.querySelectorAll("[data-open-user-admin]").forEach(button=>button.addEventListener("click",openAdmin));
   dialog.querySelectorAll("[data-ua-nav]").forEach(button=>button.addEventListener("click",()=>{
     const next=button.dataset.uaNav;
-    showPanel(next);
+    if(next==="account")openAccount(null);
+    else showPanel(next);
   }));
   byId("ua-close").addEventListener("click",()=>dialog.close());
   dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close();});
   fields.addEventListener("submit",saveAccount);
+  byId("ua-delete-user").addEventListener("click",deleteEditedUser);
   buyForm.addEventListener("submit",reviewBuy);
   byId("ua-buy-apply").addEventListener("click",applyPreviewPurchase);
   if(window.parent!==window) {
