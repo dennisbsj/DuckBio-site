@@ -100,6 +100,15 @@ export function auditEightLocalSources({sourcesRoot,stagingDomain,entries,
    if(entries.length===0||entries.some(line=>
       !/^100(?:644|755) [a-f0-9]{40,64} 0\t[^\0]+$/s.test(line)))
     throw Error('nonregular_or_unmerged_git_entries');
+   // Git's assume-unchanged and skip-worktree index flags can hide modified
+   // executable source files from git status --porcelain, even when the
+   // requested commit and ls-files --stage both appear unchanged.
+   // Require ordinary tracked H entries and reject hidden index flags.
+   const flags=git(runGit,directory,['ls-files','-v','-z'])
+    .split('\0').filter(Boolean);
+   if(flags.length!==entries.length||flags.some(item=>
+      !item.startsWith('H ')||item.length<=2))
+    throw Error('hidden_or_unreviewed_index_flags');
    // Re-read after status to deny a concurrent checkout.
    if(git(runGit,directory,['rev-parse','--verify','HEAD'])!==row.sha)
     throw Error('source_changed_during_audit');
