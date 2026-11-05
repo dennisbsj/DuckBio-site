@@ -72,14 +72,34 @@ export function auditEightLocalSources({sourcesRoot,stagingDomain,entries,
    if(!stat.isDirectory()||stat.isSymbolicLink()||
       realpathSync(directory)!==resolve(directory))
     throw Error('untrusted_checkout_path');
+   // A .git "gitfile", linked worktree, or symlinked Git directory can
+   // point outside this physical checkout. Do not treat those as isolated
+   // operator-reviewed native source trees.
+   const gitDir=lstatSync(join(directory,'.git'));
+   if(!gitDir.isDirectory()||gitDir.isSymbolicLink()||
+      realpathSync(join(directory,'.git'))!==resolve(join(directory,'.git')))
+    throw Error('nonphysical_git_directory');
    if(resolve(git(runGit,directory,['rev-parse','--show-toplevel']))!==resolve(directory))
     throw Error('nested_or_other_git_checkout');
    const remote=git(runGit,directory,['config','--local','--no-includes','--get','remote.origin.url']);
    if(!expectedRemote(row.repo).has(remote))throw Error('unexpected_git_origin');
    if(git(runGit,directory,['rev-parse','--verify','HEAD'])!==row.sha)
     throw Error('wrong_source_commit');
-   if(git(runGit,directory,['status','--porcelain','--untracked-files=all'])!=='')
-    throw Error('dirty_checkout');
+   // Ignore rules are not an authorization boundary: an ignored local
+   // source/config file can still alter a build or native app runtime.
+   // This source gate requires fresh, source-only checkouts without build
+   // output or ignored/untracked filesystem entries.
+   if(git(runGit,directory,['status','--porcelain=v1',
+      '--untracked-files=all','--ignored=matching'])!=='')
+    throw Error('dirty_or_ignored_checkout');
+   // Symlink entries and submodule gitlinks can indirectly read content
+   // outside the checked repository. Inspect the actual Git index rather
+   // than trusting git-status to report tracked symlink contents.
+   const tracked=git(runGit,directory,['ls-files','--stage','-z']);
+   const entries=tracked.split('\0').filter(Boolean);
+   if(entries.length===0||entries.some(line=>
+      !/^100(?:644|755) [a-f0-9]{40,64} 0\t[^\0]+$/s.test(line)))
+    throw Error('nonregular_or_unmerged_git_entries');
    // Re-read after status to deny a concurrent checkout.
    if(git(runGit,directory,['rev-parse','--verify','HEAD'])!==row.sha)
     throw Error('source_changed_during_audit');
