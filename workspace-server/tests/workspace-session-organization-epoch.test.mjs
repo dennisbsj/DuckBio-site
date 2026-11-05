@@ -125,8 +125,11 @@ test('a legacy selected session is migrated once and subsequent clear/reselect c
   store.selectSessionOrganization({sessionId:'legacy-session',accountId:account,organizationId:'legacy-lab'});
  }finally{store.close();}
  const db=new DatabaseSync(file);
- try{db.exec('DROP TABLE session_organization_versions');}
- finally{db.close();}
+ try{
+  // Simulate a *genuine pre-epoch* database, NOT a destructive restore of
+  // a migrated database. Legacy SQLite has no version table or header marker.
+  db.exec('DROP TABLE session_organization_versions; PRAGMA user_version=0');
+ }finally{db.close();}
  store=createOrganizationStore(cfg);
  try{
   const current=()=>store.currentSessionOrganization({sessionId:'legacy-session',accountId:account});
@@ -228,4 +231,70 @@ test('selection epoch is isolated to the session, not to every session of the sa
  assert.equal(otherDecision.candidateReady,true);
  assert.equal(otherDecision.accessGranted,false);
  assert.equal(otherDecision.licensesGranted,false);
+});
+
+
+test('dropping a migrated session generation table cannot reseed a prior selection after restart',async t=>{
+ const root=mkdtempSync(path.join(os.tmpdir(),'duckbio-session-table-loss-'));
+ const file=path.join(root,'private','org.sqlite');
+ t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const config={databasePath:file,clock:()=>NOW};
+ let store=createOrganizationStore(config);
+ try{
+  store.setupOrganization({organizationId:'alpha',name:'Alpha lab',
+   owner:{accountId:'alice',name:'Alice',nickname:'A',email:'alice@example.test'}});
+  store.selectSessionOrganization({sessionId:'session-1',accountId:'alice',organizationId:'alpha'});
+  store.clearSessionOrganization('session-1');
+  store.selectSessionOrganization({sessionId:'session-1',accountId:'alice',organizationId:'alpha'});
+  assert.equal(store.currentSessionOrganization({sessionId:'session-1',accountId:'alice'})
+   .sessionSelectionRevision,3);
+ }finally{store.close();}
+ const db=new DatabaseSync(file);
+ try{
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version,1);
+  db.exec('DROP TABLE session_organization_versions');
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version,1);
+ }finally{db.close();}
+ assert.throws(()=>createOrganizationStore(config),/session_revision_unavailable/,
+  'reopening after tombstone-table loss must never seed old sessions at generation 1');
+ const read=new DatabaseSync(file,{readOnly:true});
+ try{
+  assert.equal(read.prepare("SELECT COUNT(*) AS n FROM session_organizations").get().n,1,
+   'preexisting selected organization is still present but must not be trusted');
+  assert.equal(read.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='session_organization_versions'").get().n,0,
+   'failed migration must not recreate the missing generation table');
+  assert.equal(read.prepare('PRAGMA user_version').get().user_version,1);
+ }finally{read.close();}
+});
+
+test('SQLite schema header marker commits with first-session generations and persists on reopen',async t=>{
+ const root=mkdtempSync(path.join(os.tmpdir(),'duckbio-session-header-'));
+ const file=path.join(root,'private','org.sqlite');
+ t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const config={databasePath:file,clock:()=>NOW};
+ let first=createOrganizationStore(config);
+ try{
+  first.setupOrganization({organizationId:'alpha',name:'Alpha lab',
+   owner:{accountId:'alice',name:'Alice',nickname:'A',email:'alice@example.test'}});
+  first.selectSessionOrganization({sessionId:'session-1',accountId:'alice',organizationId:'alpha'});
+ }finally{first.close();}
+ let db=new DatabaseSync(file,{readOnly:true});
+ try{
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version,1);
+  assert.equal(db.prepare('SELECT revision FROM session_organization_versions WHERE session_id=?')
+   .get('session-1').revision,1);
+ }finally{db.close();}
+ const reopened=createOrganizationStore(config);
+ try{
+  reopened.clearSessionOrganization('session-1');
+  reopened.selectSessionOrganization({sessionId:'session-1',accountId:'alice',organizationId:'alpha'});
+  assert.equal(reopened.currentSessionOrganization({sessionId:'session-1',accountId:'alice'})
+   .sessionSelectionRevision,3);
+ }finally{reopened.close();}
+ db=new DatabaseSync(file,{readOnly:true});
+ try{
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version,1);
+  assert.equal(db.prepare('SELECT revision FROM session_organization_versions WHERE session_id=?')
+   .get('session-1').revision,3);
+ }finally{db.close();}
 });
