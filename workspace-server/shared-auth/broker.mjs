@@ -190,6 +190,11 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
     const proofBinding = Object.hasOwn(proof, 'bindingRevision') ? proof.bindingRevision : null;
     if (granted.bindingRevision !== proofBinding ||
         JSON.stringify(granted.localIdentity) !== JSON.stringify(proof.localIdentity)) return null;
+    // A trusted native/policy verifier may await external services. The
+    // parent and child can expire during that await despite an initial PASS.
+    const finalNow = clock();
+    if (!Number.isFinite(finalNow) ||
+        Math.min(proof.expiresAt, parent.expiresAt) <= finalNow) return null;
     return { proof, parent, assertion: { active: true, issuer, audience: client.id, subject: parent.subject, displayName: parent.displayName, localIdentity: granted.localIdentity, expiresAt: Math.min(proof.expiresAt, parent.expiresAt) } };
   }
   async function checkRate(req, email) {
