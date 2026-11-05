@@ -96,9 +96,9 @@ export function auditEightLocalSources({sourcesRoot,stagingDomain,entries,
    // outside the checked repository. Inspect the actual Git index rather
    // than trusting git-status to report tracked symlink contents.
    const tracked=git(runGit,directory,['ls-files','--stage','-z']);
-   const entries=tracked.split('\\0').filter(Boolean);
+   const entries=tracked.split('\0').filter(Boolean);
    if(entries.length===0||entries.some(line=>
-      !/^100(?:644|755) [a-f0-9]{40,64} 0\\t[^\\0]+$/s.test(line)))
+      !/^100(?:644|755) [a-f0-9]{40,64} 0\t[^\0]+$/s.test(line)))
     throw Error('nonregular_or_unmerged_git_entries');
    // Re-read after status to deny a concurrent checkout.
    if(git(runGit,directory,['rev-parse','--verify','HEAD'])!==row.sha)
