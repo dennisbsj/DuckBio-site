@@ -25,8 +25,8 @@
   };
   const getRole = (app,name) => listRoles(app).find(role=>role.name===name);
   window.DuckBioPreviewRoles=Object.freeze({apps:[...apps],listRoles,getRole});
-  const matrix=byId("perm-matrix"), members=byId("perm-org");
-  if(!matrix || !members)return;
+  const matrix=byId("perm-matrix");
+  if(!matrix)return;
 
   matrix.replaceChildren();
   const titleRow=textNode("div",undefined,"role-head");
@@ -45,17 +45,6 @@
   matrix.append(matrixNote);
   const roleList=textNode("div",undefined,"role-catalogue");roleList.id="role-catalogue";matrix.append(roleList);
   const status=textNode("p",undefined,"ua-message");status.id="role-matrix-status";status.setAttribute("role","status");matrix.append(status);
-
-  members.replaceChildren();
-  members.append(textNode("h3","Create or delete users"),textNode("p","Manage organisation identities here. App access and role assignments are managed separately in User administration.","perm-caption"));
-  const memberToolbar=textNode("div",undefined,"ua-toolbar");
-  memberToolbar.append(textNode("strong","Organisation accounts"));
-  const memberCreate=textNode("button","+ Create user","ua-primary");memberCreate.type="button";memberToolbar.append(memberCreate);
-  members.append(memberToolbar);
-  const membersTable=textNode("div",undefined,"ua-table-wrap");
-  membersTable.innerHTML='<table class="ua-table"><thead><tr><th>Name / email</th><th>Nickname</th><th>Workspace role</th><th>Actions</th></tr></thead><tbody id="role-member-rows"></tbody></table>';
-  members.append(membersTable);
-  const memberStatus=textNode("p",undefined,"ua-message");memberStatus.id="role-member-status";memberStatus.setAttribute("role","status");members.append(memberStatus);
 
   function buildDialog(id,title) {
     const dlg=document.createElement("dialog");dlg.className="launcher-dialog ua-dialog ua-role-dialog";dlg.id=id;dlg.setAttribute("aria-labelledby",id+"-title");
@@ -84,23 +73,6 @@
   const cancel=textNode("button","Cancel","ua-secondary");cancel.type="button";cancel.addEventListener("click",()=>editor.close());
   const save=textNode("button","Create role","ua-primary");save.type="submit";
   footer.append(cancel,save);form.append(footer);editor.append(form);
-
-  const userDialog=buildDialog("role-user-dialog","Create user");
-  userDialog.append(textNode("p","Create an account here; grant app access in User administration.","ua-hint"));
-  const userForm=document.createElement("form");userForm.id="role-create-user-form";userForm.autocomplete="off";
-  const userGrid=textNode("div",undefined,"ua-grid");
-  for(const [field,label,type,placeholder] of [["name","Name","text","Full name"],["nickname","Nickname","text","Display name"],["email","Email","email","name@organisation.com"]]){
-    const wrap=textNode("label",undefined,"ua-field");wrap.append(textNode("span",label));
-    const input=document.createElement("input");input.name=field;input.type=type;input.maxLength=field==="email"?254:field==="nickname"?80:120;input.required=true;input.placeholder=placeholder;
-    wrap.append(input);userGrid.append(wrap);
-  }
-  userForm.append(userGrid);
-  const adminLine=textNode("label",undefined,"ua-checkline");
-  const adminBox=document.createElement("input");adminBox.type="checkbox";adminBox.name="admin";adminLine.append(adminBox,textNode("span","Organisation administrator (also a normal user)"));userForm.append(adminLine);
-  const userMsg=textNode("p",undefined,"ua-message");userMsg.id="role-create-user-message";userMsg.setAttribute("role","status");userForm.append(userMsg);
-  const userFooter=textNode("div",undefined,"ua-modal-footer");
-  const userCancel=textNode("button","Cancel","ua-secondary");userCancel.type="button";userCancel.addEventListener("click",()=>userDialog.close());
-  const create=textNode("button","Create user","ua-primary");create.type="submit";userFooter.append(userCancel,create);userForm.append(userFooter);userDialog.append(userForm);
 
   let editing=null;
   let currentApp=apps[0];
@@ -225,50 +197,11 @@
   appSelect.addEventListener("change",()=>{currentApp=appSelect.value;renderRoles();clearError(status,"");});
   renderRoles();
 
-  function renderMembers(){
-    const body=byId("role-member-rows");body.replaceChildren();
-    const api=window.DuckBioWorkspacePreviewAdmin;
-    if(!api)return;
-    for(const user of api.listUsers()){
-      const row=textNode("tr");
-      const person=textNode("td");person.append(textNode("strong",user.name),textNode("small",user.email));
-      row.append(person,textNode("td",user.nickname),textNode("td",user.admin?"Admin + user":"User"));
-      const actions=textNode("td");
-      const remove=textNode("button","Delete user","ua-secondary");remove.type="button";
-      remove.setAttribute("aria-label","Delete "+user.name);
-      remove.addEventListener("click",()=>{
-        if(!window.confirm("Delete "+user.name+" and revoke their app assignments in this preview?"))return;
-        const result=api.deleteUser(user.id);
-        if(result.error)issueError(memberStatus,result.error);
-        else{renderMembers();clearError(memberStatus,"Example user deleted. No real accounts were changed.");}
-      });
-      actions.append(remove);row.append(actions);body.append(row);
-    }
-  }
-  memberCreate.addEventListener("click",()=>{
-    userForm.reset();clearError(userMsg,"");openModal(userDialog);
-  });
-  userForm.addEventListener("submit",event=>{
-    event.preventDefault();if(!userForm.reportValidity())return;
-    const api=window.DuckBioWorkspacePreviewAdmin;
-    if(!api)return issueError(userMsg,"User administration preview is unavailable.");
-    const result=api.createUser({
-      name:userForm.elements.namedItem("name").value,
-      nickname:userForm.elements.namedItem("nickname").value,
-      email:userForm.elements.namedItem("email").value,
-      admin:userForm.elements.namedItem("admin").checked
-    });
-    if(result.error)return issueError(userMsg,result.error);
-    userDialog.close();renderMembers();
-    clearError(memberStatus,"User created without app access. Assign a role in User administration.");
-  });
-  window.addEventListener("duckbio-preview-users-changed",renderMembers);
-  renderMembers();
-  window.addEventListener("resize",()=>{for(const dlg of [editor,userDialog])if(dlg.open)positionModal(dlg);},{passive:true});
+  window.addEventListener("resize",()=>{for(const dlg of [editor])if(dlg.open)positionModal(dlg);},{passive:true});
   if(window.parent!==window){
     try{
-      window.parent.addEventListener("scroll",()=>{for(const dlg of [editor,userDialog])if(dlg.open)positionModal(dlg);},{passive:true});
-      window.parent.addEventListener("resize",()=>{for(const dlg of [editor,userDialog])if(dlg.open)positionModal(dlg);},{passive:true});
+      window.parent.addEventListener("scroll",()=>{for(const dlg of [editor])if(dlg.open)positionModal(dlg);},{passive:true});
+      window.parent.addEventListener("resize",()=>{for(const dlg of [editor])if(dlg.open)positionModal(dlg);},{passive:true});
     }catch(error){}
   }
 })();
