@@ -20,10 +20,12 @@ export function parseLocalQaArgs(argv){
   expectHead:pins.length?pins[0].slice('--expect-head='.length).toLowerCase():null};
 }
 function run(command,args,{cwd=projectDir,timeout=TIMEOUT}={}){
- // Do not let GIT_DIR, GIT_WORK_TREE or GIT_CONFIG_* select an unrelated
- // checkout. Preserve normal env for npm/node; strip Git overrides for Git.
+ // No child command (including npm/browser-test subprocesses) may
+ // inherit GIT_DIR, GIT_WORK_TREE or GIT_CONFIG_* from the operator's shell.
+ // These could redirect nested Git checks or fake clean-HEAD evidence in tests.
+ // Source scripts can still set synthetic Git vars explicitly in fixtures.
  const env=Object.fromEntries(Object.entries(process.env).filter(([name])=>
-  command!=='git'||!name.startsWith('GIT_')));
+  !name.startsWith('GIT_')));
  env.FORCE_COLOR='0';
  const result=spawnSync(command,args,{cwd,encoding:'utf8',timeout,
   maxBuffer:16*1024*1024,shell:process.platform==='win32'&&/\.cmd$/i.test(command),
