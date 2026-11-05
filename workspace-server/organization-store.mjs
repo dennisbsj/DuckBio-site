@@ -591,7 +591,8 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
           if(count+pendingSeats(organizationId,app)>=limit)fail('app_seats_exhausted');
         }
         // Once an admin is demoted, their pending invites and seat holds end.
-        if(prior?.admin&&!member.admin)revokeIssuedInvitations(organizationId,member.accountId);
+        const revokedInvitations=prior?.admin&&!member.admin?
+          revokeIssuedInvitations(organizationId,member.accountId):0;
         db.prepare('INSERT INTO members(org,account,name,nickname,email,admin) VALUES(?,?,?,?,?,?) ON CONFLICT(org,account) DO UPDATE SET name=excluded.name,nickname=excluded.nickname,email=excluded.email,admin=excluded.admin').run(organizationId,member.accountId,member.name.trim(),member.nickname.trim(),email,member.admin?1:0);
         for(const app of APPLICATIONS){
           if(previousRoles[app.id] && requested[app.id] && previousRoles[app.id]!==requested[app.id])
@@ -599,7 +600,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
           if(requested[app.id])db.prepare('INSERT INTO assignments(org,account,app,role) VALUES(?,?,?,?) ON CONFLICT(org,account,app) DO UPDATE SET role=excluded.role').run(organizationId,member.accountId,app.id,requested[app.id]);
           else db.prepare('DELETE FROM assignments WHERE org=? AND account=? AND app=?').run(organizationId,member.accountId,app.id);
         }
-        audit(organizationId,actorId,prior?'member.updated':'member.added',member.accountId,{before:prior?{roles:previousRoles,admin:Boolean(prior.admin)}:null,after:{roles:requested,admin:member.admin}});
+        audit(organizationId,actorId,prior?'member.updated':'member.added',member.accountId,{before:prior?{roles:previousRoles,admin:Boolean(prior.admin)}:null,after:{roles:requested,admin:member.admin},revokedInvitations});
         return view(organizationId,db.prepare('SELECT * FROM members WHERE org=? AND account=?').get(organizationId,member.accountId));
       });
     },
@@ -984,8 +985,8 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         if(Boolean(row.active)===active)return {accountId,active,changed:false};
         if(!active && row.admin && db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1 AND active=1').get(organizationId).n===1)fail('last_organization_admin');
         db.prepare('UPDATE members SET active=? WHERE org=? AND account=?').run(active?1:0,organizationId,accountId);
-        if(!active)revokeIssuedInvitations(organizationId,accountId);
-        audit(organizationId,actorId,active?'member.reactivated':'member.deactivated',accountId);
+        const revokedInvitations=!active?revokeIssuedInvitations(organizationId,accountId):0;
+        audit(organizationId,actorId,active?'member.reactivated':'member.deactivated',accountId,{revokedInvitations});
         // A suspended user retains the licensed seat to prevent over-allocation on reactivation.
         return {accountId,active,changed:true};
       });
@@ -998,9 +999,9 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         if(!row)fail('member_not_found');
         if(row.admin && row.active && db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1 AND active=1').get(organizationId).n===1)fail('last_organization_admin');
         const removedRoles=roles(organizationId,accountId);
-        revokeIssuedInvitations(organizationId,accountId);
+        const revokedInvitations=revokeIssuedInvitations(organizationId,accountId);
         db.prepare('DELETE FROM members WHERE org=? AND account=?').run(organizationId,accountId);
-        audit(organizationId,actorId,'member.removed',accountId,{roles:removedRoles});
+        audit(organizationId,actorId,'member.removed',accountId,{roles:removedRoles,revokedInvitations});
         return {removed:true,accountId};
       });
     },
@@ -1014,10 +1015,11 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         db.prepare('DELETE FROM organization_invites WHERE expires_at<=?').run(clock());
         // Clean legacy orphaned invites before duplicate checks; they cannot
         // be claimed and must never block a new active admin invitation.
-        db.prepare(`DELETE FROM organization_invites WHERE org=? AND NOT EXISTS (
+        const purged=db.prepare(`DELETE FROM organization_invites WHERE org=? AND NOT EXISTS (
           SELECT 1 FROM members m WHERE m.org=organization_invites.org
           AND m.account=organization_invites.issued_by AND m.admin=1 AND m.active=1
-        )`).run(organizationId);
+        )`).run(organizationId).changes;
+        if(purged>0)audit(organizationId,actorId,'invitation.invalid_issuer.cleaned',organizationId,{count:purged});
         if(db.prepare('SELECT 1 FROM organization_invites WHERE org=? AND email=?').get(organizationId,normalized))fail('invitation_exists');
         for(const app of Object.keys(requested)){
           const count=db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?').get(organizationId,app).n;

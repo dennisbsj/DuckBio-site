@@ -299,6 +299,7 @@ test('suspended inviter loses outstanding invites, reserved seats and later toke
  store.setMemberActive({organizationId:'one',actorId:'admin2',accountId:'admin1',active:false});
  assert.equal(store.previewInvitation(created.token),null);
  assert.equal(store.overview('one','admin2').apps.find(x=>x.id==='eel').reserved,0);
+ assert.equal(store.auditLog('one','admin2').find(e=>e.action==='member.deactivated'&&e.subject==='admin1').details.revokedInvitations,1);
  assert.deepEqual(store.listPendingInvitations('one','admin2'),[]);
  assert.throws(()=>store.acceptInvitation({token:created.token,
   accountId:'scientist',email:'pending@example.test'}),/invalid_invitation/);
@@ -320,12 +321,14 @@ test('demoting or removing an inviting admin revokes reservations and tokens',t=
  const first=invite();
  store.saveMember({organizationId:'one',actorId:'admin1',member:member('admin2')});
  assert.equal(store.previewInvitation(first.token),null);
+ assert.equal(store.auditLog('one','admin1').find(e=>e.action==='member.updated'&&e.subject==='admin2'&&e.details.revokedInvitations===1).details.revokedInvitations,1);
  assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,0);
  store.saveMember({organizationId:'one',actorId:'admin1',
   member:member('admin2',{}, {admin:true})});
  const second=invite();
  store.removeMember({organizationId:'one',actorId:'admin1',accountId:'admin2'});
  assert.equal(store.previewInvitation(second.token),null);
+ assert.equal(store.auditLog('one','admin1').find(e=>e.action==='member.removed'&&e.subject==='admin2').details.revokedInvitations,1);
  assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,0);
 });
 
@@ -348,6 +351,7 @@ test('historical orphan invite cannot count as reserved seat or block replacemen
  assert.equal(store.previewInvitation(newer.token).email,'pending@example.test');
  assert.equal(store.previewInvitation(oldToken),null);
  assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,1);
+ assert.equal(store.auditLog('one','admin1').find(e=>e.action==='invitation.invalid_issuer.cleaned').details.count,1);
 });
 
 
