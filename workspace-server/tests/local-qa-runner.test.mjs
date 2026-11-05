@@ -144,8 +144,10 @@ test('real local QA ignores inherited GIT_DIR and GIT_WORK_TREE overrides',t=>{
   git(where,'init','-q');
   writeFileSync(join(where,'package.json'),JSON.stringify({
    name:where===first?'isolated-workspace':'other-repository',
-   private:true,scripts:{check:'node -e "process.exit(0)"',
-    test:'node -e "process.exit(0)"'}
+   private:true,scripts:{
+    check:'node -e "process.exit(process.env.GIT_DIR || process.env.GIT_WORK_TREE || process.env.GIT_CONFIG_COUNT ? 17 : 0)"',
+    test:'node -e "process.exit(process.env.GIT_DIR || process.env.GIT_WORK_TREE || process.env.GIT_CONFIG_COUNT ? 17 : 0)"'
+   }
   })+'\n');
   git(where,'add','package.json');
   git(where,'-c','user.name=Private QA','-c','user.email=private@example.test',
@@ -155,8 +157,10 @@ test('real local QA ignores inherited GIT_DIR and GIT_WORK_TREE overrides',t=>{
  const other=git(second,'rev-parse','HEAD');
  assert.notEqual(expected,other,'independently committed fixtures have different trees');
  const savedDir=process.env.GIT_DIR,savedWorkTree=process.env.GIT_WORK_TREE;
+ const savedConfigCount=process.env.GIT_CONFIG_COUNT;
  process.env.GIT_DIR=join(second,'.git');
  process.env.GIT_WORK_TREE=second;
+ process.env.GIT_CONFIG_COUNT='1';
  try{
   const result=runLocalWorkspaceQa(['--expect-head='+expected],{
    cwd:first,log:()=>{},nodeVersion:'22.16.0'
@@ -170,5 +174,7 @@ test('real local QA ignores inherited GIT_DIR and GIT_WORK_TREE overrides',t=>{
   else process.env.GIT_DIR=savedDir;
   if(savedWorkTree===undefined)delete process.env.GIT_WORK_TREE;
   else process.env.GIT_WORK_TREE=savedWorkTree;
+  if(savedConfigCount===undefined)delete process.env.GIT_CONFIG_COUNT;
+  else process.env.GIT_CONFIG_COUNT=savedConfigCount;
  }
 });
