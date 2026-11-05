@@ -57,6 +57,17 @@ export function regularTrackedGitModes(output){
  return entries.length>0&&entries.every(entry=>
   /^(?:100644|100755) [0-9a-f]{40} 0\t[^\r\n]+$/u.test(entry));
 }
+/** Both index readouts must enumerate exactly the same root-level paths.
+ * A race or altered index between the flag and mode read is not clean QA.
+ */
+export function matchingTrackedGitPaths(flags,modes){
+ if(!ordinaryTrackedGitIndex(flags)||!regularTrackedGitModes(modes))return false;
+ const names=flags.slice(0,-1).split('\0').map(entry=>entry.slice(2));
+ const staged=modes.slice(0,-1).split('\0')
+  .map(entry=>entry.slice(entry.indexOf('\t')+1));
+ return names.length===staged.length&&
+  names.every((name,i)=>name===staged[i]);
+}
 export function validQaNodeVersion(version){
  const parsed=/^(\d+)\.(\d+)\.\d+$/.exec(version);
  if(!parsed)return false;
@@ -89,8 +100,8 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const sourceModes=execute('git',['ls-files','--stage','-z'],{cwd:sourceRoot,timeout:10000});
  const sha=head.stdout.trim();
  const trustworthyIndex=Boolean(sourceIndex.ok&&ordinaryTrackedGitIndex(sourceIndex.stdout));
- const trustworthyModes=Boolean(sourceModes.ok&&regularTrackedGitModes(sourceModes.stdout)&&
-  sourceModes.stdout.split('\0').length===sourceIndex.stdout.split('\0').length);
+ const trustworthyModes=Boolean(sourceModes.ok&&
+  matchingTrackedGitPaths(sourceIndex.stdout,sourceModes.stdout));
  const clean=Boolean(head.ok&&/^[0-9a-f]{40}$/.test(sha)&&status.ok&&
   !status.stdout.trim()&&trustworthyIndex&&trustworthyModes);
  const report={schema:'duckbio.workspace.local-qa.v1',sha:head.ok?sha:null,
@@ -159,7 +170,7 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const endStatus=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
  const endIndex=execute('git',['ls-files','-v','-z'],{cwd:sourceRoot,timeout:10000});
  const endModes=execute('git',['ls-files','--stage','-z'],{cwd:sourceRoot,timeout:10000});
- if(!endModes.ok||!regularTrackedGitModes(endModes.stdout)||
+ if(!endModes.ok||!matchingTrackedGitPaths(endIndex.stdout,endModes.stdout)||
     endModes.stdout!==sourceModes.stdout){
   report.stages.push({name:'git-source-mode-integrity',status:'failed',exitCode:1,durationMs:0});
   report.exactHead=false;
