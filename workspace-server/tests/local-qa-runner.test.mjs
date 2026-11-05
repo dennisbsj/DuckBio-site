@@ -143,9 +143,10 @@ test('real local QA ignores inherited GIT_DIR and GIT_WORK_TREE overrides',t=>{
   mkdirSync(where);
   git(where,'init','-q');
   writeFileSync(join(where,'package.json'),JSON.stringify({
+   name:where===first?'isolated-workspace':'other-repository',
    private:true,scripts:{check:'node -e "process.exit(0)"',
     test:'node -e "process.exit(0)"'}
-  })+'\\n');
+  })+'\n');
   git(where,'add','package.json');
   git(where,'-c','user.name=Private QA','-c','user.email=private@example.test',
    'commit','-qm','Isolated QA local source fixture');
