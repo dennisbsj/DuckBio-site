@@ -1061,9 +1061,19 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         if(!invitation||invitation.email!==email.trim().toLowerCase())fail('invalid_invitation');
         if(db.prepare('SELECT 1 FROM members WHERE org=? AND account=?').get(invitation.organizationId,accountId))fail('member_exists');
         if(db.prepare('SELECT 1 FROM members WHERE org=? AND email=?').get(invitation.organizationId,invitation.email))fail('member_exists');
+        // A seat reservation was valid when issued, but authorization to
+        // assign a purchased seat must still be checked at acceptance. Keep
+        // the token unconsumed if capacity has disappeared meanwhile.
+        const assignedRoles=validRoles(invitation.roles,invitation.organizationId);
+        for(const app of Object.keys(assignedRoles)){
+          const assigned=db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?')
+            .get(invitation.organizationId,app).n;
+          const purchased=db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?')
+            .get(invitation.organizationId,app)?.purchased??0;
+          if(assigned>=purchased)fail('app_seats_exhausted');
+        }
         const removed=db.prepare('DELETE FROM organization_invites WHERE token_hash=? AND expires_at>? RETURNING token_hash').get(inviteHash(token),clock());
         if(!removed)fail('invalid_invitation');
-        const assignedRoles=validRoles(invitation.roles,invitation.organizationId);
         db.prepare('INSERT INTO members(org,account,name,nickname,email,admin) VALUES(?,?,?,?,?,?)').run(invitation.organizationId,accountId,invitation.name,invitation.nickname,invitation.email,invitation.admin?1:0);
         for(const [app,role] of Object.entries(assignedRoles))
           db.prepare('INSERT INTO assignments(org,account,app,role) VALUES(?,?,?,?)').run(invitation.organizationId,accountId,app,role);
