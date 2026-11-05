@@ -111,3 +111,12 @@ html[data-theme="dark"] .role-perm-key{color:#b7d6e5}
  .role-definition-top .ua-actions{flex-wrap:wrap}
  .role-definition-details,.role-checkbox-grid{grid-template-columns:1fr}
 }
+
+
+/* Destructive account action appears only inside Edit user, never in the user table. */
+.ua-danger{display:inline-flex;align-items:center;justify-content:center;min-height:39px;padding:9px 13px;border:1px solid #d7a8a7;border-radius:9px;background:#fff8f7;color:#a42c2c;font-size:12px;font-weight:800;cursor:pointer}
+.ua-danger:hover{border-color:#b74646;background:#ffeded}
+.ua-danger:focus-visible{outline:3px solid #f1a5a5;outline-offset:2px}
+html[data-theme="dark"] .ua-danger{background:#482a31;color:#ffd1d1;border-color:#a75a65}
+html[data-theme="dark"] .ua-danger:hover{background:#62343c}
+@media(max-width:520px){.ua-modal-footer .ua-danger{margin-right:auto}}
