@@ -456,7 +456,8 @@ test('Node/npm test override inspection refuses preloads, alternate module paths
   ['NODE_OPTIONS','--require=/tmp/fake-preload.js'],
   ['NODE_PATH','/tmp/unreviewed-dependencies'],
   ['npm_config_node_options','--test-name-pattern=skip-security'],
-  ['NPM_CONFIG_NODE_OPTIONS','--import=file:///tmp/unreviewed-preload.mjs']
+  ['NPM_CONFIG_NODE_OPTIONS','--import=file:///tmp/unreviewed-preload.mjs'],
+  ['npm_config_script_shell','/custom-test-shell']
  ]){
   assert.deepEqual(unsafeQaNodeEnvironment({[key]:value}),[key]);
  }
@@ -467,7 +468,8 @@ test('unsafe inherited NODE_OPTIONS and npm node-options block before executing 
   ['NODE_OPTIONS','--test-name-pattern=not-found'],
   ['NODE_OPTIONS','--require=/tmp/unsafe-mock.js'],
   ['NODE_PATH','/tmp/untrusted-source'],
-  ['npm_config_node_options','--test-name-pattern=not-found']
+  ['npm_config_node_options','--test-name-pattern=not-found'],
+  ['NPM_CONFIG_SCRIPT_SHELL','/custom-test-shell']
  ];
  for(const [name,value] of inputs){
   const previous=process.env[name];
