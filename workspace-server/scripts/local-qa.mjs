@@ -45,7 +45,7 @@ export function browserFiles(directory){
 export function ordinaryTrackedGitIndex(output){
  if(typeof output!=='string'||!output.endsWith('\0'))return false;
  const entries=output.slice(0,-1).split('\0');
- return entries.length>0&&entries.every(entry=>/^H /u.test(entry));
+ return entries.length>0&&entries.every(entry=>/^H [^\r\n]+$/u.test(entry));
 }
 export function validQaNodeVersion(version){
  const parsed=/^(\d+)\.(\d+)\.\d+$/.exec(version);
