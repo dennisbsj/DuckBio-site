@@ -4,7 +4,7 @@ import {mkdtempSync,writeFileSync,rmSync,mkdirSync,symlinkSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {dirname,join} from 'node:path';
-import {parseLocalQaArgs,browserFiles,summarizeQaStage,validQaNodeVersion,ordinaryTrackedGitIndex,regularTrackedGitModes,runLocalWorkspaceQa} from '../scripts/local-qa.mjs';
+import {parseLocalQaArgs,browserFiles,summarizeQaStage,validQaNodeVersion,ordinaryTrackedGitIndex,regularTrackedGitModes,matchingTrackedGitPaths,runLocalWorkspaceQa} from '../scripts/local-qa.mjs';
 
 const SHA='a'.repeat(40);
 const ok=stdout=>({ok:true,exitCode:0,stdout:stdout??'',stderr:'',error:null});
@@ -420,4 +420,27 @@ test('real modified parent policy hidden by index flags cannot escape child-fold
    'hidden parent policy must not reach any npm execution stage');
   exec(root,'update-index',off,'suite-permissions.json');
  }
+});
+
+
+test('Git index flag and mode snapshots must contain precisely the same tracked paths',()=>{
+ const flagged='H package.json\0H suite-permissions.json\0';
+ const matched='100644 '+SHA+' 0\tpackage.json\0'+
+  '100644 '+SHA+' 0\tsuite-permissions.json\0';
+ assert.equal(matchingTrackedGitPaths(flagged,matched),true);
+ assert.equal(matchingTrackedGitPaths(flagged,
+  '100644 '+SHA+' 0\tpackage.json\0'+
+  '100644 '+SHA+' 0\tunrelated-same-count.json\0'),false);
+ assert.equal(matchingTrackedGitPaths(flagged,
+  '100644 '+SHA+' 0\tsuite-permissions.json\0'+
+  '100644 '+SHA+' 0\tpackage.json\0'),false);
+ assert.equal(matchingTrackedGitPaths('h package.json\0',matched),false);
+});
+
+test('source mode index with a substituted same-count filename cannot run QA',()=>{
+ const f=fake({initialModes:'100644 '+SHA+' 0\tdifferent-file.mjs\0'});
+ const r=runLocalWorkspaceQa([],{execute:f.execute,log:()=>{}});
+ assert.equal(r.exitCode,2);
+ assert.equal(r.report.exactHead,false);
+ assert.equal(f.calls.filter(call=>call[0]!=='git').length,0);
 });
