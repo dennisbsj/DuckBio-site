@@ -189,7 +189,7 @@
     setMessage(byId("ua-list-message"),original?"Example user updated.":"Example account created. No real account was created.",false);
     window.dispatchEvent(new Event("duckbio-preview-users-changed"));
   }
-  function deleteEditedUser() {
+  async function deleteEditedUser() {
     const member=state.members.find(user=>user.id===state.editId);
     if(!member){
       setMessage(message,"This user is no longer available.",true);return;
@@ -197,7 +197,19 @@
     if(member.admin&&state.members.filter(user=>user.admin).length<=1){
       setMessage(message,"You cannot delete the organisation's last administrator.",true);return;
     }
-    if(!window.confirm("Delete "+member.name+" and remove their app access from this preview?"))return;
+    const confirmed=await window.DuckBioWorkspaceConfirm({
+      title:"Delete user?",
+      description:"Delete "+member.name+" and remove all their app access? This cannot be undone in this preview.",
+      confirmLabel:"Delete user"
+    });
+    if(!confirmed)return;
+    const latest=state.members.find(user=>user.id===member.id);
+    if(!latest){
+      setMessage(message,"This user is no longer available.",true);return;
+    }
+    if(latest.admin&&state.members.filter(user=>user.admin).length<=1){
+      setMessage(message,"You cannot delete the organisation's last administrator.",true);return;
+    }
     state.members=state.members.filter(user=>user.id!==member.id);
     state.editId=null;
     showPanel("list");
