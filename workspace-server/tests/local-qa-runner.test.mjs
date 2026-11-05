@@ -112,7 +112,7 @@ test('a different Git HEAD after test stages cannot be reported as exact-head PA
  assert.deepEqual(r.report.stages.map(x=>[x.name,x.status]),[
   ['syntax','passed'],['core','passed'],['git-head-integrity','failed']
  ]);
- assert.equal(f.calls.filter(x=>x[0]==='git'&&x[1]==='rev-parse').length,2);
+ assert.equal(f.calls.filter(x=>x[0]==='git'&&x[1]==='rev-parse'&&x[2]==='--verify').length,2);
 });
 
 test('new working-tree changes during tests fail despite a stable Git HEAD',()=>{
@@ -129,7 +129,7 @@ test('a failed final Git HEAD query fails closed even if all test stages pass',(
  const original=f.execute;
  let calls=0;
  const execute=(cmd,args)=>{
-  if(cmd==='git'&&args[0]==='rev-parse'&&calls++>0)return fail();
+  if(cmd==='git'&&args[0]==='rev-parse'&&args[1]==='--verify'&&calls++>0)return fail();
   return original(cmd,args);
  };
  const r=runLocalWorkspaceQa(['--json'],{execute,log:()=>{}});
