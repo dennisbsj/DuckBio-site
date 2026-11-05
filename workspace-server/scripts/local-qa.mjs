@@ -9,6 +9,19 @@ import {fileURLToPath} from 'node:url';
 
 const projectDir=dirname(dirname(fileURLToPath(import.meta.url)));
 const TIMEOUT=20*60*1000;
+const unsafeQaOverrideKeys=new Set([
+ 'NODE_OPTIONS','NODE_PATH','NPM_CONFIG_NODE_OPTIONS',
+ 'NPM_CONFIG_SCRIPT_SHELL'
+]);
+/** Host-provided Node test filters/preloads can suppress every test and still
+ * return exit 0. Never claim exact-head QA with these inherited settings.
+ * Also catches the npm config alias regardless of casing on Windows.
+ */
+export function unsafeQaNodeEnvironment(environment=process.env){
+ return Object.entries(environment).filter(([name,value])=>
+  unsafeQaOverrideKeys.has(name.toUpperCase())&&
+  typeof value==='string'&&value.trim().length>0).map(([name])=>name);
+}
 
 export function parseLocalQaArgs(argv){
  const allowed=new Set(['--browser','--json','--allow-dirty','--help']);
@@ -20,10 +33,15 @@ export function parseLocalQaArgs(argv){
   expectHead:pins.length?pins[0].slice('--expect-head='.length).toLowerCase():null};
 }
 function run(command,args,{cwd=projectDir,timeout=TIMEOUT}={}){
- // Do not let GIT_DIR, GIT_WORK_TREE or GIT_CONFIG_* select an unrelated
- // checkout. Preserve normal env for npm/node; strip Git overrides for Git.
- const env=Object.fromEntries(Object.entries(process.env).filter(([name])=>
-  command!=='git'||!name.startsWith('GIT_')));
+ // Node preloads/test filters can make a FAILING test exit 0.
+ // npm's overridden script shell can return 0 WITHOUT executing the test.
+ // Git overrides can select unrelated trees inside npm and browser scripts.
+ // The runner rejects nonempty unsafe Node overrides before QA; independently
+ // strip them from EVERY child process, including npm and node.
+ const env=Object.fromEntries(Object.entries(process.env).filter(([name])=>{
+  const upper=name.toUpperCase();
+  return !upper.startsWith('GIT_')&&!unsafeQaOverrideKeys.has(upper);
+ }));
  env.FORCE_COLOR='0';
  const result=spawnSync(command,args,{cwd,encoding:'utf8',timeout,
   maxBuffer:16*1024*1024,shell:process.platform==='win32'&&/\.cmd$/i.test(command),
@@ -107,6 +125,13 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const report={schema:'duckbio.workspace.local-qa.v1',sha:head.ok?sha:null,
   exactHead:clean,expectedRoot:sourceRoot,expectedHead:options.expectHead,allowDirty:options.allowDirty,stages:[],
   outcome:'blocked',nodeVersion};
+ const unsafeNodeEnvironment=unsafeQaNodeEnvironment();
+ if(unsafeNodeEnvironment.length){
+  report.exactHead=false;
+  log('Unsafe inherited Node/npm test or script-shell overrides detected: '+unsafeNodeEnvironment.join(', ')+
+   '. Clear the environment before running Workspace release QA.');
+  return {exitCode:2,report};
+ }
  if(!validQaNodeVersion(nodeVersion)){
   log('Workspace QA requires Node 22.16+ or Node 24.');
   return {exitCode:2,report};
@@ -136,7 +161,16 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
   return {exitCode:2,report};
  }
  const npm=process.platform==='win32'?'npm.cmd':'npm';
- const stages=[['syntax',npm,['run','check']],['core',npm,['test']]];
+ // Explicit shell overrides even a user/global npmrc script-shell. The
+ // operator must launch THIS runner directly with trusted Node, not via an
+ // untrusted npm wrapper that can bypass executing the runner itself.
+ const scriptShell=process.platform==='win32'
+  ?join(process.env.SystemRoot||'C:\\Windows','System32','cmd.exe')
+  :'/bin/sh';
+ const stages=[
+  ['syntax',npm,['--script-shell='+scriptShell,'--node-options=','run','check']],
+  ['core',npm,['--script-shell='+scriptShell,'--node-options=','test']]
+ ];
  if(options.browser){
   const dependency=execute(process.execPath,['--input-type=module','-e',
    "Promise.all([import('playwright'),import('playwright/package.json',{with:{type:'json'}})]).then(([p,v])=>import('node:fs').then(fs=>process.exit(v.default.version==='1.56.1'&&fs.existsSync(p.chromium.executablePath())?0:2))).catch(()=>process.exit(2))"],

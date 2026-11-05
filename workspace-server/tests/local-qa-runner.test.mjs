@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,writeFileSync,rmSync,mkdirSync,symlinkSync} from 'node:fs';
-import {execFileSync} from 'node:child_process';
+import {execFileSync,spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {dirname,join} from 'node:path';
-import {parseLocalQaArgs,browserFiles,summarizeQaStage,validQaNodeVersion,ordinaryTrackedGitIndex,regularTrackedGitModes,matchingTrackedGitPaths,runLocalWorkspaceQa} from '../scripts/local-qa.mjs';
+import {parseLocalQaArgs,browserFiles,summarizeQaStage,validQaNodeVersion,ordinaryTrackedGitIndex,regularTrackedGitModes,matchingTrackedGitPaths,unsafeQaNodeEnvironment,runLocalWorkspaceQa} from '../scripts/local-qa.mjs';
 
 const SHA='a'.repeat(40);
 const ok=stdout=>({ok:true,exitCode:0,stdout:stdout??'',stderr:'',error:null});
@@ -445,4 +445,88 @@ test('source mode index with a substituted same-count filename cannot run QA',()
  assert.equal(r.exitCode,2);
  assert.equal(r.report.exactHead,false);
  assert.equal(f.calls.filter(call=>call[0]!=='git').length,0);
+});
+
+test('Node/npm test override inspection refuses preloads, alternate module paths and skipped test patterns',()=>{
+ assert.deepEqual(unsafeQaNodeEnvironment({}),[]);
+ assert.deepEqual(unsafeQaNodeEnvironment({NODE_OPTIONS:''}),[]);
+ assert.deepEqual(unsafeQaNodeEnvironment({NODE_OPTIONS:'  '}),[]);
+ for(const [key,value] of [
+  ['NODE_OPTIONS','--test-name-pattern=not-found'],
+  ['NODE_OPTIONS','--require=/tmp/fake-preload.js'],
+  ['NODE_PATH','/tmp/unreviewed-dependencies'],
+  ['npm_config_node_options','--test-name-pattern=skip-security'],
+  ['NPM_CONFIG_NODE_OPTIONS','--import=file:///tmp/unreviewed-preload.mjs'],
+  ['npm_config_script_shell','/custom-test-shell']
+ ]){
+  assert.deepEqual(unsafeQaNodeEnvironment({[key]:value}),[key]);
+ }
+});
+
+test('unsafe inherited NODE_OPTIONS and npm node-options block before executing any QA stage',()=>{
+ const inputs=[
+  ['NODE_OPTIONS','--test-name-pattern=not-found'],
+  ['NODE_OPTIONS','--require=/tmp/unsafe-mock.js'],
+  ['NODE_PATH','/tmp/untrusted-source'],
+  ['npm_config_node_options','--test-name-pattern=not-found'],
+  ['NPM_CONFIG_SCRIPT_SHELL','/custom-test-shell']
+ ];
+ for(const [name,value] of inputs){
+  const previous=process.env[name];
+  try{
+   process.env[name]=value;
+   const f=fake();
+   const result=runLocalWorkspaceQa(['--allow-dirty'],{
+    execute:f.execute,log:()=>{}
+   });
+   assert.equal(result.exitCode,2,name);
+   assert.equal(result.report.exactHead,false,name);
+   assert.equal(result.report.outcome,'blocked',name);
+   assert.equal(result.report.stages.length,0,
+    'never launch npm or node stages for '+name);
+   assert.equal(f.calls.filter(call=>call[0]!=='git').length,0,name);
+  }finally{
+   if(previous===undefined)delete process.env[name];
+   else process.env[name]=previous;
+  }
+ }
+});
+
+test('real Node test-name injection can turn a failing security regression into an exit-0 test file',t=>{
+ const root=mkdtempSync(join(tmpdir(),'duckbio-node-test-skip-'));
+ t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const file=join(root,'mandatory-security.test.mjs');
+ writeFileSync(file,
+  "import test from 'node:test';\nimport assert from 'node:assert/strict';\n"+
+  "test('mandatory seat and tenant check',()=>assert.fail('this test MUST fail'));\n");
+ const env=Object.fromEntries(Object.entries(process.env)
+  .filter(([name])=>!['NODE_OPTIONS','NODE_PATH','NPM_CONFIG_NODE_OPTIONS'].includes(name.toUpperCase())));
+ const direct=spawnSync(process.execPath,['--test',file],{encoding:'utf8',env,timeout:10000});
+ assert.equal(direct.status,1,'without injection, failing test fails the command');
+ const injected=spawnSync(process.execPath,['--test',file],{
+  encoding:'utf8',
+  env:{...env,NODE_OPTIONS:'--test-name-pattern=no-match-for-any-test'},
+  timeout:10000
+ });
+ assert.equal(injected.status,0,
+  'Node can incorrectly return exit 0 with all real named tests suppressed');
+ assert.match(injected.stdout,/1\.\.0/,
+  'Node TAP emits an empty inner suite under the inherited test-name pattern');
+ assert.equal(unsafeQaNodeEnvironment({NODE_OPTIONS:'--test-name-pattern=no-match-for-any-test'}).length,1,
+  'Workspace QA must independently block precisely that inherited flag');
+});
+
+test('release QA pins a trusted npm command shell rather than the user npmrc default',()=>{
+ const f=fake();
+ const outcome=runLocalWorkspaceQa([],{execute:f.execute,log:()=>{}});
+ assert.equal(outcome.exitCode,0);
+ const npmCalls=f.calls.filter(call=>call[0]==='npm'||call[0]==='npm.cmd');
+ assert.equal(npmCalls.length,2,'both source syntax and core tests must use the pinned shell');
+ const expected=process.platform==='win32'?'cmd.exe':'/bin/sh';
+ for(const call of npmCalls){
+  assert(call.some(arg=>arg.startsWith('--script-shell=')&&arg.endsWith(expected)),
+   'npm user/global script-shell must not replace test execution');
+  assert(call.includes('--node-options='),
+   'npmrc must not inject a Node test-name filter or preload into the test child');
+ }
 });
