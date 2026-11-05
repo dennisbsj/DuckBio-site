@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import {createHash,randomBytes} from 'node:crypto';
-import {createAuthBroker,createMemoryBrokerStore} from '../shared-auth/broker.mjs';
+import {createAuthBroker} from '../shared-auth/broker.mjs';
 import {createSqliteAuthStores} from '../shared-auth/sqlite-store.mjs';
 import {createIdentityStore} from '../shared-auth/identity-store.mjs';
 import {createOrganizationStore} from '../organization-store.mjs';
