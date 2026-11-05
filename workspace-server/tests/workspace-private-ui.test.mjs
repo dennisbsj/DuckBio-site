@@ -54,3 +54,34 @@ test('Create account uses secure invitation while existing-account assignment st
  assert(js.includes("'Add existing account access'"));
  assert(!html.includes('Create an account with a password chosen by an administrator'));
 });
+
+
+test('administrator actions disclose and confirm pending invitation invalidation',()=>{
+ const js=readFileSync(fileURLToPath(new URL('workspace.js',base)),'utf8');
+ assert(js.includes('Pending invitations issued by this administrator will be revoked and their reserved app seats released.'));
+ assert(js.includes('Pending invitations issued by this member will be revoked.'));
+ assert(js.includes('Removing organization administrator status also revokes any pending invitations issued by this member.'));
+ assert(js.includes('Pending invitations issued by the former administrator were revoked.'));
+ assert(js.includes('Their assigned app seats remain reserved.'));
+ assert(!js.includes('innerHTML'));
+});
+
+
+test('seats are shown per app after subtracting assignments and pending invites',()=>{
+ const js=readFileSync(fileURLToPath(new URL('workspace.js',base)),'utf8');
+ assert(js.includes('function appSeatSummary(app)'));
+ assert(js.includes('app.purchased-app.assigned-(app.reserved||0)'));
+ assert(js.includes('appSeatSummary(app)'));
+ assert(js.includes('(Workspace assignments only)'));
+ assert(js.includes('Over capacity by '));
+ assert(!js.includes('organization-wide available users'));
+});
+
+
+test('invitation revoked during asynchronous delivery has an explicit private Workspace error',()=>{
+ const js=readFileSync(fileURLToPath(new URL('workspace.js',base)),'utf8');
+ assert(js.includes("code==='invitation_revoked'"));
+ assert(js.includes('The invitation was canceled while email was being sent.'));
+ assert(js.includes('errorMessage(res.status,body.error)'));
+ assert(!js.includes('innerHTML'));
+});

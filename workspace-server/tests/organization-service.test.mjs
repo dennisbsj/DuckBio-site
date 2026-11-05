@@ -595,3 +595,110 @@ test('DuckBio-only messaging uses private virtual mail and hides owner from all 
  assert.equal((await alice.call('/api/suite/communications/chat/send',{
   recipientId:c.id,body:'Hello across labs',clientId:'cross-lab-123'})).status,201);
 });
+
+
+test('HTTP user administration revokes dormant issuer invitations and frees app seats',async t=>{
+ const f=await fixture(t),original=f.browser(),standby=f.browser(),invitee=f.browser();
+ await original.preflight();await standby.preflight();await invitee.preflight();
+ const owner=(await (await original.call('/api/suite/setup',{
+  setupToken:f.setupToken,email:'owner@example.test',
+  displayName:'Owner',password:'Owner password 12345'
+ })).json()).user;
+ f.organizationStore.setupOrganization({organizationId:'org-a',name:'Lab A',
+  owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:owner.email}});
+ f.organizationStore.applyVerifiedSeatPurchase({reference:'private-test-reservation',
+  organizationId:'org-a',plan:'Single',apps:['eel'],seats:1});
+ const backup=await f.identityStore.createUser({
+  email:'backup@example.test',displayName:'Backup Admin',
+  password:'Backup password 12345'
+ });
+ f.organizationStore.saveMember({organizationId:'org-a',actorId:owner.id,
+  member:{accountId:backup.id,name:'Backup Admin',nickname:'Backup',
+   email:backup.email,admin:true,roles:{}}});
+ assert.equal((await original.call('/api/suite/organization/select',{
+  organizationId:'org-a'})).status,200);
+ assert.equal((await standby.call('/api/suite/account/login',{
+  email:'backup@example.test',password:'Backup password 12345'})).status,200);
+ assert.equal((await standby.call('/api/suite/organization/select',{
+  organizationId:'org-a'})).status,200);
+ const body={organizationId:'org-a',name:'New scientist',nickname:'New',
+  email:'new@example.test',admin:true,roles:{eel:'scientist'}};
+ const issued=await original.call('/api/suite/organization/invite',body);
+ assert.equal(issued.status,201);
+ const oldToken=new URL((await issued.json()).invitationUrl).searchParams.get('invite');
+ assert.equal((await invitee.call('/api/suite/organization/invite/preview?token='+oldToken)).status,200);
+ assert.equal((await (await standby.call('/api/suite/organization/overview',{
+  organizationId:'org-a'})).json()).apps.find(x=>x.id==='eel').reserved,1);
+ assert.equal((await standby.call('/api/suite/organization/user/active',{
+  organizationId:'org-a',accountId:owner.id,active:false})).status,200);
+ assert.equal((await invitee.call('/api/suite/organization/invite/preview?token='+oldToken)).status,403);
+ assert.equal((await invitee.call('/api/suite/organization/invite/accept',{
+  token:oldToken,password:'Never active password 12345'})).status,403);
+ assert.equal(f.identityStore.findUserByEmail('new@example.test'),null);
+ assert.equal((await (await standby.call('/api/suite/organization/overview',{
+  organizationId:'org-a'})).json()).apps.find(x=>x.id==='eel').reserved,0);
+ assert.deepEqual((await (await standby.call('/api/suite/organization/invite/list',{
+  organizationId:'org-a'})).json()).invitations,[]);
+ assert.equal((await original.call('/api/suite/organization/invite',{
+  ...body,email:'forbidden@example.test'})).status,403);
+ const replacement=await standby.call('/api/suite/organization/invite',body);
+ assert.equal(replacement.status,201);
+ const newToken=new URL((await replacement.json()).invitationUrl).searchParams.get('invite');
+ assert.notEqual(newToken,oldToken);
+ assert.equal((await standby.call('/api/suite/organization/user/active',{
+  organizationId:'org-a',accountId:owner.id,active:true})).status,200);
+ assert.equal((await invitee.call('/api/suite/organization/invite/preview?token='+oldToken)).status,403);
+ assert.equal((await invitee.call('/api/suite/organization/invite/preview?token='+newToken)).status,200);
+ assert.equal(f.organizationStore.auditLog('org-a',backup.id)
+  .find(e=>e.action==='member.deactivated'&&e.subject===owner.id)
+  .details.revokedInvitations,1);
+});
+
+
+for(const providerRejects of [false,true]){
+ test('organization invitation issuer disabled during email '+(providerRejects?'failure':'success')+' cannot leave a falsely usable link',async t=>{
+  let f,ownerId,backupId,deliveredToken;
+  const mailer={async sendInvitation(invitation){
+   deliveredToken=new URL(invitation.invitationUrl).searchParams.get('invite');
+   f.organizationStore.setMemberActive({organizationId:'org-a',actorId:backupId,
+    accountId:ownerId,active:false});
+   if(providerRejects)throw Error('synthetic email transport failure');
+   return {accepted:true};
+  }};
+  f=await fixture(t,{invitationMailer:mailer});
+  const admin=f.browser(),guest=f.browser();
+  await admin.preflight();await guest.preflight();
+  const owner=(await (await admin.call('/api/suite/setup',{
+   setupToken:f.setupToken,email:'owner@example.test',
+   displayName:'Owner',password:'Owner password 12345'
+  })).json()).user;
+  ownerId=owner.id;
+  f.organizationStore.setupOrganization({organizationId:'org-a',name:'Alpha',
+   owner:{accountId:owner.id,name:'Owner',nickname:'Owner',email:owner.email}});
+  f.organizationStore.applyVerifiedSeatPurchase({reference:'trusted-mailer-race',
+   organizationId:'org-a',plan:'Single',apps:['eel'],seats:1});
+  const backup=await f.identityStore.createUser({
+   email:'backup@example.test',displayName:'Backup',password:'Backup password 12345'
+  });
+  backupId=backup.id;
+  f.organizationStore.saveMember({organizationId:'org-a',actorId:owner.id,
+   member:{accountId:backup.id,name:'Backup',nickname:'B',email:backup.email,
+    admin:true,roles:{}}});
+  assert.equal((await admin.call('/api/suite/organization/select',{
+   organizationId:'org-a'})).status,200);
+  const created=await admin.call('/api/suite/organization/invite',{
+   organizationId:'org-a',name:'Scientist',nickname:'S',
+   email:'new@example.test',roles:{eel:'scientist'}
+  });
+  assert.equal(created.status,providerRejects?503:409);
+  assert.deepEqual(await created.json(),{
+   error:providerRejects?'email_unavailable':'invitation_revoked'
+  });
+  assert.match(deliveredToken,/^[A-Za-z0-9_-]{43}$/);
+  assert.equal((await guest.call('/api/suite/organization/invite/preview?token='+deliveredToken)).status,403);
+  assert.equal((await guest.call('/api/suite/organization/invite/accept',{
+   token:deliveredToken,password:'Example new password 12345'})).status,403);
+  assert.equal(f.identityStore.findUserByEmail('new@example.test'),null);
+  assert.equal(f.organizationStore.overview('org-a',backupId).apps.find(x=>x.id==='eel').reserved,0);
+ });
+}

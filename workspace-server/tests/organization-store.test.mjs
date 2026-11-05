@@ -1,4 +1,6 @@
 import test from 'node:test';
+import {DatabaseSync} from 'node:sqlite';
+import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync,statSync} from 'node:fs';
 import os from 'node:os';import path from 'node:path';
@@ -283,4 +285,135 @@ test('subscription drafts are tenant scoped and cannot ever grant seats',t=>{
  assert.equal(store.cancelSubscriptionDraft({organizationId:'one',actorId:'admin1',draftId:draft.id}).status,'canceled');
  assert.deepEqual(store.overview('one','admin1').apps.map(a=>a.purchased),[0,0,0,0,0,0]);
  assert.deepEqual(store.overview('one','admin1').apps.map(a=>a.assigned),[0,0,0,0,0,0]);
+});
+
+test('suspended inviter loses outstanding invites, reserved seats and later token revival',t=>{
+ const {store}=fixture(t);
+ buy(store,'sus-seat','Single',['eel']);
+ store.saveMember({organizationId:'one',actorId:'admin1',
+  member:member('admin2',{}, {admin:true})});
+ const created=store.issueInvitation({organizationId:'one',actorId:'admin1',
+  name:'Pending',nickname:'P',email:'pending@example.test',
+  admin:true,roles:{eel:'scientist'}});
+ assert.equal(store.overview('one','admin2').apps.find(x=>x.id==='eel').reserved,1);
+ store.setMemberActive({organizationId:'one',actorId:'admin2',accountId:'admin1',active:false});
+ assert.equal(store.previewInvitation(created.token),null);
+ assert.equal(store.overview('one','admin2').apps.find(x=>x.id==='eel').reserved,0);
+ assert.equal(store.auditLog('one','admin2').find(e=>e.action==='member.deactivated'&&e.subject==='admin1').details.revokedInvitations,1);
+ assert.deepEqual(store.listPendingInvitations('one','admin2'),[]);
+ assert.throws(()=>store.acceptInvitation({token:created.token,
+  accountId:'scientist',email:'pending@example.test'}),/invalid_invitation/);
+ const newInvite=store.issueInvitation({organizationId:'one',actorId:'admin2',
+  name:'Pending',nickname:'P',email:'pending@example.test',roles:{eel:'scientist'}});
+ assert.notEqual(newInvite.token,created.token);
+ store.setMemberActive({organizationId:'one',actorId:'admin2',accountId:'admin1',active:true});
+ assert.equal(store.previewInvitation(created.token),null);
+ assert.equal(store.previewInvitation(newInvite.token).email,'pending@example.test');
+});
+
+test('demoting or removing an inviting admin revokes reservations and tokens',t=>{
+ const {store}=fixture(t);
+ buy(store,'demote-seat','Single',['eel']);
+ store.saveMember({organizationId:'one',actorId:'admin1',
+  member:member('admin2',{}, {admin:true})});
+ const invite=()=>store.issueInvitation({organizationId:'one',actorId:'admin2',
+  name:'New',nickname:'N',email:'new@example.test',roles:{eel:'scientist'}});
+ const first=invite();
+ store.saveMember({organizationId:'one',actorId:'admin1',member:member('admin2')});
+ assert.equal(store.previewInvitation(first.token),null);
+ assert.equal(store.auditLog('one','admin1').find(e=>e.action==='member.updated'&&e.subject==='admin2'&&e.details.revokedInvitations===1).details.revokedInvitations,1);
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,0);
+ store.saveMember({organizationId:'one',actorId:'admin1',
+  member:member('admin2',{}, {admin:true})});
+ const second=invite();
+ store.removeMember({organizationId:'one',actorId:'admin1',accountId:'admin2'});
+ assert.equal(store.previewInvitation(second.token),null);
+ assert.equal(store.auditLog('one','admin1').find(e=>e.action==='member.removed'&&e.subject==='admin2').details.revokedInvitations,1);
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,0);
+});
+
+test('historical orphan invite cannot count as reserved seat or block replacement',t=>{
+ const {store,dbPath}=fixture(t);
+ buy(store,'legacy-seat','Single',['eel']);
+ const oldToken='A'.repeat(43);
+ const db=new DatabaseSync(dbPath);
+ try{
+  db.prepare('INSERT INTO organization_invites(token_hash,org,issued_by,email,name,nickname,admin,expires_at,roles) VALUES(?,?,?,?,?,?,?,?,?)')
+   .run(createHash('sha256').update(oldToken).digest('hex'),
+    'one','missing-issuer','pending@example.test','Pending','P',0,
+    1000+7*24*60*60*1000,JSON.stringify({eel:'scientist'}));
+ }finally{db.close()}
+ assert.equal(store.previewInvitation(oldToken),null);
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,0);
+ assert.deepEqual(store.listPendingInvitations('one','admin1'),[]);
+ const newer=store.issueInvitation({organizationId:'one',actorId:'admin1',
+  name:'Pending',nickname:'P',email:'pending@example.test',roles:{eel:'scientist'}});
+ assert.equal(store.previewInvitation(newer.token).email,'pending@example.test');
+ assert.equal(store.previewInvitation(oldToken),null);
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,1);
+ assert.equal(store.auditLog('one','admin1').find(e=>e.action==='invitation.invalid_issuer.cleaned').details.count,1);
+});
+
+
+test('last active administrator cannot be suspended and their invitation remains valid',t=>{
+ const {store}=fixture(t);
+ const issued=store.issueInvitation({organizationId:'one',actorId:'admin1',
+  name:'Researcher',nickname:'R',email:'researcher@example.test'});
+ assert.throws(()=>store.setMemberActive({organizationId:'one',actorId:'admin1',
+  accountId:'admin1',active:false}),/last_organization_admin/);
+ assert.equal(store.previewInvitation(issued.token).email,'researcher@example.test');
+ assert.equal(store.listPendingInvitations('one','admin1').length,1);
+});
+
+test('orphan invitation cleanup never touches valid invitations in another lab',t=>{
+ const {store,dbPath}=fixture(t);
+ store.setupOrganization({organizationId:'two',name:'Lab B',
+  owner:{accountId:'adminB',name:'Admin B',nickname:'B',email:'adminb@example.test'}});
+ const outside=store.issueInvitation({organizationId:'two',actorId:'adminB',
+  name:'Guest',nickname:'G',email:'guest@example.test'});
+ const stale='Z'.repeat(43);
+ const db=new DatabaseSync(dbPath);
+ try{
+  db.prepare('INSERT INTO organization_invites(token_hash,org,issued_by,email,name,nickname,admin,expires_at,roles) VALUES(?,?,?,?,?,?,?,?,?)')
+   .run(createHash('sha256').update(stale).digest('hex'),'one','removed-admin',
+    'orphan@example.test','Orphan','O',0,1000+7*24*60*60*1000,'{}');
+ }finally{db.close()}
+ const refreshed=store.issueInvitation({organizationId:'one',actorId:'admin1',
+  name:'Orphan',nickname:'O',email:'orphan@example.test'});
+ assert.equal(store.previewInvitation(stale),null);
+ assert.equal(store.previewInvitation(refreshed.token).email,'orphan@example.test');
+ assert.equal(store.previewInvitation(outside.token).email,'guest@example.test');
+ assert.equal(store.listPendingInvitations('two','adminB').length,1);
+});
+
+
+test('private SQLite restart preserves invitation revocation and audit after admin suspension',t=>{
+ const root=mkdtempSync(path.join(os.tmpdir(),'duckbio-invitation-restart-'));
+ const databasePath=path.join(root,'private','organization.sqlite');
+ let store=createOrganizationStore({databasePath,clock:()=>1000});
+ let closed=false;
+ const close=()=>{if(!closed){store.close();closed=true;}};
+ t.after(()=>{close();rmSync(root,{recursive:true,force:true})});
+ store.setupOrganization({organizationId:'one',name:'Lab A',
+  owner:{accountId:'owner',name:'Owner',nickname:'O',email:'owner@example.test'}});
+ store.saveMember({organizationId:'one',actorId:'owner',
+  member:member('backup',{}, {admin:true})});
+ store.applyVerifiedSeatPurchase({reference:'durable-seat',organizationId:'one',
+  plan:'Single',apps:['eel'],seats:1});
+ const invitation=store.issueInvitation({organizationId:'one',actorId:'owner',
+  name:'Guest',nickname:'G',email:'guest@example.test',
+  admin:true,roles:{eel:'scientist'}});
+ assert.equal(store.overview('one','backup').apps.find(x=>x.id==='eel').reserved,1);
+ store.setMemberActive({organizationId:'one',actorId:'backup',accountId:'owner',active:false});
+ close();
+ store=createOrganizationStore({databasePath,clock:()=>1000});
+ closed=false;
+ assert.equal(store.previewInvitation(invitation.token),null);
+ assert.equal(store.overview('one','backup').apps.find(x=>x.id==='eel').reserved,0);
+ assert.equal(store.auditLog('one','backup').find(e=>
+  e.action==='member.deactivated'&&e.subject==='owner').details.revokedInvitations,1);
+ store.setMemberActive({organizationId:'one',actorId:'backup',accountId:'owner',active:true});
+ assert.equal(store.previewInvitation(invitation.token),null);
+ assert.throws(()=>store.acceptInvitation({token:invitation.token,
+  accountId:'guest',email:'guest@example.test'}),/invalid_invitation/);
 });
