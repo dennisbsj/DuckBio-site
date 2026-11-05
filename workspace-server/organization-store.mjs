@@ -584,15 +584,17 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         if(prior?.admin&&prior.active&&!member.admin&&db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1 AND active=1').get(organizationId).n===1)fail('last_organization_admin');
         const collision=db.prepare('SELECT account FROM members WHERE org=? AND email=?').get(organizationId,email);
         if(collision&&collision.account!==member.accountId)fail('duplicate_organization_email');
+        // Demotion ends this member's invitation authority immediately.
+        // Release their pending reservations before validating new app roles,
+        // all inside the same transaction so failed edits roll back both.
+        const revokedInvitations=prior?.admin&&!member.admin?
+          revokeIssuedInvitations(organizationId,member.accountId):0;
         for(const app of Object.keys(requested)){
           if(db.prepare('SELECT 1 FROM assignments WHERE org=? AND account=? AND app=?').get(organizationId,member.accountId,app))continue;
           const count=db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?').get(organizationId,app).n;
           const limit=db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?').get(organizationId,app)?.purchased??0;
           if(count+pendingSeats(organizationId,app)>=limit)fail('app_seats_exhausted');
         }
-        // Once an admin is demoted, their pending invites and seat holds end.
-        const revokedInvitations=prior?.admin&&!member.admin?
-          revokeIssuedInvitations(organizationId,member.accountId):0;
         db.prepare('INSERT INTO members(org,account,name,nickname,email,admin) VALUES(?,?,?,?,?,?) ON CONFLICT(org,account) DO UPDATE SET name=excluded.name,nickname=excluded.nickname,email=excluded.email,admin=excluded.admin').run(organizationId,member.accountId,member.name.trim(),member.nickname.trim(),email,member.admin?1:0);
         for(const app of APPLICATIONS){
           if(previousRoles[app.id] && requested[app.id] && previousRoles[app.id]!==requested[app.id])
