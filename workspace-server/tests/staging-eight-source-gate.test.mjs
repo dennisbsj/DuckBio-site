@@ -73,3 +73,21 @@ test('malformed source inventory and fake source status never grants anything',t
  }
  assert.equal(auditEightLocalSources({...f,sourcesRoot:'relative'}).ok,false);
 });
+
+test('inherited Git environment cannot redirect the checked repository',t=>{
+ const f=fixture(t);
+ const original=process.env.GIT_DIR;
+ process.env.GIT_DIR=join(f.source('DuckMan'),'.git');
+ try{
+  const runGit=(command,args,options)=>{
+   assert.equal(options.env.GIT_DIR,undefined);
+   return execFileSync(command,args,options);
+  };
+  const result=auditEightLocalSources({...f,runGit});
+  assert.equal(result.ok,true);
+  assert.equal(result.verified,8);
+ }finally{
+  if(original===undefined)delete process.env.GIT_DIR;
+  else process.env.GIT_DIR=original;
+ }
+});

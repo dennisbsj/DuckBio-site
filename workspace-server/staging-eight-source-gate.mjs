@@ -37,7 +37,10 @@ const expectedRemote=repo=>new Set([
 const git=(runGit,directory,args)=>{
  const value=runGit('git',['-c','core.fsmonitor=false',...args],{
   cwd:directory,encoding:'utf8',timeout:10000,
-  stdio:['ignore','pipe','ignore'],maxBuffer:1024*1024
+  stdio:['ignore','pipe','ignore'],maxBuffer:1024*1024,
+  // Do not allow GIT_DIR, GIT_WORK_TREE or GIT_CONFIG_* from callers
+  // to redirect what the offline source audit actually inspects.
+  env:Object.fromEntries(Object.entries(process.env).filter(([name])=>!name.startsWith('GIT_')))
  });
  if(typeof value!=='string')throw Error('untrusted_git_response');
  return value.trim();
@@ -71,7 +74,7 @@ export function auditEightLocalSources({sourcesRoot,stagingDomain,entries,
     throw Error('untrusted_checkout_path');
    if(resolve(git(runGit,directory,['rev-parse','--show-toplevel']))!==resolve(directory))
     throw Error('nested_or_other_git_checkout');
-   const remote=git(runGit,directory,['remote','get-url','origin']);
+   const remote=git(runGit,directory,['config','--local','--no-includes','--get','remote.origin.url']);
    if(!expectedRemote(row.repo).has(remote))throw Error('unexpected_git_origin');
    if(git(runGit,directory,['rev-parse','--verify','HEAD'])!==row.sha)
     throw Error('wrong_source_commit');
