@@ -294,7 +294,7 @@ test('suspended inviter loses outstanding invites, reserved seats and later toke
   member:member('admin2',{}, {admin:true})});
  const created=store.issueInvitation({organizationId:'one',actorId:'admin1',
   name:'Pending',nickname:'P',email:'pending@example.test',
-  roles:{eel:'scientist'}});
+  admin:true,roles:{eel:'scientist'}});
  assert.equal(store.overview('one','admin2').apps.find(x=>x.id==='eel').reserved,1);
  store.setMemberActive({organizationId:'one',actorId:'admin2',accountId:'admin1',active:false});
  assert.equal(store.previewInvitation(created.token),null);
@@ -348,4 +348,36 @@ test('historical orphan invite cannot count as reserved seat or block replacemen
  assert.equal(store.previewInvitation(newer.token).email,'pending@example.test');
  assert.equal(store.previewInvitation(oldToken),null);
  assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,1);
+});
+
+
+test('last active administrator cannot be suspended and their invitation remains valid',t=>{
+ const {store}=fixture(t);
+ const issued=store.issueInvitation({organizationId:'one',actorId:'admin1',
+  name:'Researcher',nickname:'R',email:'researcher@example.test'});
+ assert.throws(()=>store.setMemberActive({organizationId:'one',actorId:'admin1',
+  accountId:'admin1',active:false}),/last_organization_admin/);
+ assert.equal(store.previewInvitation(issued.token).email,'researcher@example.test');
+ assert.equal(store.listPendingInvitations('one','admin1').length,1);
+});
+
+test('orphan invitation cleanup never touches valid invitations in another lab',t=>{
+ const {store,dbPath}=fixture(t);
+ store.setupOrganization({organizationId:'two',name:'Lab B',
+  owner:{accountId:'adminB',name:'Admin B',nickname:'B',email:'adminb@example.test'}});
+ const outside=store.issueInvitation({organizationId:'two',actorId:'adminB',
+  name:'Guest',nickname:'G',email:'guest@example.test'});
+ const stale='Z'.repeat(43);
+ const db=new DatabaseSync(dbPath);
+ try{
+  db.prepare('INSERT INTO organization_invites(token_hash,org,issued_by,email,name,nickname,admin,expires_at,roles) VALUES(?,?,?,?,?,?,?,?,?)')
+   .run(createHash('sha256').update(stale).digest('hex'),'one','removed-admin',
+    'orphan@example.test','Orphan','O',0,1000+7*24*60*60*1000,'{}');
+ }finally{db.close()}
+ const refreshed=store.issueInvitation({organizationId:'one',actorId:'admin1',
+  name:'Orphan',nickname:'O',email:'orphan@example.test'});
+ assert.equal(store.previewInvitation(stale),null);
+ assert.equal(store.previewInvitation(refreshed.token).email,'orphan@example.test');
+ assert.equal(store.previewInvitation(outside.token).email,'guest@example.test');
+ assert.equal(store.listPendingInvitations('two','adminB').length,1);
 });
