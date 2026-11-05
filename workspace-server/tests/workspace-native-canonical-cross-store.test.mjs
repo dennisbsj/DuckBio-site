@@ -10,7 +10,8 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import {createHash,randomBytes} from 'node:crypto';
-import {createAuthBroker,createMemoryBrokerStore} from '../shared-auth/broker.mjs';
+import {createAuthBroker} from '../shared-auth/broker.mjs';
+import {createSqliteAuthStores} from '../shared-auth/sqlite-store.mjs';
 import {createIdentityStore} from '../shared-auth/identity-store.mjs';
 import {createOrganizationStore} from '../organization-store.mjs';
 import {createWorkspaceNativeAccessInspector} from '../workspace-native-access-inspector.mjs';
@@ -358,6 +359,14 @@ test('REAL broker HTTP PKCE handoff uses LIVE-org SQLite grant epochs and reject
  const verifier=randomBytes(32).toString('base64url');
  const challenge=createHash('sha256').update(verifier).digest('base64url');
  const redirectUri='https://cytoduck.example.test/auth/callback';
+ // Unlike the earlier synthetic broker tests, this handoff persists PKCE
+ // codes and native proof records in the ACTUAL SQLite broker-store.
+ const brokerRoot=mkdtempSync(path.join(os.tmpdir(),'duckbio-real-broker-store-'));
+ const brokerFile=path.join(brokerRoot,'private','auth.sqlite');
+ const brokerStorage=createSqliteAuthStores({
+  databasePath:brokerFile,clock:()=>1800000000000
+ });
+ t.after(()=>{brokerStorage.close();rmSync(brokerRoot,{recursive:true,force:true})});
  let broker;
  const server=http.createServer(async(req,res)=>{
   try{
@@ -369,7 +378,7 @@ test('REAL broker HTTP PKCE handoff uses LIVE-org SQLite grant epochs and reject
  const origin='http://127.0.0.1:'+server.address().port;
  broker=createAuthBroker({origin,issuer:'https://identity.example.test',
   clients:[{id:'goflo',appId:'goflo',secret,redirectUris:[redirectUri]}],
-  identity:brokerIdentity,store:createMemoryBrokerStore(),
+  identity:brokerIdentity,store:brokerStorage.brokerStore,
   clock:()=>1800000000000
  });
  const preflight=await fetch(origin+'/api/suite/auth/session');
@@ -399,6 +408,25 @@ test('REAL broker HTTP PKCE handoff uses LIVE-org SQLite grant epochs and reject
  assert.deepEqual(issued.data.localIdentity,{userId:NATIVE_USER,organizationId:NATIVE_ORG});
  const proof=issued.data.sessionToken;
  assert.equal((await introspect(proof)).data.active,true);
+ const peer=createSqliteAuthStores({
+  databasePath:brokerFile,clock:()=>1800000000000
+ });
+ try{
+  const hash=createHash('sha256').update(proof).digest('hex');
+  const durable=await peer.brokerStore.getProof(hash);
+  assert.equal(durable.parentSessionId,f.alpha.id,
+   'separate SQLite process can read the exact exchanged native child proof');
+  assert.deepEqual(durable.localIdentity,{
+   userId:NATIVE_USER,organizationId:NATIVE_ORG
+  });
+ }finally{peer.close();}
+ // Two separate HTTP exchange requests compete for one durable PKCE code.
+ const race=await authorize();
+ assert.equal(race.status,200);
+ const raceCode=new URL(race.data.redirectUrl).searchParams.get('code');
+ const results=await Promise.all([exchange(raceCode),exchange(raceCode)]);
+ assert.deepEqual(results.map(x=>x.status).sort(),[200,401],
+  'SQLite DELETE ... RETURNING permits exactly one code redemption');
  // Revocation is persistent and must invalidate a previously exchanged
  // child proof even if the exact same role/permission is restored.
  f.organization.setPermission({organizationId:'alpha',actorId:f.user.id,
