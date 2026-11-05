@@ -143,16 +143,21 @@ async function revokeInvitation(invite){
 }
 async function changeUserStatus(user){
  const verb=user.active?'deactivate':'reactivate';
- if(!window.confirm('Do you want to '+verb+' '+user.name+' in this organization? Their other organization memberships are unaffected.'))return;
+ const inviteEffect=user.active&&user.admin
+  ?' Pending invitations issued by this administrator will be revoked and their reserved app seats released.':'';
+ if(!window.confirm('Do you want to '+verb+' '+user.name+' in this organization? Their other organization memberships are unaffected.'+inviteEffect))return;
  try{
   await request('/api/suite/organization/user/active',{organizationId:state.selected,accountId:user.accountId,active:!user.active});
   await overview(state.selected);
-  status(user.name+(user.active?' deactivated. Existing app seats remain reserved.':' reactivated.') );
+  status(user.name+(user.active
+   ?' deactivated. Their assigned app seats remain reserved.'+
+    (user.admin?' Pending invitations they issued were revoked.':'')
+   :' reactivated.'));
  }catch(e){status(e.message);}
 }
 async function removeUser(user){
- if(!window.confirm('Remove '+user.name+' from '+state.overview.organization.name+'? This does not delete their DuckBio account or any other organization memberships.'))return;
- try{await request('/api/suite/organization/user/remove',{organizationId:state.selected,accountId:user.accountId});await overview(state.selected);status('Removed '+user.name+' from this organization.');}
+ if(!window.confirm('Remove '+user.name+' from '+state.overview.organization.name+'? This does not delete their DuckBio account or any other organization memberships. Pending invitations issued by this member will be revoked.'))return;
+ try{await request('/api/suite/organization/user/remove',{organizationId:state.selected,accountId:user.accountId});await overview(state.selected);status('Removed '+user.name+' from this organization. Any pending invitations issued by this member were revoked.');}
  catch(e){status(e.message);}
 }
 function roleFields(user){
@@ -255,8 +260,11 @@ $('member-form').addEventListener('submit',async e=>{
  e.preventDefault();if(state.busy||!e.currentTarget.reportValidity())return;
  const roles={};for(const select of $('role-fields').querySelectorAll('select'))if(select.value)roles[select.name]=select.value;
  const member={accountId:$('account-id').value.trim(),name:$('name').value.trim(),nickname:$('nickname').value.trim(),email:$('member-email').value.trim(),admin:$('org-admin').checked,roles};
+ const existing=state.overview?.users.find(user=>user.accountId===member.accountId);
+ const demoted=Boolean(existing?.admin&&!member.admin);
+ if(demoted&&!window.confirm('Removing organization administrator status also revokes any pending invitations issued by this member. Continue?'))return;
  state.busy=true;
- try{await request('/api/suite/organization/user/save',{organizationId:state.selected,member});await overview(state.selected);status('App permissions updated. Native app-account mapping remains separately controlled.');}
+ try{await request('/api/suite/organization/user/save',{organizationId:state.selected,member});await overview(state.selected);status('App permissions updated. Native app-account mapping remains separately controlled.'+(demoted?' Pending invitations issued by the former administrator were revoked.':''));}
  catch(err){status(err.message);}finally{state.busy=false;}
 });
 

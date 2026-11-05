@@ -54,3 +54,14 @@ test('Create account uses secure invitation while existing-account assignment st
  assert(js.includes("'Add existing account access'"));
  assert(!html.includes('Create an account with a password chosen by an administrator'));
 });
+
+
+test('administrator actions disclose and confirm pending invitation invalidation',()=>{
+ const js=readFileSync(fileURLToPath(new URL('workspace.js',base)),'utf8');
+ assert(js.includes('Pending invitations issued by this administrator will be revoked and their reserved app seats released.'));
+ assert(js.includes('Pending invitations issued by this member will be revoked.'));
+ assert(js.includes('Removing organization administrator status also revokes any pending invitations issued by this member.'));
+ assert(js.includes('Pending invitations issued by the former administrator were revoked.'));
+ assert(js.includes('Their assigned app seats remain reserved.'));
+ assert(!js.includes('innerHTML'));
+});
