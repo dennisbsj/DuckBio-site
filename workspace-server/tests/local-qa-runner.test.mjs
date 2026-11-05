@@ -515,3 +515,15 @@ test('real Node test-name injection can turn a failing security regression into 
  assert.equal(unsafeQaNodeEnvironment({NODE_OPTIONS:'--test-name-pattern=no-match-for-any-test'}).length,1,
   'Workspace QA must independently block precisely that inherited flag');
 });
+
+test('release QA pins a trusted npm command shell rather than the user npmrc default',()=>{
+ const f=fake();
+ const outcome=runLocalWorkspaceQa([],{execute:f.execute,log:()=>{}});
+ assert.equal(outcome.exitCode,0);
+ const npmCalls=f.calls.filter(call=>call[0]==='npm'||call[0]==='npm.cmd');
+ assert.equal(npmCalls.length,2,'both source syntax and core tests must use the pinned shell');
+ const expected=process.platform==='win32'?'cmd.exe':'/bin/sh';
+ for(const call of npmCalls)
+  assert(call.some(arg=>arg.startsWith('--script-shell=')&&arg.endsWith(expected)),
+   'npm user/global script-shell must not replace test execution');
+});
