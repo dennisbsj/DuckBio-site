@@ -1,8 +1,9 @@
 /**
  * DORMANT, PRIVATE, broker-compatible ORGANIZATION SSO decision adapter.
  * This module is intentionally NOT imported by the active Workspace runtime.
- * It requires the reviewed inspector's signed native ownership verification,
+ * Its private diagnostics require reviewed signed native ownership verification,
  * real LIVE per-app seat ledger, current user/session/org and scoped native link.
+ * The broker-facing getAccess method is DENY ONLY regardless of diagnostics.
  * It is not native resource authorization: each app must enforce its own ACL.
  *
  * Do not mount, deploy or activate until independent native + billing + MFA
@@ -56,7 +57,8 @@ export function createNativeOrganizationBrokerAccessAdapter({
       if (!policy || policy.source !== 'verified_live_subscription_ledger' ||
           policy.organizationId !== selected.id || policy.accountId !== active.subject ||
           policy.appId !== appId || policy.permission !== PERMISSION ||
-          policy.accessGranted !== false || policy.nativeEnforcementRequired !== true ||
+          policy.accessGranted !== false || policy.licensesGranted !== false ||
+          policy.nativeEnforcementRequired !== true ||
           !roleName(policy.role) || !positive(policy.authorizationAuditRevision) ||
           !Number.isSafeInteger(policy.verifiedPaidThroughMs) ||
           policy.verifiedPaidThroughMs <= now) return null;
@@ -96,7 +98,7 @@ export function createNativeOrganizationBrokerAccessAdapter({
     return 'org-native-v1:' + createHash('sha256')
       .update(JSON.stringify(tuple)).digest('base64url');
   }
-  async function getAccess(parent, appId) {
+  async function inspectAccessCandidate(parent, appId) {
     const first = current(parent, appId);
     if (!first) return null;
     let candidate;
@@ -123,17 +125,29 @@ export function createNativeOrganizationBrokerAccessAdapter({
     const last = current(parent,appId);
     if (!last || cursor(first) !== cursor(last)) return null;
     return Object.freeze({
+      // PRIVATE DIAGNOSTIC ONLY. Never hand this to broker.getAccess or a
+      // token/code endpoint. A signed OWNER preflight does not authorize
+      // native login, MFA, scientific resources or a paid seat by itself.
+      candidateReady:true,accessGranted:false,licensesGranted:false,
+      loginEnabled:false,nativeEnforcementRequired:true,
       localIdentity: Object.freeze({
         userId:last.nativeUserId,organizationId:last.nativeOrganizationId
       }),
       bindingRevision:cursor(last)
     });
   }
+  // Deliberate hard denial until an independently approved native SSO
+  // authorization exchange exists. Inspecting ownership or LIVE central
+  // seat capacity can NEVER itself create a broker child proof or PKCE code.
+  async function getAccess(_parent, _appId) {
+    return null;
+  }
   return Object.freeze({
     getSession:req=>identity.getSession(req),
     authenticate:(req,res,credentials)=>identity.authenticate(req,res,credentials),
     getParentSession:id=>identity.getParentSession(id),
     logout:id=>identity.logout(id),
-    getAccess
+    getAccess,
+    inspectAccessCandidate
   });
 }
