@@ -97,6 +97,7 @@
   function buildRoles() {
     const container=byId("ua-role-fields");
     container.replaceChildren();
+    selectMap.clear();
     appRoles.forEach(app => {
       const card=el("div","ua-app-role");
       const labelNode=el("label","ua-field",app.name);
@@ -106,7 +107,8 @@
       const none=el("option","", "No access");
       none.value="";
       select.append(none);
-      app.roles.forEach(role => {
+      const roles=window.DuckBioPreviewRoles?.listRoles(app.name).map(role=>role.name)||app.roles;
+      roles.forEach(role => {
         const option=el("option","",label(role));
         option.value=role;
         select.append(option);
@@ -119,18 +121,18 @@
     });
   }
   function openAccount(member) {
-    state.editId=member?member.id:null;
+    if(!member)return;
+    state.editId=member.id;
     fields.reset();
-    const isEdit=Boolean(member);
-    byId("ua-account-heading").textContent=isEdit?"Edit user":"Create account";
-    action.textContent=isEdit?"Save changes":"Create account";
-    fields.elements.namedItem("name").value=member?member.name:"";
-    fields.elements.namedItem("nickname").value=member?member.nickname:"";
-    fields.elements.namedItem("email").value=member?member.email:"";
-    fields.elements.namedItem("organisationAdmin").checked=member?member.admin:false;
-    selectMap.forEach((select,app)=>{
-      select.value=member?(member.roles[app]||""):"";
-    });
+    buildRoles(); // Refresh dropdowns after custom roles are defined in Permission matrix.
+    byId("ua-account-heading").textContent="Edit app permissions";
+    action.textContent="Save permissions";
+    for(const key of ["name","nickname","email"]) {
+      const input=fields.elements.namedItem(key);
+      input.value=member[key];input.readOnly=true;
+    }
+    fields.elements.namedItem("organisationAdmin").checked=member.admin;
+    selectMap.forEach((select,app)=>{select.value=member.roles[app]||"";});
     showPanel("account");
   }
   function checkCapacity(roles,original) {
@@ -142,35 +144,25 @@
   }
   function saveAccount(event) {
     event.preventDefault();
-    if (!fields.reportValidity()) return;
-    const name=fields.elements.namedItem("name").value.trim();
-    const nickname=fields.elements.namedItem("nickname").value.trim();
-    const email=fields.elements.namedItem("email").value.trim().toLowerCase();
-    const admin=fields.elements.namedItem("organisationAdmin").checked;
     const original=state.members.find(x=>x.id===state.editId);
+    if(!original) {setMessage(message,"Select an existing user.",true);return;}
+    const admin=fields.elements.namedItem("organisationAdmin").checked;
     const roles={};
-    selectMap.forEach((select,app)=>{if (select.value) roles[app]=select.value;});
-    if (!name||!nickname||!email) {
-      setMessage(message,"Name, nickname and email are required.",true);return;
+    selectMap.forEach((select,app)=>{if(select.value)roles[app]=select.value;});
+    for(const [app,role] of Object.entries(roles)){
+      const catalog=window.DuckBioPreviewRoles;
+      const valid=catalog?Boolean(catalog.getRole(app,role)):Boolean(appRoles.find(x=>x.name===app)?.roles.includes(role));
+      if(!valid){setMessage(message,"Unknown role for "+app+". Please reselect the app role.",true);return;}
     }
-    if (Object.keys(roles).length===0) {
-      setMessage(message,"Select at least one app role.",true);return;
-    }
-    if (state.members.some(x=>x.email===email&&x.id!==state.editId)) {
-      setMessage(message,"This email already belongs to an example account.",true);return;
-    }
-    if (original && original.admin && !admin && state.members.filter(x=>x.admin).length===1) {
+    if(original.admin&&!admin&&state.members.filter(x=>x.admin).length===1){
       setMessage(message,"The organisation must retain at least one administrator.",true);return;
     }
     const blocked=checkCapacity(roles,original);
-    if (blocked) {
-      setMessage(message,"No unassigned " + blocked + " licence. Use Buy users to increase that app's licence count before adding access.",true);
-      return;
-    }
-    if (original) Object.assign(original,{name,nickname,email,admin,roles});
-    else state.members.push({id:state.nextId++,name,nickname,email,admin,roles});
+    if(blocked){setMessage(message,"No available "+blocked+" licence. Choose Buy users before granting access to this app.",true);return;}
+    Object.assign(original,{admin,roles});
     showPanel("list");
-    setMessage(byId("ua-list-message"),original?"Example permissions updated in this preview.":"Example account created in this preview.",false);
+    setMessage(byId("ua-list-message"),"Example role assignments updated. No real app access was changed.",false);
+    window.dispatchEvent(new Event("duckbio-preview-users-changed"));
   }
   function buildBuy() {
     const rows=byId("ua-buy-rows");
@@ -251,15 +243,36 @@
     setMessage(byId("ua-list-message"),"",false);
     positionAdminDialog();
     if(!dialog.open)dialog.showModal();
-    byId("ua-create").focus({preventScroll:true});
+    byId("ua-buy-start")?.focus({preventScroll:true});
   }
 
+  window.DuckBioWorkspacePreviewAdmin=Object.freeze({
+    listUsers:()=>state.members.map(member=>({...member,roles:{...member.roles}})),
+    isRoleAssigned:(app,role)=>state.members.some(member=>member.roles[app]===role),
+    createUser:({name,nickname,email,admin=false})=>{
+      name=String(name||"").trim();nickname=String(nickname||"").trim();
+      email=String(email||"").trim().toLowerCase();
+      if(!name||!nickname||!email||!email.includes("@"))return {error:"Name, nickname and a valid email are required."};
+      if(state.members.some(member=>member.email===email))return {error:"A user with this email already exists."};
+      const member={id:state.nextId++,name,nickname,email,admin:Boolean(admin),roles:{}};
+      state.members.push(member);renderList();
+      window.dispatchEvent(new Event("duckbio-preview-users-changed"));
+      return {userId:member.id};
+    },
+    deleteUser:id=>{
+      const user=state.members.find(member=>member.id===id);
+      if(!user)return {error:"User not found."};
+      if(user.admin&&state.members.filter(member=>member.admin).length<=1)return {error:"The last organisation administrator cannot be deleted."};
+      state.members=state.members.filter(member=>member.id!==id);
+      renderList();window.dispatchEvent(new Event("duckbio-preview-users-changed"));
+      return {deleted:true};
+    }
+  });
   buildRoles();buildBuy();renderList();
   document.querySelectorAll("[data-open-user-admin]").forEach(button=>button.addEventListener("click",openAdmin));
   dialog.querySelectorAll("[data-ua-nav]").forEach(button=>button.addEventListener("click",()=>{
     const next=button.dataset.uaNav;
-    if(next==="account")openAccount(null);
-    else showPanel(next);
+    showPanel(next);
   }));
   byId("ua-close").addEventListener("click",()=>dialog.close());
   dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close();});
