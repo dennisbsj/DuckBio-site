@@ -9,8 +9,9 @@ import {fileURLToPath} from 'node:url';
 
 const projectDir=dirname(dirname(fileURLToPath(import.meta.url)));
 const TIMEOUT=20*60*1000;
-const unsafeNodeOptionKeys=new Set([
- 'NODE_OPTIONS','NODE_PATH','NPM_CONFIG_NODE_OPTIONS'
+const unsafeQaOverrideKeys=new Set([
+ 'NODE_OPTIONS','NODE_PATH','NPM_CONFIG_NODE_OPTIONS',
+ 'NPM_CONFIG_SCRIPT_SHELL'
 ]);
 /** Host-provided Node test filters/preloads can suppress every test and still
  * return exit 0. Never claim exact-head QA with these inherited settings.
@@ -18,7 +19,7 @@ const unsafeNodeOptionKeys=new Set([
  */
 export function unsafeQaNodeEnvironment(environment=process.env){
  return Object.entries(environment).filter(([name,value])=>
-  unsafeNodeOptionKeys.has(name.toUpperCase())&&
+  unsafeQaOverrideKeys.has(name.toUpperCase())&&
   typeof value==='string'&&value.trim().length>0).map(([name])=>name);
 }
 
@@ -33,12 +34,13 @@ export function parseLocalQaArgs(argv){
 }
 function run(command,args,{cwd=projectDir,timeout=TIMEOUT}={}){
  // Node preloads/test filters can make a FAILING test exit 0.
+ // npm's overridden script shell can return 0 WITHOUT executing the test.
  // Git overrides can select unrelated trees inside npm and browser scripts.
  // The runner rejects nonempty unsafe Node overrides before QA; independently
  // strip them from EVERY child process, including npm and node.
  const env=Object.fromEntries(Object.entries(process.env).filter(([name])=>{
   const upper=name.toUpperCase();
-  return !upper.startsWith('GIT_')&&!unsafeNodeOptionKeys.has(upper);
+  return !upper.startsWith('GIT_')&&!unsafeQaOverrideKeys.has(upper);
  }));
  env.FORCE_COLOR='0';
  const result=spawnSync(command,args,{cwd,encoding:'utf8',timeout,
@@ -126,7 +128,7 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const unsafeNodeEnvironment=unsafeQaNodeEnvironment();
  if(unsafeNodeEnvironment.length){
   report.exactHead=false;
-  log('Unsafe inherited Node/npm test options detected: '+unsafeNodeEnvironment.join(', ')+
+  log('Unsafe inherited Node/npm test or script-shell overrides detected: '+unsafeNodeEnvironment.join(', ')+
    '. Clear the environment before running Workspace release QA.');
   return {exitCode:2,report};
  }
