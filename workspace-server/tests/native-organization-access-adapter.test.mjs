@@ -61,11 +61,16 @@ function fixture(){
  return {state,adapter,identityStore,organizationStore,inspector,identity,
   inspections:()=>inspections,mutate:x=>{hook=x},setClock:x=>{now=x}};
 }
-const go=fixture=>fixture.adapter.getAccess(PARENT,'goflo');
+const go=fixture=>fixture.adapter.inspectAccessCandidate(PARENT,'goflo');
 
 test('trusted ownership preflight plus current tenant and verified LIVE seat yields revision-bound native ID',async()=>{
  const f=fixture();const a=await go(f);
  assert(a);
+ assert.equal(a.candidateReady,true);
+ assert.equal(a.accessGranted,false);
+ assert.equal(a.licensesGranted,false);
+ assert.equal(a.loginEnabled,false);
+ assert.equal(a.nativeEnforcementRequired,true);
  assert.deepEqual(a.localIdentity,{userId:NATIVE.nativeUserId,organizationId:NATIVE.nativeOrganizationId});
  assert.match(a.bindingRevision,/^org-native-v1:[A-Za-z0-9_-]{43}$/);
  assert.equal((await go(f)).bindingRevision,a.bindingRevision,
@@ -185,4 +190,44 @@ test('no missing or malformed private authority adapters can construct the grant
    organizationStore:f.organizationStore,inspector:f.inspector,clock:()=>NOW,...error
   }),/required/);
  }
+});
+
+test('broker getAccess is unconditionally deny-only even after positive native diagnostics',async()=>{
+ const f=fixture();
+ const diagnostic=await go(f);
+ assert(diagnostic?.candidateReady);
+ assert.equal(diagnostic?.accessGranted,false);
+ assert.equal(diagnostic?.licensesGranted,false);
+ const before=f.inspections();
+ assert.equal(await f.adapter.getAccess(PARENT,'goflo'),null,
+  'preflight is never a broker/PKCE grant, even with a current LIVE seat');
+ assert.equal(await f.adapter.getAccess(PARENT,'dataduck'),null);
+ assert.equal(f.inspections(),before,'broker must not invoke grant-capable preflight');
+ assert.equal(await f.adapter.getAccess(null,'goflo'),null);
+});
+
+test('a malformed central policy claiming licensesGranted true cannot produce even diagnostics',async()=>{
+ const f=fixture();
+ const original=f.organizationStore.verifiedNativePermissionCandidate;
+ f.organizationStore.verifiedNativePermissionCandidate=request=>{
+  const result=original(request);
+  return result?{...result,licensesGranted:true}:null;
+ };
+ assert.equal(await go(f),null);
+ assert.equal(await f.adapter.getAccess(PARENT,'goflo'),null);
+ assert.equal(f.inspections(),0,'invalid central proof denied before native inspection');
+});
+
+test('diagnostic binding revision is never a reusable native token or proof',async()=>{
+ const f=fixture();
+ const candidate=await go(f);
+ assert(candidate);
+ assert.equal(candidate.accessGranted,false);
+ assert.match(candidate.bindingRevision,/^org-native-v1:[A-Za-z0-9_-]{43}$/);
+ const json=JSON.stringify(candidate);
+ assert(!json.includes('sessionToken'));
+ assert(!json.includes('authorizationCode'));
+ assert(!json.includes('token:'));
+ assert.equal(await f.adapter.getAccess(PARENT,'goflo'),null,
+  'reusing a diagnostic binding revision cannot bypass broker denial');
 });
