@@ -170,7 +170,7 @@ function roleFields(user){
 }
 function edit(user){
  $('buy-panel').hidden=true;$('invite-panel').hidden=true;$('edit-panel').hidden=false;
- $('edit-title').textContent=user?'Edit user permissions':'Create account access';
+ $('edit-title').textContent=user?'Edit user permissions':'Add existing account access';
  $('account-id').readOnly=Boolean(user);
  for(const [id,value] of [['account-id',user?.accountId||''],['name',user?.name||''],['nickname',user?.nickname||''],['member-email',user?.email||'']])$(id).value=value;
  $('org-admin').checked=Boolean(user?.admin);

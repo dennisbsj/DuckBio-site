@@ -36,3 +36,21 @@ test('user and invitation role forms offer app dropdown filters without changing
  assert(!js.includes('innerHTML'));
  assert(!html.includes('dataduck</option>'));
 });
+
+
+test('Create account uses secure invitation while existing-account assignment stays separate',()=>{
+ const html=readFileSync(fileURLToPath(new URL('workspace.html',base)),'utf8');
+ const js=readFileSync(fileURLToPath(new URL('workspace.js',base)),'utf8');
+ assert(html.includes('id="invite" class="primary">Create account</button>'));
+ assert(html.includes('id="create">Add existing account</button>'));
+ assert(html.includes('<h2>Create account</h2>'));
+ assert(html.includes('The person receiving the invitation creates their own password.'));
+ assert(html.includes('app access remains disabled until acceptance.'));
+ assert(html.includes('id="account-app-picker"'));
+ assert(html.includes('id="invite-app-picker"'));
+ assert(js.includes("$('invite').addEventListener('click'"));
+ assert(js.includes("request('/api/suite/organization/invite'"));
+ assert(js.includes("$('create').addEventListener('click',()=>edit(null))"));
+ assert(js.includes("'Add existing account access'"));
+ assert(!html.includes('Create an account with a password chosen by an administrator'));
+});
