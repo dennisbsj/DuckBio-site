@@ -358,6 +358,8 @@ test('tracked mode metadata changing during tests invalidates exact-head report'
 });
 
 test('real Git tracked symlink remains clean when external JS changes, but QA refuses to execute it',t=>{
+ // Windows may require Developer Mode or elevated symlink privileges.
+ if(process.platform==='win32'){t.skip('File symlink requires Windows privilege');return;}
  const scratch=mkdtempSync(join(tmpdir(),'duckbio-qa-symlink-'));
  t.after(()=>rmSync(scratch,{recursive:true,force:true}));
  const root=join(scratch,'DuckBio-site'),workspace=join(root,'workspace-server');
