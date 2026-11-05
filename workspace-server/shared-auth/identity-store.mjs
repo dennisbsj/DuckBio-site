@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'no
 import { promisify } from 'node:util';
 import { chmodSync, existsSync, mkdirSync, realpathSync } from 'node:fs';
 import path from 'node:path';
+import {ensureNativeOrganizationAuditSchema} from './native-org-audit-schema-guard.mjs';
 
 const derive = promisify(scrypt);
 const PASSWORD_COST = Object.freeze({ N: 32768, r: 8, p: 1, keyLength: 64 });
@@ -119,37 +120,14 @@ export function createIdentityStore({ databasePath, clock = Date.now, orgNativeL
       expires_at INTEGER NOT NULL
     );
   `);
-  if (orgLinksEnabled) db.exec(`
-    CREATE TABLE IF NOT EXISTS suite_identity_org_native_links (
-      user_id TEXT NOT NULL REFERENCES suite_identity_users(id) ON DELETE CASCADE,
-      app_id TEXT NOT NULL,
-      workspace_org_id TEXT NOT NULL,
-      native_user_id TEXT NOT NULL,
-      native_org_id TEXT NOT NULL,
-      verified_at INTEGER NOT NULL,
-      PRIMARY KEY(user_id,app_id,workspace_org_id),
-      UNIQUE(app_id,native_user_id)
-    );
-    CREATE INDEX IF NOT EXISTS suite_identity_org_native_by_org
-      ON suite_identity_org_native_links(app_id,workspace_org_id,native_org_id);
-    CREATE INDEX IF NOT EXISTS suite_identity_org_native_by_native_tenant
-      ON suite_identity_org_native_links(app_id,native_org_id,workspace_org_id);
-    CREATE TABLE IF NOT EXISTS suite_identity_org_native_audit (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      actor_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      app_id TEXT NOT NULL,
-      workspace_org_id TEXT NOT NULL,
-      action TEXT NOT NULL CHECK(action IN ('link.bound','link.migrated','link.revoked')),
-      recorded_at INTEGER NOT NULL
-    );
-  `);
   // First-time migration: create an independent monotonic legacy grant
   // generation table AND seed existing grants in one IMMEDIATE transaction.
   // A second process rechecks table existence after the write lock.
   // Once created, missing/corrupted records are NEVER backfilled on restart.
   db.exec('BEGIN IMMEDIATE');
   try {
+    // Audit IDs used as native binding generations must never be re-seeded.
+    if(orgLinksEnabled)ensureNativeOrganizationAuditSchema(db);
     const versionTableExists=Boolean(db.prepare(
       "SELECT 1 FROM sqlite_master WHERE type='table' AND name='suite_identity_grant_versions'"
     ).get());
