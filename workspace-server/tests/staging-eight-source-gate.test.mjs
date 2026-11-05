@@ -152,3 +152,31 @@ test('a tracked gitlink/submodule cannot masquerade as ordinary reviewed source'
  assert(result.errors.includes('unverified_limsman_source'));
  assert.equal(result.nativeAuthorizationVerified,false);
 });
+
+test('assume-unchanged cannot hide modified tracked executable source from exact-source audit',t=>{
+ const f=fixture(t);
+ const location=f.source('CytoDuck');
+ run(location,'update-index','--assume-unchanged','sample.txt');
+ writeFileSync(join(location,'sample.txt'),'MALICIOUS UNCOMMITTED EXECUTABLE\n');
+ assert.equal(run(location,'status','--porcelain=v1','--untracked-files=all',
+  '--ignored=matching'),'','Git status is blind to assume-unchanged modifications');
+ assert.match(run(location,'ls-files','-v'),/^h /);
+ const report=auditEightLocalSources(f);
+ assert.equal(report.ok,false);
+ assert(report.errors.includes('unverified_goflo_source'));
+ assert.equal(report.productionAuthorized,false);
+});
+
+test('skip-worktree cannot hide modified tracked native source from exact-source audit',t=>{
+ const f=fixture(t);
+ const location=f.source('DataDuck');
+ run(location,'update-index','--skip-worktree','sample.txt');
+ writeFileSync(join(location,'sample.txt'),'MALICIOUS UNCOMMITTED SOURCE\n');
+ assert.equal(run(location,'status','--porcelain=v1','--untracked-files=all',
+  '--ignored=matching'),'','Git status is blind to skip-worktree modifications');
+ assert.match(run(location,'ls-files','-v'),/^S /);
+ const report=auditEightLocalSources(f);
+ assert.equal(report.ok,false);
+ assert(report.errors.includes('unverified_dataduck_source'));
+ assert.equal(report.stagingAuthorized,false);
+});
