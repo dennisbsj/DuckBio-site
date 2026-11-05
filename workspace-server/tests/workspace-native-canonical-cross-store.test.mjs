@@ -408,6 +408,17 @@ test('REAL broker HTTP PKCE handoff uses LIVE-org SQLite grant epochs and reject
   accountId:f.user.id,appId:'goflo',permission:'workspace.view',enabled:true});
  assert.deepEqual((await introspect(proof)).data,{active:false},
   'regranting identical permission must never resurrect old child sessions');
+ // A code minted before a same-value revoke/regrant must also fail PKCE
+ // exchange, not just a previously issued child-session proof.
+ const stale=await authorize();
+ assert.equal(stale.status,200);
+ f.organization.setPermission({organizationId:'alpha',actorId:f.user.id,
+  accountId:f.user.id,appId:'goflo',permission:'workspace.view',enabled:false});
+ f.organization.setPermission({organizationId:'alpha',actorId:f.user.id,
+  accountId:f.user.id,appId:'goflo',permission:'workspace.view',enabled:true});
+ const staleCode=new URL(stale.data.redirectUrl).searchParams.get('code');
+ assert.equal((await exchange(staleCode)).status,401,
+  'old authorization code cannot survive a restored identical role');
  const next=await authorize();
  assert.equal(next.status,200);
  const nextProof=await exchange(new URL(next.data.redirectUrl).searchParams.get('code'));
