@@ -1,4 +1,5 @@
 import {DatabaseSync} from 'node:sqlite';
+import {assertOrganizationAuditSchema} from './organization-audit-schema-guard.mjs';
 import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import {existsSync,mkdirSync,realpathSync,chmodSync,readFileSync} from 'node:fs';
 import path from 'node:path';
@@ -36,10 +37,14 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
   mkdirSync(path.dirname(databasePath),{recursive:true,mode:0o700});
   const db=new DatabaseSync(databasePath);
   db.exec('PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON');
-  // The first-time session epoch migration is performed atomically AFTER
-  // the existing schema is ready, under a separate SQLite IMMEDIATE lock.
-  // A second process must re-check the table under that lock, not use a
-  // potentially stale check performed before schema initialization.
+  // One IMMEDIATE lock covers audit existence, base schema and the session epoch seed.
+  db.exec('BEGIN IMMEDIATE');
+  try{
+    assertOrganizationAuditSchema(db);
+  // The base schema and session-epoch migration are now one SQLite
+  // write transaction. An audit table lost between two ordinary DDL
+  // statements must not be silently recreated or re-seeded at revision 1.
+  // Both policy and session epochs are checked after acquiring the lock.
   db.exec([
     'CREATE TABLE IF NOT EXISTS organizations(id TEXT PRIMARY KEY,name TEXT NOT NULL)',
     'CREATE TABLE IF NOT EXISTS members(org TEXT NOT NULL REFERENCES organizations(id),account TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,email TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),PRIMARY KEY(org,account),UNIQUE(org,email))',
@@ -64,8 +69,6 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     "CREATE TABLE IF NOT EXISTS owner_alert_outbox(id INTEGER PRIMARY KEY AUTOINCREMENT,audit_id INTEGER NOT NULL UNIQUE REFERENCES organization_audit(id),category TEXT NOT NULL CHECK(category IN ('organization','subscription','user','permission')),state TEXT NOT NULL CHECK(state IN ('pending','sending','sent','failed')),attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),lease_token TEXT,locked_until INTEGER,next_attempt_at INTEGER NOT NULL,sent_at INTEGER)",
     "CREATE TABLE IF NOT EXISTS stripe_live_event_log(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,object_id TEXT NOT NULL,event_created INTEGER NOT NULL,raw_digest TEXT NOT NULL,received_at INTEGER NOT NULL)"
   ].join(';')+';');
-  db.exec('BEGIN IMMEDIATE');
-  try{
     const epochTableExists=Boolean(db.prepare(
       "SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_organization_versions'"
     ).get());
