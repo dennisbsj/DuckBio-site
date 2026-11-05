@@ -385,3 +385,35 @@ test('orphan invitation cleanup never touches valid invitations in another lab',
  assert.equal(store.previewInvitation(outside.token).email,'guest@example.test');
  assert.equal(store.listPendingInvitations('two','adminB').length,1);
 });
+
+
+test('private SQLite restart preserves invitation revocation and audit after admin suspension',t=>{
+ const root=mkdtempSync(path.join(os.tmpdir(),'duckbio-invitation-restart-'));
+ const databasePath=path.join(root,'private','organization.sqlite');
+ let store=createOrganizationStore({databasePath,clock:()=>1000});
+ let closed=false;
+ const close=()=>{if(!closed){store.close();closed=true;}};
+ t.after(()=>{close();rmSync(root,{recursive:true,force:true})});
+ store.setupOrganization({organizationId:'one',name:'Lab A',
+  owner:{accountId:'owner',name:'Owner',nickname:'O',email:'owner@example.test'}});
+ store.saveMember({organizationId:'one',actorId:'owner',
+  member:member('backup',{}, {admin:true})});
+ store.applyVerifiedSeatPurchase({reference:'durable-seat',organizationId:'one',
+  plan:'Single',apps:['eel'],seats:1});
+ const invitation=store.issueInvitation({organizationId:'one',actorId:'owner',
+  name:'Guest',nickname:'G',email:'guest@example.test',
+  admin:true,roles:{eel:'scientist'}});
+ assert.equal(store.overview('one','backup').apps.find(x=>x.id==='eel').reserved,1);
+ store.setMemberActive({organizationId:'one',actorId:'backup',accountId:'owner',active:false});
+ close();
+ store=createOrganizationStore({databasePath,clock:()=>1000});
+ closed=false;
+ assert.equal(store.previewInvitation(invitation.token),null);
+ assert.equal(store.overview('one','backup').apps.find(x=>x.id==='eel').reserved,0);
+ assert.equal(store.auditLog('one','backup').find(e=>
+  e.action==='member.deactivated'&&e.subject==='owner').details.revokedInvitations,1);
+ store.setMemberActive({organizationId:'one',actorId:'backup',accountId:'owner',active:true});
+ assert.equal(store.previewInvitation(invitation.token),null);
+ assert.throws(()=>store.acceptInvitation({token:invitation.token,
+  accountId:'guest',email:'guest@example.test'}),/invalid_invitation/);
+});
