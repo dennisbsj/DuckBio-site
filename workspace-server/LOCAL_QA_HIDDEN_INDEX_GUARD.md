@@ -20,3 +20,11 @@ An isolated local Git 2.47.3 test reproduced both cases with `workspace-server/a
 New unit/real Git regression cases check initial and in-flight masking, both index flags, NUL robustness, and a real parent-`DuckBio-site/workspace-server` layout. The standalone Git primitive reproduction has passed. These new Workspace source tests are **not yet run on the exact PR HEAD**, so no full CI pass is claimed.
 
 Requires independently reviewed exact-head Node22/24 and Chromium execution; source-only code is not production authorization. The eight native repositories and DataDuck staging remain under the existing release plan.
+
+## Additional Git source integrity: parent-scope and tracked symlinks
+
+Git status from the `workspace-server` working folder checks the overall repository, but `git ls-files` from that subfolder only enumerates files **under that folder**. I reproduced a hidden mutation of the tracked root-level `suite-permissions.json`: ordinary `git status` was empty and subfolder `ls-files -v` omitted the parent policy entirely. The local QA guard now performs its index and mode enumeration from the canonical **parent repository root**, still verifying the same root before and after the test stages. Parent policy files cannot escape inspection.
+
+Likewise, a tracked `120000` Git symlink to an outside `.mjs` file remains clean in Git after the external target is modified; Node executes the changed external bytes. The guard now enumerates `git ls-files --stage -z` and accepts only normal stage-0 regular `100644` or executable `100755` blobs, rejecting tracked symlinks (`120000`), submodules (`160000`), conflict-stage entries, empty/truncated output and source mode/index differences after tests. The current Workspace repository snapshot has no nonregular blobs under `workspace-server/`; this restriction is intentional for release QA.
+
+A focused isolated Node22.16/real Git exercise confirmed that the full repository scan identifies a masked parent policy that a subfolder scan misses, and that the source-mode scan identifies tracked symlinks despite a clean Git status. This is limited **primitive verification**, not the full authored exact-HEAD CI/browser suite. All new QA regression source remains unexecuted on the private complete checkout.
