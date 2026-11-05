@@ -4,15 +4,16 @@ import {mkdtempSync,writeFileSync,rmSync,mkdirSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {dirname,join} from 'node:path';
-import {parseLocalQaArgs,browserFiles,summarizeQaStage,validQaNodeVersion,runLocalWorkspaceQa} from '../scripts/local-qa.mjs';
+import {parseLocalQaArgs,browserFiles,summarizeQaStage,validQaNodeVersion,cleanQaGitIndex,runLocalWorkspaceQa} from '../scripts/local-qa.mjs';
 
 const SHA='a'.repeat(40);
 const ok=stdout=>({ok:true,exitCode:0,stdout:stdout??'',stderr:'',error:null});
 const fail=()=>({ok:false,exitCode:1,stdout:'',stderr:'fail',error:null});
 function fake({dirty='',failName=null,playwright=true,
- endHead=SHA,endDirty=dirty,wrongRoot=false,endWrongRoot=false}={}){
+ endHead=SHA,endDirty=dirty,wrongRoot=false,endWrongRoot=false,
+ indexFlags='H workspace-server/package.json\0',endIndexFlags=indexFlags}={}){
  const calls=[];
- let headReads=0,statusReads=0;
+ let headReads=0,statusReads=0,indexReads=0;
  let rootReads=0;
  const execute=(command,args,options={})=>{
   calls.push([command,...args]);
@@ -25,6 +26,8 @@ function fake({dirty='',failName=null,playwright=true,
    return ok((headReads++===0?SHA:endHead)+'\n');
   if(command==='git'&&args[0]==='status')
    return ok(statusReads++===0?dirty:endDirty);
+  if(command==='git'&&args[0]==='ls-files')
+   return ok(indexReads++===0?indexFlags:endIndexFlags);
   if(args[0]==='--input-type=module')return playwright?ok():fail();
   if(args.includes('run')&&args.includes('check'))return failName==='syntax'?fail():ok();
   if(args.includes('test')||args[0]==='--test')return failName==='core'?fail():ok();
@@ -234,4 +237,70 @@ test('real nested Git checkout cannot impersonate the parent Workspace repositor
  assert.equal(blocked.exitCode,2);
  assert.equal(blocked.report.exactHead,false);
  assert.equal(blocked.report.outcome,'blocked');
+});
+
+
+test('index-flag validator rejects hidden source, unreadable and empty Git indexes',()=>{
+ const good={ok:true,stdout:'H workspace-server/a.mjs\0H workspace-server/b.mjs\0'};
+ assert.equal(cleanQaGitIndex(good),true);
+ for(const bad of [
+  {ok:false,stdout:good.stdout},{ok:true,stdout:''},
+  {ok:true,stdout:'h workspace-server/a.mjs\0'},
+  {ok:true,stdout:'S workspace-server/a.mjs\0'},
+  {ok:true,stdout:'H workspace-server/a.mjs\0s workspace-server/b.mjs\0'}
+ ])assert.equal(cleanQaGitIndex(bad),false);
+});
+
+test('hidden source Git flags block exact-head tests before executing any npm stage',()=>{
+ for(const hidden of ['h','S']){
+  const f=fake({indexFlags:hidden+' workspace-server/package.json\0'});
+  const result=runLocalWorkspaceQa([],{execute:f.execute,log:()=>{}});
+  assert.equal(result.exitCode,2);
+  assert.equal(result.report.exactHead,false);
+  assert.equal(result.report.indexFlagsClean,false);
+  assert.equal(f.calls.some(x=>x[0]==='npm'||x[0]==='npm.cmd'),false);
+ }
+});
+
+test('index flags changed during testing cannot report passed exact HEAD',()=>{
+ const f=fake({endIndexFlags:'S workspace-server/package.json\0'});
+ const result=runLocalWorkspaceQa(['--expect-head='+SHA],{
+  execute:f.execute,log:()=>{}
+ });
+ assert.equal(result.exitCode,1);
+ assert.equal(result.report.outcome,'failed');
+ assert.equal(result.report.exactHead,false);
+ assert.equal(result.report.stages.at(-1).name,'git-index-integrity');
+});
+
+test('real assume-unchanged and skip-worktree native source changes are rejected before QA',t=>{
+ const scratch=mkdtempSync(join(tmpdir(),'duckbio-qa-hidden-index-'));
+ t.after(()=>rmSync(scratch,{recursive:true,force:true}));
+ const root=join(scratch,'DuckBio-site'),cwd=join(root,'workspace-server');
+ mkdirSync(root);mkdirSync(cwd);
+ const git=(...args)=>execFileSync('git',args,{
+  cwd,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
+ git('init','-q');git('config','user.name','Synthetic QA');
+ git('config','user.email','qa@example.test');
+ const source=join(cwd,'program.mjs');
+ writeFileSync(source,'console.log("original");\n');
+ git('add','.');git('commit','-qm','Original source');
+ const head=git('rev-parse','HEAD');
+ for(const option of ['--assume-unchanged','--skip-worktree']){
+  git('update-index',option,'program.mjs');
+  writeFileSync(source,'console.log("CHANGED");\n');
+  assert.equal(git('status','--porcelain','--untracked-files=normal'),'',
+   'plain git status misses hidden source changes');
+  const result=runLocalWorkspaceQa(['--expect-head='+head],{
+   cwd,nodeVersion:'22.16.0',log:()=>{}
+  });
+  assert.equal(result.exitCode,2,option);
+  assert.equal(result.report.exactHead,false,option);
+  assert.equal(result.report.indexFlagsClean,false,option);
+  assert.equal(result.report.stages.length,0,
+   'untrusted hidden source never reaches execution');
+  git('update-index',option==='--assume-unchanged'?
+    '--no-assume-unchanged':'--no-skip-worktree','program.mjs');
+  git('restore','program.mjs');
+ }
 });

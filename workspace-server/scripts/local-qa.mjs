@@ -42,6 +42,14 @@ export function validQaNodeVersion(version){
  const major=Number(parsed[1]),minor=Number(parsed[2]);
  return (major===22&&minor>=16)||major===24;
 }
+// Git status can falsely report a clean source tree for tracked files that
+// are marked assume-unchanged or skip-worktree, while npm executes their
+// modified working-tree contents. Refuse such index flags before and after QA.
+export function cleanQaGitIndex(outcome){
+ if(!outcome?.ok||typeof outcome.stdout!=='string')return false;
+ const paths=outcome.stdout.split('\0').filter(Boolean);
+ return paths.length>0&&paths.every(line=>line.startsWith('H ')&&line.length>2);
+}
 export function summarizeQaStage(name,outcome,durationMs){
  return {name,status:outcome.error?'blocked':outcome.ok?'passed':'failed',
   exitCode:outcome.exitCode,durationMs};
@@ -61,10 +69,13 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const root=execute('git',['rev-parse','--show-toplevel'],{cwd,timeout:10000});
  const head=execute('git',['rev-parse','--verify','HEAD'],{cwd,timeout:10000});
  const status=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
+ const index=execute('git',['ls-files','-v','-z'],{cwd,timeout:10000});
  const sha=head.stdout.trim();
- const clean=Boolean(head.ok&&/^[0-9a-f]{40}$/.test(sha)&&status.ok&&!status.stdout.trim());
+ const indexClean=cleanQaGitIndex(index);
+ const clean=Boolean(head.ok&&/^[0-9a-f]{40}$/.test(sha)&&
+  status.ok&&!status.stdout.trim()&&indexClean);
  const report={schema:'duckbio.workspace.local-qa.v1',sha:head.ok?sha:null,
-  exactHead:clean,expectedRoot:sourceRoot,expectedHead:options.expectHead,allowDirty:options.allowDirty,stages:[],
+  exactHead:clean,indexFlagsClean:indexClean,expectedRoot:sourceRoot,expectedHead:options.expectHead,allowDirty:options.allowDirty,stages:[],
   outcome:'blocked',nodeVersion};
  if(!validQaNodeVersion(nodeVersion)){
   log('Workspace QA requires Node 22.16+ or Node 24.');
@@ -84,7 +95,7 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
   return {exitCode:2,report};
  }
  if(!clean&&!options.allowDirty){
-  log('Working tree differs from HEAD. Commit the changes first, or use --allow-dirty (non-release QA).');
+  log('Working tree or Git index flags differ from reviewed HEAD; fix source before release QA, or use --allow-dirty (non-release QA).');
   return {exitCode:2,report};
  }
  const npm=process.platform==='win32'?'npm.cmd':'npm';
@@ -120,6 +131,7 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const endRoot=execute('git',['rev-parse','--show-toplevel'],{cwd,timeout:10000});
  const endHead=execute('git',['rev-parse','--verify','HEAD'],{cwd,timeout:10000});
  const endStatus=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
+ const endIndex=execute('git',['ls-files','-v','-z'],{cwd,timeout:10000});
  if(!endRoot.ok||resolve(endRoot.stdout.trim())!==sourceRoot){
   report.stages.push({name:'git-root-integrity',status:'failed',exitCode:1,durationMs:0});
   report.exactHead=false;
@@ -130,6 +142,10 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  }
  if(!endStatus.ok||endStatus.stdout!==status.stdout){
   report.stages.push({name:'working-tree-integrity',status:'failed',exitCode:1,durationMs:0});
+  report.exactHead=false;
+ }
+ if(!cleanQaGitIndex(endIndex)||endIndex.stdout!==index.stdout){
+  report.stages.push({name:'git-index-integrity',status:'failed',exitCode:1,durationMs:0});
   report.exactHead=false;
  }
  report.outcome=report.stages.every(stage=>stage.status==='passed')&&clean?'passed':
