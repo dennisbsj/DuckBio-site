@@ -69,6 +69,16 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     const epochTableExists=Boolean(db.prepare(
       "SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_organization_versions'"
     ).get());
+    // A persistent SQLite schema marker distinguishes a true pre-epoch
+    // database from a damaged/restored database whose version tombstones
+    // have been deleted. The header marker and the first epoch seed must
+    // commit under the SAME write lock. Never accept a fresh revision 1
+    // after a previously migrated session selection was revoked/rebound.
+    const schemaRevision=db.prepare('PRAGMA user_version').get()?.user_version;
+    if(!Number.isSafeInteger(schemaRevision)||schemaRevision<0)
+      fail('session_revision_unavailable');
+    if(!epochTableExists && schemaRevision!==0)
+      fail('session_revision_unavailable');
     if(!epochTableExists){
       // Tombstones persist after clear: deleting + reselecting the same org
       // must never restore an in-flight preflight's prior selection revision.
@@ -77,6 +87,10 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       db.exec('CREATE TABLE session_organization_versions(session_id TEXT PRIMARY KEY,revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991))');
       db.prepare('INSERT INTO session_organization_versions(session_id,revision) SELECT session_id,1 FROM session_organizations').run();
     }
+    // Old organization schemas did not use the SQLite user_version header.
+    // Make the independent existence proof durable for all existing and
+    // freshly migrated databases, but never roll it backward on reopen.
+    if(schemaRevision===0)db.exec('PRAGMA user_version=1');
     // When the table already exists, do NOT backfill missing records;
     // those represent corruption or attempted tampering, not a migration.
     db.exec('COMMIT');
