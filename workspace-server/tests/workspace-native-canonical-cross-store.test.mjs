@@ -8,6 +8,9 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import http from 'node:http';
+import {createHash,randomBytes} from 'node:crypto';
+import {createAuthBroker,createMemoryBrokerStore} from '../shared-auth/broker.mjs';
 import {createIdentityStore} from '../shared-auth/identity-store.mjs';
 import {createOrganizationStore} from '../organization-store.mjs';
 import {createWorkspaceNativeAccessInspector} from '../workspace-native-access-inspector.mjs';
@@ -334,4 +337,86 @@ test('unverified legacy seat purchase never qualifies for broker organization ac
  const broker=sourceOnlyBrokerAdapter(f);
  assert.equal(await broker.getAccess(f.alpha,'goflo'),null);
  assert.equal(await broker.getAccess(f.beta,'goflo'),null);
+});
+
+test('REAL broker HTTP PKCE handoff uses LIVE-org SQLite grant epochs and rejects revoked child proof',async t=>{
+ const f=await fixture(t);
+ const parentIdentity={
+  getSession:async()=>f.alpha,
+  authenticate:async()=>f.alpha,
+  getParentSession:id=>f.identity.getParentSession(id),
+  logout:id=>f.identity.revokeSession(id)
+ };
+ const signedInspector=f.inspector(async x=>f.verified(x));
+ const brokerIdentity=createNativeOrganizationBrokerAccessAdapter({
+  identity:parentIdentity,identityStore:f.identity,
+  organizationStore:f.organization,inspector:signedInspector,
+  clock:()=>1800000000000
+ });
+ const secret=randomBytes(32).toString('base64url');
+ const state=randomBytes(32).toString('base64url');
+ const verifier=randomBytes(32).toString('base64url');
+ const challenge=createHash('sha256').update(verifier).digest('base64url');
+ const redirectUri='https://cytoduck.example.test/auth/callback';
+ let broker;
+ const server=http.createServer(async(req,res)=>{
+  try{
+   if(!await broker.handle(req,res)){res.statusCode=404;res.end();}
+  }catch{res.statusCode=500;res.end();}
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const origin='http://127.0.0.1:'+server.address().port;
+ broker=createAuthBroker({origin,issuer:'https://identity.example.test',
+  clients:[{id:'goflo',appId:'goflo',secret,redirectUris:[redirectUri]}],
+  identity:brokerIdentity,store:createMemoryBrokerStore(),
+  clock:()=>1800000000000
+ });
+ const preflight=await fetch(origin+'/api/suite/auth/session');
+ assert.equal(preflight.status,200);
+ const csrf=await preflight.json();
+ const cookie=preflight.headers.get('set-cookie').split(';')[0];
+ const target={appId:'goflo',returnPath:'/analysis',state,
+  codeChallenge:challenge,codeChallengeMethod:'S256',redirectUri};
+ const post=async(route,payload,native=false)=>{
+  const response=await fetch(origin+'/api/suite/auth/'+route,{
+   method:'POST',headers:{'Content-Type':'application/json',
+    ...(native?{'Authorization':'Basic '+Buffer.from('goflo:'+secret).toString('base64')}:
+      {'Origin':origin,'Cookie':cookie,'X-CSRF-Token':csrf.csrfToken})},
+   body:JSON.stringify(payload)
+  });
+  return {status:response.status,data:response.status===204?null:await response.json()};
+ };
+ const authorize=()=>post('authorize',target);
+ const exchange=code=>post('exchange',{clientId:'goflo',code,state,
+  codeVerifier:verifier,redirectUri},true);
+ const introspect=token=>post('introspect',{sessionToken:token},true);
+ const first=await authorize();
+ assert.equal(first.status,200,'current LIVE paid seat and exact signed native owner must allow reviewed candidate');
+ const code=new URL(first.data.redirectUrl).searchParams.get('code');
+ const issued=await exchange(code);
+ assert.equal(issued.status,200);
+ assert.deepEqual(issued.data.localIdentity,{userId:NATIVE_USER,organizationId:NATIVE_ORG});
+ const proof=issued.data.sessionToken;
+ assert.equal((await introspect(proof)).data.active,true);
+ // Revocation is persistent and must invalidate a previously exchanged
+ // child proof even if the exact same role/permission is restored.
+ f.organization.setPermission({organizationId:'alpha',actorId:f.user.id,
+  accountId:f.user.id,appId:'goflo',permission:'workspace.view',enabled:false});
+ assert.deepEqual((await introspect(proof)).data,{active:false});
+ f.organization.setPermission({organizationId:'alpha',actorId:f.user.id,
+  accountId:f.user.id,appId:'goflo',permission:'workspace.view',enabled:true});
+ assert.deepEqual((await introspect(proof)).data,{active:false},
+  'regranting identical permission must never resurrect old child sessions');
+ const next=await authorize();
+ assert.equal(next.status,200);
+ const nextProof=await exchange(new URL(next.data.redirectUrl).searchParams.get('code'));
+ assert.equal(nextProof.status,200);
+ assert.equal((await introspect(nextProof.data.sessionToken)).data.active,true);
+ // The separately paid beta tenant cannot reuse the first native link.
+ f.organization.clearSessionOrganization(f.alpha.id);
+ f.organization.selectSessionOrganization({sessionId:f.alpha.id,accountId:f.user.id,
+  organizationId:'beta'});
+ assert.deepEqual((await introspect(nextProof.data.sessionToken)).data,{active:false});
+ assert.equal((await authorize()).status,403);
 });
