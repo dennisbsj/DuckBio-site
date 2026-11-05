@@ -530,3 +530,38 @@ test('release QA pins a trusted npm command shell rather than the user npmrc def
    'npmrc must not inject a Node test-name filter or preload into the test child');
  }
 });
+
+test('modified tracked parent policy blocks QA before npm even when workspace subtree is clean',t=>{
+ const scratch=mkdtempSync(join(tmpdir(),'duckbio-qa-parent-dirty-'));
+ t.after(()=>rmSync(scratch,{recursive:true,force:true}));
+ const root=join(scratch,'DuckBio-site'),workspace=join(root,'workspace-server');
+ mkdirSync(root);mkdirSync(workspace);
+ const git=(cwd,...args)=>execFileSync('git',args,{
+  cwd,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
+ git(root,'init','-q');
+ git(root,'config','user.name','QA');
+ git(root,'config','user.email','qa@example.test');
+ writeFileSync(join(root,'suite-permissions.json'),'{"enabled":false}\\n');
+ writeFileSync(join(workspace,'package.json'),'{"private":true}\\n');
+ git(root,'add','.');
+ git(root,'commit','-qm','Baseline with root policy');
+ const head=git(root,'rev-parse','HEAD');
+ writeFileSync(join(root,'suite-permissions.json'),'{"enabled":true}\\n');
+ assert.equal(git(workspace,'status','--porcelain'),'',
+  'subdirectory-scoped Git status overlooks the modified root policy');
+ assert.match(git(root,'status','--porcelain'),/suite-permissions\\.json/);
+ let nonGitCalls=0;
+ const result=runLocalWorkspaceQa(['--expect-head='+head],{
+  cwd:workspace,nodeVersion:'22.16.0',log:()=>{},
+  execute:(command,args,options)=>{
+   if(command!=='git'){nonGitCalls++;return ok();}
+   const stdout=execFileSync(command,args,{
+    cwd:options.cwd,encoding:'utf8',stdio:['ignore','pipe','ignore']});
+   return ok(stdout);
+  }
+ });
+ assert.equal(result.exitCode,2);
+ assert.equal(result.report.exactHead,false);
+ assert.equal(result.report.outcome,'blocked');
+ assert.equal(nonGitCalls,0,'dirty parent source must block before executing QA');
+});
