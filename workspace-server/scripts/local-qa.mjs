@@ -20,9 +20,14 @@ export function parseLocalQaArgs(argv){
   expectHead:pins.length?pins[0].slice('--expect-head='.length).toLowerCase():null};
 }
 function run(command,args,{cwd=projectDir,timeout=TIMEOUT}={}){
+ // Do not let GIT_DIR, GIT_WORK_TREE or GIT_CONFIG_* select an unrelated
+ // checkout. Preserve normal env for npm/node; strip Git overrides for Git.
+ const env=Object.fromEntries(Object.entries(process.env).filter(([name])=>
+  command!=='git'||!name.startsWith('GIT_')));
+ env.FORCE_COLOR='0';
  const result=spawnSync(command,args,{cwd,encoding:'utf8',timeout,
   maxBuffer:16*1024*1024,shell:process.platform==='win32'&&/\.cmd$/i.test(command),
-  env:{...process.env,FORCE_COLOR:'0'}});
+  env});
  return {ok:result.status===0&&!result.error,exitCode:result.status,
   stdout:result.stdout||'',stderr:result.stderr||'',
   error:result.error?.code||null};
@@ -99,9 +104,17 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
    if(!outcome.ok)log((outcome.stderr+'\n'+outcome.stdout).slice(-5000));
   }
  }
+ // Status alone cannot bind a run to the original commit. A second
+ // process could switch to a different HEAD and leave the tree clean.
+ const endHead=execute('git',['rev-parse','--verify','HEAD'],{cwd,timeout:10000});
  const endStatus=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
+ if(!endHead.ok||endHead.stdout.trim()!==sha){
+  report.stages.push({name:'git-head-integrity',status:'failed',exitCode:1,durationMs:0});
+  report.exactHead=false;
+ }
  if(!endStatus.ok||endStatus.stdout!==status.stdout){
   report.stages.push({name:'working-tree-integrity',status:'failed',exitCode:1,durationMs:0});
+  report.exactHead=false;
  }
  report.outcome=report.stages.every(stage=>stage.status==='passed')&&clean?'passed':
   report.stages.some(stage=>stage.status==='failed')?'failed':'blocked';

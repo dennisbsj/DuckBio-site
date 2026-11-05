@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
+import {mkdtempSync,writeFileSync,rmSync,mkdirSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {parseLocalQaArgs,browserFiles,summarizeQaStage,validQaNodeVersion,runLocalWorkspaceQa} from '../scripts/local-qa.mjs';
@@ -8,12 +9,16 @@ import {parseLocalQaArgs,browserFiles,summarizeQaStage,validQaNodeVersion,runLoc
 const SHA='a'.repeat(40);
 const ok=stdout=>({ok:true,exitCode:0,stdout:stdout??'',stderr:'',error:null});
 const fail=()=>({ok:false,exitCode:1,stdout:'',stderr:'fail',error:null});
-function fake({dirty='',failName=null,playwright=true}={}){
+function fake({dirty='',failName=null,playwright=true,
+ endHead=SHA,endDirty=dirty}={}){
  const calls=[];
+ let headReads=0,statusReads=0;
  const execute=(command,args)=>{
   calls.push([command,...args]);
-  if(command==='git'&&args[0]==='rev-parse')return ok(SHA+'\n');
-  if(command==='git'&&args[0]==='status')return ok(dirty);
+  if(command==='git'&&args[0]==='rev-parse')
+   return ok((headReads++===0?SHA:endHead)+'\n');
+  if(command==='git'&&args[0]==='status')
+   return ok(statusReads++===0?dirty:endDirty);
   if(args[0]==='--input-type=module')return playwright?ok():fail();
   if(args.includes('run')&&args.includes('check'))return failName==='syntax'?fail():ok();
   if(args.includes('test')||args[0]==='--test')return failName==='core'?fail():ok();
@@ -87,4 +92,83 @@ test('pinned exact SHA mismatches block before executing any code checks',()=>{
  const r=runLocalWorkspaceQa(['--expect-head='+other],{execute:f.execute,log:()=>{}});
  assert.equal(r.exitCode,2);assert.equal(r.report.expectedHead,other);
  assert.equal(f.calls.filter(x=>x[0]!=='git').length,0);
+});
+
+
+test('a different Git HEAD after test stages cannot be reported as exact-head PASS',()=>{
+ const other='b'.repeat(40);
+ const f=fake({endHead:other});
+ const r=runLocalWorkspaceQa(['--expect-head='+SHA],{execute:f.execute,log:()=>{}});
+ assert.equal(r.exitCode,1);
+ assert.equal(r.report.outcome,'failed');
+ assert.equal(r.report.exactHead,false);
+ assert.equal(r.report.sha,SHA,'never overwrite original expected source revision');
+ assert.deepEqual(r.report.stages.map(x=>[x.name,x.status]),[
+  ['syntax','passed'],['core','passed'],['git-head-integrity','failed']
+ ]);
+ assert.equal(f.calls.filter(x=>x[0]==='git'&&x[1]==='rev-parse').length,2);
+});
+
+test('new working-tree changes during tests fail despite a stable Git HEAD',()=>{
+ const f=fake({endDirty:' M organization-store.mjs\n'});
+ const r=runLocalWorkspaceQa([],{execute:f.execute,log:()=>{}});
+ assert.equal(r.exitCode,1);
+ assert.equal(r.report.outcome,'failed');
+ assert.equal(r.report.exactHead,false);
+ assert.equal(r.report.stages.at(-1).name,'working-tree-integrity');
+});
+
+test('a failed final Git HEAD query fails closed even if all test stages pass',()=>{
+ const f=fake();
+ const original=f.execute;
+ let calls=0;
+ const execute=(cmd,args)=>{
+  if(cmd==='git'&&args[0]==='rev-parse'&&calls++>0)return fail();
+  return original(cmd,args);
+ };
+ const r=runLocalWorkspaceQa(['--json'],{execute,log:()=>{}});
+ assert.equal(r.exitCode,1);
+ assert.equal(r.report.exactHead,false);
+ assert.equal(r.report.stages.at(-1).name,'git-head-integrity');
+});
+
+
+test('real local QA ignores inherited GIT_DIR and GIT_WORK_TREE overrides',t=>{
+ const scratch=mkdtempSync(join(tmpdir(),'duckbio-qa-env-'));
+ t.after(()=>rmSync(scratch,{recursive:true,force:true}));
+ const first=join(scratch,'workspace'),second=join(scratch,'unrelated');
+ const git=(where,...args)=>execFileSync('git',args,{
+  cwd:where,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
+ for(const where of [first,second]){
+  mkdirSync(where);
+  git(where,'init','-q');
+  writeFileSync(join(where,'package.json'),JSON.stringify({
+   name:where===first?'isolated-workspace':'other-repository',
+   private:true,scripts:{check:'node -e "process.exit(0)"',
+    test:'node -e "process.exit(0)"'}
+  })+'\n');
+  git(where,'add','package.json');
+  git(where,'-c','user.name=Private QA','-c','user.email=private@example.test',
+   'commit','-qm','Isolated QA local source fixture');
+ }
+ const expected=git(first,'rev-parse','HEAD');
+ const other=git(second,'rev-parse','HEAD');
+ assert.notEqual(expected,other,'independently committed fixtures have different trees');
+ const savedDir=process.env.GIT_DIR,savedWorkTree=process.env.GIT_WORK_TREE;
+ process.env.GIT_DIR=join(second,'.git');
+ process.env.GIT_WORK_TREE=second;
+ try{
+  const result=runLocalWorkspaceQa(['--expect-head='+expected],{
+   cwd:first,log:()=>{},nodeVersion:'22.16.0'
+  });
+  assert.equal(result.exitCode,0,JSON.stringify(result.report));
+  assert.equal(result.report.sha,expected);
+  assert.equal(result.report.exactHead,true);
+  assert.equal(result.report.outcome,'passed');
+ }finally{
+  if(savedDir===undefined)delete process.env.GIT_DIR;
+  else process.env.GIT_DIR=savedDir;
+  if(savedWorkTree===undefined)delete process.env.GIT_WORK_TREE;
+  else process.env.GIT_WORK_TREE=savedWorkTree;
+ }
 });
