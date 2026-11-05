@@ -65,3 +65,14 @@ test('administrator actions disclose and confirm pending invitation invalidation
  assert(js.includes('Their assigned app seats remain reserved.'));
  assert(!js.includes('innerHTML'));
 });
+
+
+test('seats are shown per app after subtracting assignments and pending invites',()=>{
+ const js=readFileSync(fileURLToPath(new URL('workspace.js',base)),'utf8');
+ assert(js.includes('function appSeatSummary(app)'));
+ assert(js.includes('app.purchased-app.assigned-(app.reserved||0)'));
+ assert(js.includes('appSeatSummary(app)'));
+ assert(js.includes('(Workspace assignments only)'));
+ assert(js.includes('Over capacity by '));
+ assert(!js.includes('organization-wide available users'));
+});

@@ -57,11 +57,18 @@ async function csrf(){
  state.csrf=body.csrfToken||'';
  if(!state.csrf)throw new Error('Session protection is unavailable.');
 }
+// Per-app calculation only; there is deliberately no organization-wide
+// user-seat pool. This display is not authorization for a native app.
+function appSeatSummary(app){
+ const remaining=app.purchased-app.assigned-(app.reserved||0);
+ if(!Number.isSafeInteger(remaining))return 'Seat capacity unavailable';
+ return remaining<0?'Over capacity by '+(-remaining)+' app seats':remaining+' available app seats';
+}
 function renderSeats(){
  const root=$('seats');root.replaceChildren();
  const subscriptions=$('subscription-seats');subscriptions.replaceChildren();
  for(const app of state.overview.apps){
-  const card=el('div',undefined,'seat-card');card.append(el('div',app.name),el('strong',app.assigned+' / '+app.purchased),el('small','Assigned / purchased · '+(app.reserved||0)+' pending reservations'));
+  const card=el('div',undefined,'seat-card');card.append(el('div',app.name),el('strong',app.assigned+' / '+app.purchased),el('small','Assigned / purchased · '+(app.reserved||0)+' pending reservations · '+appSeatSummary(app)+' (Workspace assignments only)'));
   root.append(card);
   const copy=card.cloneNode(true);subscriptions.append(copy);
  }
