@@ -82,8 +82,11 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const root=execute('git',['rev-parse','--show-toplevel'],{cwd,timeout:10000});
  const head=execute('git',['rev-parse','--verify','HEAD'],{cwd,timeout:10000});
  const status=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
- const sourceIndex=execute('git',['ls-files','-v','-z'],{cwd,timeout:10000});
- const sourceModes=execute('git',['ls-files','--stage','-z'],{cwd,timeout:10000});
+ // Enumerate from the FULL canonical repository root. Git ls-files run
+ // inside workspace-server omits tracked parent configuration (including
+ // suite-permissions.json) and could miss its hidden modified bytes.
+ const sourceIndex=execute('git',['ls-files','-v','-z'],{cwd:sourceRoot,timeout:10000});
+ const sourceModes=execute('git',['ls-files','--stage','-z'],{cwd:sourceRoot,timeout:10000});
  const sha=head.stdout.trim();
  const trustworthyIndex=Boolean(sourceIndex.ok&&ordinaryTrackedGitIndex(sourceIndex.stdout));
  const trustworthyModes=Boolean(sourceModes.ok&&regularTrackedGitModes(sourceModes.stdout)&&
@@ -154,8 +157,8 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const endRoot=execute('git',['rev-parse','--show-toplevel'],{cwd,timeout:10000});
  const endHead=execute('git',['rev-parse','--verify','HEAD'],{cwd,timeout:10000});
  const endStatus=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
- const endIndex=execute('git',['ls-files','-v','-z'],{cwd,timeout:10000});
- const endModes=execute('git',['ls-files','--stage','-z'],{cwd,timeout:10000});
+ const endIndex=execute('git',['ls-files','-v','-z'],{cwd:sourceRoot,timeout:10000});
+ const endModes=execute('git',['ls-files','--stage','-z'],{cwd:sourceRoot,timeout:10000});
  if(!endModes.ok||!regularTrackedGitModes(endModes.stdout)||
     endModes.stdout!==sourceModes.stdout){
   report.stages.push({name:'git-source-mode-integrity',status:'failed',exitCode:1,durationMs:0});
