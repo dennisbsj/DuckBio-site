@@ -128,9 +128,9 @@ test('a failed final Git HEAD query fails closed even if all test stages pass',(
  const f=fake();
  const original=f.execute;
  let calls=0;
- const execute=(cmd,args)=>{
+ const execute=(cmd,args,options)=>{
   if(cmd==='git'&&args[0]==='rev-parse'&&args[1]==='--verify'&&calls++>0)return fail();
-  return original(cmd,args);
+  return original(cmd,args,options);
  };
  const r=runLocalWorkspaceQa(['--json'],{execute,log:()=>{}});
  assert.equal(r.exitCode,1);
