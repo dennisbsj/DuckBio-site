@@ -11,6 +11,7 @@ import path from 'node:path';
 import {createIdentityStore} from '../shared-auth/identity-store.mjs';
 import {createOrganizationStore} from '../organization-store.mjs';
 import {createWorkspaceNativeAccessInspector} from '../workspace-native-access-inspector.mjs';
+import {createNativeOrganizationBrokerAccessAdapter} from '../shared-auth/native-organization-access-adapter.mjs';
 
 const ACCOUNT='2f8164be-4529-48ac-a2cb-a9094019ba01';
 const NATIVE_USER='2f8164be-4529-48ac-a2cb-a9094019ba02';
@@ -248,4 +249,89 @@ test('missing scoped generation cannot produce even an inspection candidate',asy
  assert.equal(decision.candidateReady,false);
  assert.equal(decision.accessGranted,false);
  assert.equal(decision.reason,'central_session_role_seat_or_link_missing');
+});
+
+/** Future broker-compatible org mode. Unmounted. Synthetic signed-owner adapter,
+ * but REAL native links, parent sessions, LIVE-ledger schema, roles and SQLite. */
+function sourceOnlyBrokerAdapter(f,inspector=f.inspector()){
+ const parentIdentity={
+  getSession:async()=>null,
+  authenticate:async()=>null,
+  getParentSession:id=>f.identity.getParentSession(id),
+  logout:id=>f.identity.revokeSession(id)
+ };
+ return createNativeOrganizationBrokerAccessAdapter({
+  identity:parentIdentity,identityStore:f.identity,
+  organizationStore:f.organization,inspector,clock:()=>1800000000000
+ });
+}
+
+test('cross-store org broker adapter produces native epoch only for exact LIVE-linked tenant',async t=>{
+ const f=await fixture(t);
+ const broker=sourceOnlyBrokerAdapter(f);
+ const grant=await broker.getAccess(f.alpha,'goflo');
+ assert(grant);
+ assert.deepEqual(grant.localIdentity,{userId:NATIVE_USER,organizationId:NATIVE_ORG});
+ assert.match(grant.bindingRevision,/^org-native-v1:[A-Za-z0-9_-]{43}$/);
+ assert.equal((await broker.getAccess(f.alpha,'goflo')).bindingRevision,grant.bindingRevision);
+ assert.equal(await broker.getAccess(f.beta,'goflo'),null,
+  'a separately paid second org may not reuse alpha native binding');
+ assert.equal(await broker.getAccess(f.alpha,'dataduck'),null,
+  'DataDuck is still excluded from active six-app organization SSO');
+});
+
+test('real SQLite role revoke/regrant changes broker child-proof binding generation',async t=>{
+ const f=await fixture(t);
+ const broker=sourceOnlyBrokerAdapter(f);
+ const initial=await broker.getAccess(f.alpha,'goflo');
+ assert(initial);
+ const update=enabled=>f.organization.setPermission({
+  organizationId:'alpha',actorId:f.user.id,accountId:f.user.id,
+  appId:'goflo',permission:'workspace.view',enabled
+ });
+ update(false);
+ assert.equal(await broker.getAccess(f.alpha,'goflo'),null);
+ update(true);
+ const current=await broker.getAccess(f.alpha,'goflo');
+ assert(current);
+ assert.notEqual(current.bindingRevision,initial.bindingRevision,
+  'revoked and restored identical permission must not resurrect prior proof');
+});
+
+test('real SQLite role ABA during awaited signed-owner preflight refuses stale organization grant',async t=>{
+ const f=await fixture(t);
+ const signed=f.inspector(async request=>{
+  assert.equal(f.verified(request),true);
+  for(const enabled of [false,true])f.organization.setPermission({
+   organizationId:'alpha',actorId:f.user.id,accountId:f.user.id,
+   appId:'goflo',permission:'workspace.view',enabled
+  });
+  return true;
+ });
+ const broker=sourceOnlyBrokerAdapter(f,signed);
+ assert.equal(await broker.getAccess(f.alpha,'goflo'),null);
+ assert((await sourceOnlyBrokerAdapter(f).getAccess(f.alpha,'goflo'))?.bindingRevision);
+});
+
+test('same-tenant session clear and reselect during native proof is denied',async t=>{
+ const f=await fixture(t);
+ const inspector=f.inspector(async request=>{
+  assert.equal(f.verified(request),true);
+  f.organization.clearSessionOrganization(f.alpha.id);
+  f.organization.selectSessionOrganization({
+   sessionId:f.alpha.id,accountId:f.user.id,organizationId:'alpha'
+  });
+  return true;
+ });
+ const broker=sourceOnlyBrokerAdapter(f,inspector);
+ assert.equal(await broker.getAccess(f.alpha,'goflo'),null);
+ const current=await sourceOnlyBrokerAdapter(f).getAccess(f.alpha,'goflo');
+ assert(current);
+});
+
+test('unverified legacy seat purchase never qualifies for broker organization access',async t=>{
+ const f=await fixture(t,{onlyHistoricalSeats:true});
+ const broker=sourceOnlyBrokerAdapter(f);
+ assert.equal(await broker.getAccess(f.alpha,'goflo'),null);
+ assert.equal(await broker.getAccess(f.beta,'goflo'),null);
 });
