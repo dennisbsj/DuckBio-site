@@ -171,8 +171,13 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
   }
   async function issueCode(parent, target) {
     const initialAccess = await checkAccess(parent, target.client.appId);
+    // The parent may expire while the native access check awaits its result.
+    // Never emit a browser redirect for an already-expired central session.
+    const authorizedAt = clock();
+    if (!Number.isFinite(authorizedAt) || parent.expiresAt <= authorizedAt)
+      throw new BrokerError(401, 'invalid_credentials');
     const code = opaque();
-    await store.putCode(digest(code), { clientId: target.client.id, appId: target.client.appId, parentSessionId: parent.id, subject: parent.subject, state: target.state, challenge: target.challenge, redirectUri: target.redirectUri, returnPath: target.returnPath, localIdentity: initialAccess.localIdentity, bindingRevision: initialAccess.bindingRevision, expiresAt: Math.min(clock() + 60_000, parent.expiresAt) });
+    await store.putCode(digest(code), { clientId: target.client.id, appId: target.client.appId, parentSessionId: parent.id, subject: parent.subject, state: target.state, challenge: target.challenge, redirectUri: target.redirectUri, returnPath: target.returnPath, localIdentity: initialAccess.localIdentity, bindingRevision: initialAccess.bindingRevision, expiresAt: Math.min(authorizedAt + 60_000, parent.expiresAt) });
     const redirect = new URL(target.redirectUri);
     redirect.searchParams.set('code', code); redirect.searchParams.set('state', target.state);
     return { redirectUrl: redirect.href };
@@ -190,6 +195,11 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
     const proofBinding = Object.hasOwn(proof, 'bindingRevision') ? proof.bindingRevision : null;
     if (granted.bindingRevision !== proofBinding ||
         JSON.stringify(granted.localIdentity) !== JSON.stringify(proof.localIdentity)) return null;
+    // A trusted native/policy verifier may await external services. The
+    // parent and child can expire during that await despite an initial PASS.
+    const finalNow = clock();
+    if (!Number.isFinite(finalNow) || !Number.isFinite(proof.expiresAt) ||
+        Math.min(proof.expiresAt, parent.expiresAt) <= finalNow) return null;
     return { proof, parent, assertion: { active: true, issuer, audience: client.id, subject: parent.subject, displayName: parent.displayName, localIdentity: granted.localIdentity, expiresAt: Math.min(proof.expiresAt, parent.expiresAt) } };
   }
   async function checkRate(req, email) {
@@ -287,7 +297,14 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
                   JSON.stringify(granted.localIdentity) !== JSON.stringify(record.localIdentity))
                 throw new BrokerError(401, 'invalid_grant');
               const localIdentity = granted.localIdentity;
-              const sessionToken = opaque(); const expiresAt = Math.min(parent.expiresAt, clock() + 8 * 60 * 60_000);
+              // The single-use code and parent may expire while the current
+              // native grant is checked asynchronously. Never mint a fresh
+              // child proof from an expired authorization or parent session.
+              const exchangeNow = clock();
+              if (!Number.isFinite(exchangeNow) || !Number.isFinite(record.expiresAt) ||
+                  Math.min(record.expiresAt, parent.expiresAt) <= exchangeNow)
+                throw new BrokerError(401, 'invalid_grant');
+              const sessionToken = opaque(); const expiresAt = Math.min(parent.expiresAt, exchangeNow + 8 * 60 * 60_000);
               await store.putProof(digest(sessionToken), { clientId: client.id, appId: client.appId, parentSessionId: parent.id, subject: parent.subject, localIdentity, bindingRevision: granted.bindingRevision, expiresAt });
               json(res, 200, { issuer, audience: client.id, subject: parent.subject, displayName: parent.displayName, localIdentity, expiresAt, sessionToken, returnPath: record.returnPath });
             } else if (route === 'introspect') {
