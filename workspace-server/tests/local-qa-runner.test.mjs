@@ -1,19 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,writeFileSync,rmSync,mkdirSync} from 'node:fs';
+import {mkdtempSync,writeFileSync,rmSync,mkdirSync,symlinkSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {dirname,join} from 'node:path';
-import {parseLocalQaArgs,browserFiles,summarizeQaStage,validQaNodeVersion,ordinaryTrackedGitIndex,runLocalWorkspaceQa} from '../scripts/local-qa.mjs';
+import {parseLocalQaArgs,browserFiles,summarizeQaStage,validQaNodeVersion,ordinaryTrackedGitIndex,regularTrackedGitModes,runLocalWorkspaceQa} from '../scripts/local-qa.mjs';
 
 const SHA='a'.repeat(40);
 const ok=stdout=>({ok:true,exitCode:0,stdout:stdout??'',stderr:'',error:null});
 const fail=()=>({ok:false,exitCode:1,stdout:'',stderr:'fail',error:null});
 function fake({dirty='',failName=null,playwright=true,
  endHead=SHA,endDirty=dirty,wrongRoot=false,endWrongRoot=false,
- initialIndex='H package.json\0',endIndex=initialIndex}={}){
+ initialIndex='H package.json\0',endIndex=initialIndex,
+ initialModes='100644 '+SHA+' 0\tpackage.json\0',endModes=initialModes}={}){
  const calls=[];
- let headReads=0,statusReads=0,indexReads=0;
+ let headReads=0,statusReads=0,indexReads=0,modeReads=0;
  let rootReads=0;
  const execute=(command,args,options={})=>{
   calls.push([command,...args]);
@@ -26,6 +27,8 @@ function fake({dirty='',failName=null,playwright=true,
    return ok((headReads++===0?SHA:endHead)+'\n');
   if(command==='git'&&args[0]==='status')
    return ok(statusReads++===0?dirty:endDirty);
+  if(command==='git'&&args[0]==='ls-files'&&args.includes('--stage'))
+   return ok(modeReads++===0?initialModes:endModes);
   if(command==='git'&&args[0]==='ls-files')
    return ok(indexReads++===0?initialIndex:endIndex);
   if(args[0]==='--input-type=module')return playwright?ok():fail();
@@ -317,4 +320,65 @@ test('real local Git hides modifications with assume-unchanged and skip-worktree
  }
  assert.match(git('status','--porcelain'),/app\.mjs/,
   'normal Git status detects modified tracked source after removing hidden flags');
+});
+
+
+test('tracked source mode validator refuses symlinks, submodules and partial index entries',()=>{
+ assert.equal(regularTrackedGitModes('100644 '+SHA+' 0\tpackage.json\0'),true);
+ assert.equal(regularTrackedGitModes('100755 '+SHA+' 0\tscripts/qa.mjs\0'),true);
+ for(const entry of [
+  '120000 '+SHA+' 0\tworkspace-server/app.mjs\0',
+  '160000 '+SHA+' 0\tworkspace-server/native\0',
+  '100644 '+SHA+' 1\tworkspace-server/app.mjs\0',
+  '100644 '+SHA+' 0\tworkspace-server/app.mjs',
+  '100644 '+SHA+' 0\t\0',
+  '100644 '+SHA+' 0\tapp.mjs\n100644 '+SHA+' 0\tother.mjs\0',
+  '',null
+ ])assert.equal(regularTrackedGitModes(entry),false,String(entry));
+});
+
+test('a tracked symlink to external executable source blocks QA even when status and index flags are ordinary',()=>{
+ const f=fake({initialModes:'120000 '+SHA+' 0\tpackage.json\0'});
+ const result=runLocalWorkspaceQa(['--allow-dirty'],{
+  execute:f.execute,log:()=>{}
+ });
+ assert.equal(result.exitCode,2);
+ assert.equal(result.report.exactHead,false);
+ assert.equal(f.calls.filter(call=>call[0]!=='git').length,0);
+});
+
+test('tracked mode metadata changing during tests invalidates exact-head report',()=>{
+ const f=fake({endModes:'120000 '+SHA+' 0\tpackage.json\0'});
+ const r=runLocalWorkspaceQa(['--expect-head='+SHA],{
+  execute:f.execute,log:()=>{}
+ });
+ assert.equal(r.exitCode,1);
+ assert.equal(r.report.exactHead,false);
+ assert.equal(r.report.stages.find(stage=>stage.name==='git-source-mode-integrity').status,'failed');
+});
+
+test('real Git tracked symlink remains clean when external JS changes, but QA refuses to execute it',t=>{
+ const scratch=mkdtempSync(join(tmpdir(),'duckbio-qa-symlink-'));
+ t.after(()=>rmSync(scratch,{recursive:true,force:true}));
+ const root=join(scratch,'DuckBio-site'),workspace=join(root,'workspace-server');
+ mkdirSync(root);mkdirSync(workspace);
+ const external=join(scratch,'external-app.mjs'),symlink=join(workspace,'app.mjs');
+ writeFileSync(external,'export const version="original";\n');
+ symlinkSync(external,symlink);
+ const gitRoot=(...args)=>execFileSync('git',args,{
+  cwd:root,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
+ gitRoot('init','-q');gitRoot('config','user.name','QA');
+ gitRoot('config','user.email','qa@example.test');
+ gitRoot('add','workspace-server/app.mjs');gitRoot('commit','-qm','Tracked symlink');
+ const sha=gitRoot('rev-parse','HEAD');
+ writeFileSync(external,'export const version="changed";\n');
+ assert.equal(gitRoot('status','--porcelain'),'',
+  'modifying outside symlink target must not alter the tracked Git tree');
+ assert.match(gitRoot('ls-files','--stage'),/^120000 /);
+ const result=runLocalWorkspaceQa(['--expect-head='+sha],{
+  cwd:workspace,nodeVersion:'22.16.0',log:()=>{}
+ });
+ assert.equal(result.exitCode,2);
+ assert.equal(result.report.exactHead,false);
+ assert.equal(result.report.stages.length,0);
 });
