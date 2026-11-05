@@ -531,7 +531,7 @@ test('release QA pins a trusted npm command shell rather than the user npmrc def
  }
 });
 
-test('modified tracked parent policy blocks QA before npm even when workspace subtree is clean',t=>{
+test('modified tracked parent policy blocks QA before npm from a workspace child directory',t=>{
  const scratch=mkdtempSync(join(tmpdir(),'duckbio-qa-parent-dirty-'));
  t.after(()=>rmSync(scratch,{recursive:true,force:true}));
  const root=join(scratch,'DuckBio-site'),workspace=join(root,'workspace-server');
@@ -547,8 +547,8 @@ test('modified tracked parent policy blocks QA before npm even when workspace su
  git(root,'commit','-qm','Baseline with root policy');
  const head=git(root,'rev-parse','HEAD');
  writeFileSync(join(root,'suite-permissions.json'),'{"enabled":true}\\n');
- assert.equal(git(workspace,'status','--porcelain'),'',
-  'subdirectory-scoped Git status overlooks the modified root policy');
+ assert.match(git(workspace,'status','--porcelain'),/suite-permissions\.json/,
+  'Git status from a child directory reports tracked parent changes without a pathspec');
  assert.match(git(root,'status','--porcelain'),/suite-permissions\\.json/);
  let nonGitCalls=0;
  const result=runLocalWorkspaceQa(['--expect-head='+head],{
