@@ -32,3 +32,18 @@ The **isolated actual Node22 and npm test-filter bypass was reproduced** (origin
 This prevents accidental/malicious inherited test suppression, but a host that can arbitrarily replace Node/npm executables or modify the running QA process cannot be attested by code in that same untrusted environment. The staging operator must additionally use pinned, trusted toolchains and a controlled runner.
 
 No secrets, Stripe payments, native permissions, client grants, DNS, deployment or merges were performed.
+
+## Important entrypoint limitation: npm wrapper vs. direct Node invocation
+
+The environment guard executes **inside** `scripts/local-qa.mjs`. A system with a deliberately altered npm script shell could prevent `npm run qa:local` from launching that script at all. A zero exit code from the **npm wrapper alone** is therefore not sufficient release evidence.
+
+For the real release-acceptance gate, the operator must launch the source-pinned program **directly**, from the canonical `workspace-server` directory, using a trusted Node executable:
+
+```sh
+node scripts/local-qa.mjs --expect-head=<verified-40-hex-head> --json
+node scripts/local-qa.mjs --browser --expect-head=<verified-40-hex-head> --json
+```
+
+Review the actual JSON report from the runner, including `exactHead:true`, every test stage `passed`, and the expected SHA, rather than relying only on shell exit code. The tool must refuse an inherited custom npm script shell. `npm run qa:local` remains a developer convenience but **must not** be presented as a fully attested release gate in an untrusted npm environment.
+
+The direct Node runner still invokes `npm run check` and `npm test` internally, using cleaned child environment. A malicious global npm configuration or compromised local executable is outside the guarantees of an application-level guard; require a controlled, reviewed operator machine.
