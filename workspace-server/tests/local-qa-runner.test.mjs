@@ -541,12 +541,12 @@ test('modified tracked parent policy blocks QA before npm from a workspace child
  git(root,'init','-q');
  git(root,'config','user.name','QA');
  git(root,'config','user.email','qa@example.test');
- writeFileSync(join(root,'suite-permissions.json'),'{"enabled":false}\\n');
- writeFileSync(join(workspace,'package.json'),'{"private":true}\\n');
+ writeFileSync(join(root,'suite-permissions.json'),'{"enabled":false}\n');
+ writeFileSync(join(workspace,'package.json'),'{"private":true}\n');
  git(root,'add','.');
  git(root,'commit','-qm','Baseline with root policy');
  const head=git(root,'rev-parse','HEAD');
- writeFileSync(join(root,'suite-permissions.json'),'{"enabled":true}\\n');
+ writeFileSync(join(root,'suite-permissions.json'),'{"enabled":true}\n');
  assert.match(git(workspace,'status','--porcelain'),/suite-permissions\.json/,
   'Git status from a child directory reports tracked parent changes without a pathspec');
  assert.match(git(root,'status','--porcelain'),/suite-permissions\.json/);
