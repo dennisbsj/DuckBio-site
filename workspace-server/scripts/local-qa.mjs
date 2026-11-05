@@ -110,7 +110,7 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const isWorkspaceDirectory=basename(resolve(cwd))==='workspace-server';
  const root=execute('git',['rev-parse','--show-toplevel'],{cwd,timeout:10000});
  const head=execute('git',['rev-parse','--verify','HEAD'],{cwd,timeout:10000});
- const status=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
+ const status=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd:sourceRoot,timeout:10000});
  // Enumerate from the FULL canonical repository root. Git ls-files run
  // inside workspace-server omits tracked parent configuration (including
  // suite-permissions.json) and could miss its hidden modified bytes.
@@ -201,7 +201,7 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  // process could switch to a different HEAD and leave the tree clean.
  const endRoot=execute('git',['rev-parse','--show-toplevel'],{cwd,timeout:10000});
  const endHead=execute('git',['rev-parse','--verify','HEAD'],{cwd,timeout:10000});
- const endStatus=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
+ const endStatus=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd:sourceRoot,timeout:10000});
  const endIndex=execute('git',['ls-files','-v','-z'],{cwd:sourceRoot,timeout:10000});
  const endModes=execute('git',['ls-files','--stage','-z'],{cwd:sourceRoot,timeout:10000});
  if(!endModes.ok||!matchingTrackedGitPaths(endIndex.stdout,endModes.stdout)||
