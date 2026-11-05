@@ -915,8 +915,8 @@ html[data-theme="dark"] .pr-process-free:not([hidden]){background:#185f5c;color:
  </div>
 <div class="pr-full-rules pr-consolidated-discounts" id="discounts" aria-labelledby="pr-discounts-title">
 <h2 class="pr-consolidated-heading" id="pr-discounts-title">Organisation discounts &amp; full price tables</h2>
-<p class="pr-custom-quote-help">For 50+ users, <a href="index.html#contact">contact us</a> for a custom quote.</p>
-<p class="pr-consolidated-intro">Additional team savings apply after the app discount: <strong>5–19 users: 10%</strong> · <strong>20–49 users: 20%</strong> · <strong>50+ users: custom quote</strong>.</p>
+<p class="pr-custom-quote-help">For 20 or more users, <a href="index.html#contact">contact us</a> for a custom quote.</p>
+<p class="pr-consolidated-intro">Additional team savings apply after the app discount: <strong>5–19 users: 10%</strong>. For 20 or more users, pricing is provided through a <strong>custom quote</strong>.</p>
 <div class="pr-tables">
 <div><h3>Price per user / month</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Selection</th><th>Price</th></tr></thead><tbody>
 <tr><td>Single app</td><td data-eur-static="35">35 €</td></tr>
@@ -926,7 +926,7 @@ html[data-theme="dark"] .pr-process-free:not([hidden]){background:#185f5c;color:
 <tr><td>Core bundle + CytoDuck (all 7 apps)</td><td data-eur-static="140">140 €</td></tr>
 </tbody></table></div></div>
 <div><h3>Additional organisation savings</h3><div class="pr-table-wrap"><table class="pr-table"><thead><tr><th>Licensed users</th><th>Extra discount</th></tr></thead><tbody>
-<tr><td>1–4</td><td>0%</td></tr><tr><td>5–19</td><td>10%</td></tr><tr><td>20–49</td><td>20%</td></tr><tr><td>50+</td><td>Custom quote</td></tr></tbody></table></div></div>
+<tr><td>1–4</td><td>0%</td></tr><tr><td>5–19</td><td>10%</td></tr><tr><td>20–49</td><td>Custom quote</td></tr></tbody></table></div></div>
 </div><p class="pr-small">Prices exclude VAT. Mixed discounts apply only to eligible non-CytoDuck apps. CytoDuck is €35 in Single or Mixed. Core includes DuckPipe and DuckTrain free; adding CytoDuck to Core costs €20. EUR is the reference currency; DKK/USD conversions are indicative.</p></div></div></section>
 </main><footer class="footer"><div class="wrap"><div class="footer-grid"><div><a class="brand" href="index.html"><img class="brand-mark" src="assets/duckbio-brand-nofill-dark.svg" alt="" width="43" height="43"><span>Duck<em>Bio</em></span></a><p>Specialised scientific software for laboratory teams, research and structured workflows.</p></div><div><h4>Products</h4><nav aria-label="Products"><a href="apps.html">App workspace</a><a href="labduck.html">LabDuck</a><a href="cytoduck.html">CytoDuck</a><a href="duckpipe.html">DuckPipe</a><a href="eel.html">DuckNote</a><a href="duckman.html">DuckMan</a><a href="mantrain.html">DuckTrain</a><a href="dataduck.html">DataDuck</a></nav></div><div><h4>DuckBio</h4><nav aria-label="Company"><a href="index.html#contact">Contact</a><a href="pricing.html">Pricing</a><a href="apps.html">App workspace</a><a href="support.html">Support</a></nav></div><div><h4>Legal</h4><nav aria-label="Legal information"><a href="terms.html">Terms (draft)</a><a href="privacy.html">Privacy (draft)</a><a href="cookies.html">Cookies (draft)</a><a href="subscriptions.html">Subscriptions (draft)</a><a href="refunds.html">Refunds (draft)</a></nav></div></div><div class="footer-bottom"><span>© <span data-year>2026</span> DuckBio</span><span>Preview site · Authentication, trial and payments not yet launched</span></div></div></footer><script src="assets/xlsx-export.js"></script><script>
 (()=>{
@@ -998,9 +998,9 @@ function exportPriceRows(info,chosenApps){
   ["Units of display currency per EUR",fxPerEUR[currency]],
   ["Standard individual app price (EUR)",BASE_EUR],
   ["Undiscounted individual app total (EUR/month)",round2(info.baseEUR)],
-  ["Selected app price before organisation discount (EUR/month)",round2(info.suiteEUR)],
-  ["App/package savings (EUR/month)",round2(info.baseEUR-info.suiteEUR)],
-  ["Organisation discount",String(info.orgRate)+"%"],
+  ["Selected app price before organisation discount (EUR/month)",info.custom?"Custom quote required":round2(info.suiteEUR)],
+  ["App/package savings (EUR/month)",info.custom?"Custom quote required":round2(info.baseEUR-info.suiteEUR)],
+  ["Organisation discount",info.custom?"Custom quote":String(info.orgRate)+"%"],
   ["Total monthly estimate (EUR)",info.custom?"Individual quote required":round2(info.finalEUR)],
   ["Total monthly estimate ("+currency+")",info.custom?"Individual quote required":round2(converted(info.finalEUR))],
   ["VAT","Excluded"],
@@ -1062,13 +1062,13 @@ function renderSelection(){
  }
  const suiteEUR=pricing.unitEUR*users;
  const baseEUR=count*BASE_EUR*users;
- const custom=users>=50;
- const organisationRate=custom?0:users>=20?20:users>=5?10:0;
+ const custom=users>=20;
+ const organisationRate=custom?0:users>=5?10:0;
  const finalEUR=suiteEUR*(1-organisationRate/100);
  find("pr-select-total").textContent=custom?"Individual quote":formatEUR(finalEUR)+" / month";
  const appSavingsEUR=baseEUR-suiteEUR;
  const teamSavingsEUR=suiteEUR-finalEUR;
- const monthlySavingsEUR=custom?appSavingsEUR:appSavingsEUR+teamSavingsEUR;
+ const monthlySavingsEUR=custom?0:appSavingsEUR+teamSavingsEUR;
  if(monthlySavingsEUR>0.001){
   savingsBox.hidden=false;
   find("pr-select-savings-amount").textContent=formatEUR(monthlySavingsEUR);
@@ -1081,7 +1081,7 @@ function renderSelection(){
  }
  const planDetail=pricing.core?(pricing.cyto?"Core + CytoDuck":"Core + free Process"):pricing.plan;
  find("pr-select-breakdown").textContent=custom?
-  "50+ users: contact us for a custom quote. Excl. VAT.":
+  "20 or more users: contact us for a custom quote. Excl. VAT.":
   "Plan: "+planDetail+" · "+users+" "+(users===1?"user":"users")+" · Excl. VAT.";
  selectionEstimate={apps:count,users,custom,baseEUR,suiteEUR,finalEUR,orgRate:organisationRate,
   unitEUR:pricing.unitEUR,plan:pricing.plan,core:pricing.core,cyto:pricing.cyto};
