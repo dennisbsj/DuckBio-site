@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtempSync,mkdirSync,writeFileSync,rmSync,symlinkSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,rmSync,symlinkSync,renameSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {EIGHT_SERVICE_SLOTS} from '../staging-eight-origin-candidate.mjs';
@@ -90,4 +90,65 @@ test('inherited Git environment cannot redirect the checked repository',t=>{
   if(original===undefined)delete process.env.GIT_DIR;
   else process.env.GIT_DIR=original;
  }
+});
+
+test('tracked symlink stays disallowed even when git status is clean',t=>{
+ const f=fixture(t);
+ const location=f.source('DuckPipe');
+ symlinkSync('sample.txt',join(location,'outside-linked-source'));
+ run(location,'add','outside-linked-source');
+ run(location,'commit','-qm','Synthetic tracked symlink fixture');
+ assert.equal(run(location,'status','--porcelain','--untracked-files=all'),'',
+  'tracked symlink looks clean to plain git status');
+ assert.match(run(location,'ls-files','--stage'),/^120000 .*outside-linked-source$/m);
+ const audit=auditEightLocalSources({...f,
+  entries:f.entries.map(e=>e.id==='methpipe'?{
+   ...e,sha:run(location,'rev-parse','HEAD')
+  }:e)});
+ assert.equal(audit.ok,false);
+ assert(audit.errors.includes('unverified_methpipe_source'));
+ assert.equal(audit.productionAuthorized,false);
+});
+
+test('ignored local source files cannot silently pass as a clean physical checkout',t=>{
+ const f=fixture(t);
+ const location=f.source('DuckNote');
+ writeFileSync(join(location,'.gitignore'),'ignored-runtime.mjs\n');
+ run(location,'add','.gitignore');
+ run(location,'commit','-qm','Track ignore definition');
+ writeFileSync(join(location,'ignored-runtime.mjs'),
+  'export const secretlyInjected = true;\n');
+ assert.equal(run(location,'status','--porcelain','--untracked-files=all'),'',
+  'ordinary git status does not report ignored executable source');
+ const audit=auditEightLocalSources({...f,
+  entries:f.entries.map(e=>e.id==='eel'?{...e,
+    sha:run(location,'rev-parse','HEAD')
+  }:e)});
+ assert.equal(audit.ok,false);
+ assert(audit.errors.includes('unverified_eel_source'));
+ assert.equal(audit.stagingAuthorized,false);
+});
+
+test('external Git metadata through a gitfile must not count as isolated source repository',t=>{
+ const f=fixture(t);
+ const location=f.source('DuckMan');
+ renameSync(join(location,'.git'),join(location,'metadata'));
+ writeFileSync(join(location,'.git'),'gitdir: metadata\n');
+ assert.equal(run(location,'rev-parse','--show-toplevel'),location,
+  'git can still report the same working-tree directory with external metadata');
+ const report=auditEightLocalSources(f);
+ assert.equal(report.ok,false);
+ assert(report.errors.includes('unverified_duckman_source'));
+});
+
+test('a tracked gitlink/submodule cannot masquerade as ordinary reviewed source',t=>{
+ const f=fixture(t);
+ const location=f.source('LabDuck');
+ const sha=run(location,'rev-parse','HEAD');
+ run(location,'update-index','--add','--cacheinfo',
+  '160000,'+sha+',unreviewed-native-submodule');
+ const result=auditEightLocalSources(f);
+ assert.equal(result.ok,false);
+ assert(result.errors.includes('unverified_limsman_source'));
+ assert.equal(result.nativeAuthorizationVerified,false);
 });
