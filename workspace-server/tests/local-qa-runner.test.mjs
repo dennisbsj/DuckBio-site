@@ -3,18 +3,24 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,writeFileSync,rmSync,mkdirSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {dirname,join} from 'node:path';
 import {parseLocalQaArgs,browserFiles,summarizeQaStage,validQaNodeVersion,runLocalWorkspaceQa} from '../scripts/local-qa.mjs';
 
 const SHA='a'.repeat(40);
 const ok=stdout=>({ok:true,exitCode:0,stdout:stdout??'',stderr:'',error:null});
 const fail=()=>({ok:false,exitCode:1,stdout:'',stderr:'fail',error:null});
 function fake({dirty='',failName=null,playwright=true,
- endHead=SHA,endDirty=dirty}={}){
+ endHead=SHA,endDirty=dirty,wrongRoot=false,endWrongRoot=false}={}){
  const calls=[];
  let headReads=0,statusReads=0;
- const execute=(command,args)=>{
+ let rootReads=0;
+ const execute=(command,args,options={})=>{
   calls.push([command,...args]);
+  if(command==='git'&&args[0]==='rev-parse'&&args[1]==='--show-toplevel'){
+   const wrong=rootReads++===0?wrongRoot:endWrongRoot;
+   return ok((wrong?join(dirname(options.cwd||'/tmp/workspace-server'),'unrelated'):
+    dirname(options.cwd||'/tmp/workspace-server'))+'\n');
+  }
   if(command==='git'&&args[0]==='rev-parse')
    return ok((headReads++===0?SHA:endHead)+'\n');
   if(command==='git'&&args[0]==='status')
@@ -136,18 +142,20 @@ test('a failed final Git HEAD query fails closed even if all test stages pass',(
 test('real local QA ignores inherited GIT_DIR and GIT_WORK_TREE overrides',t=>{
  const scratch=mkdtempSync(join(tmpdir(),'duckbio-qa-env-'));
  t.after(()=>rmSync(scratch,{recursive:true,force:true}));
- const first=join(scratch,'workspace'),second=join(scratch,'unrelated');
+ const first=join(scratch,'primary'),second=join(scratch,'unrelated');
  const git=(where,...args)=>execFileSync('git',args,{
   cwd:where,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
  for(const where of [first,second]){
   mkdirSync(where);
   git(where,'init','-q');
-  writeFileSync(join(where,'package.json'),JSON.stringify({
+  const localPackage=where===first?join(where,'workspace-server'):where;
+  if(where===first)mkdirSync(localPackage);
+  writeFileSync(join(localPackage,'package.json'),JSON.stringify({
    name:where===first?'isolated-workspace':'other-repository',
    private:true,scripts:{check:'node -e "process.exit(0)"',
     test:'node -e "process.exit(0)"'}
   })+'\n');
-  git(where,'add','package.json');
+  git(where,'add',where===first?'workspace-server/package.json':'package.json');
   git(where,'-c','user.name=Private QA','-c','user.email=private@example.test',
    'commit','-qm','Isolated QA local source fixture');
  }
@@ -159,7 +167,7 @@ test('real local QA ignores inherited GIT_DIR and GIT_WORK_TREE overrides',t=>{
  process.env.GIT_WORK_TREE=second;
  try{
   const result=runLocalWorkspaceQa(['--expect-head='+expected],{
-   cwd:first,log:()=>{},nodeVersion:'22.16.0'
+   cwd:join(first,'workspace-server'),log:()=>{},nodeVersion:'22.16.0'
   });
   assert.equal(result.exitCode,0,JSON.stringify(result.report));
   assert.equal(result.report.sha,expected);
@@ -171,4 +179,21 @@ test('real local QA ignores inherited GIT_DIR and GIT_WORK_TREE overrides',t=>{
   if(savedWorkTree===undefined)delete process.env.GIT_WORK_TREE;
   else process.env.GIT_WORK_TREE=savedWorkTree;
  }
+});
+
+test('a nested Git repository or noncanonical package directory cannot establish Workspace exact HEAD',()=>{
+ for(const bad of [
+  fake({wrongRoot:true}),
+  fake({endWrongRoot:true})
+ ]){
+  const result=runLocalWorkspaceQa([],{
+   cwd:'/tmp/workspace-server',execute:bad.execute,log:()=>{}
+  });
+  assert.notEqual(result.exitCode,0);
+  assert.equal(result.report.exactHead,false);
+ }
+ const f=fake();
+ const result=runLocalWorkspaceQa([],{cwd:'/tmp/not-workspace',execute:f.execute,log:()=>{}});
+ assert.equal(result.exitCode,2);
+ assert.equal(result.report.exactHead,false);
 });

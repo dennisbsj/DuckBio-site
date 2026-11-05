@@ -4,7 +4,7 @@
  */
 import {spawnSync} from 'node:child_process';
 import {readdirSync} from 'node:fs';
-import {dirname,join,resolve} from 'node:path';
+import {basename,dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const projectDir=dirname(dirname(fileURLToPath(import.meta.url)));
@@ -53,15 +53,26 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  if(options.help){
   return {exitCode:0,help:'Usage: npm run qa:local -- [--browser] [--json] [--expect-head=<40-hex-SHA>] [--allow-dirty]'};
  }
+ // A nested Git repository inside workspace-server would otherwise make
+ // tests appear clean for the wrong source tree. This runner is exclusively
+ // for the DuckBio-site/workspace-server checkout layout.
+ const sourceRoot=resolve(dirname(cwd));
+ const isWorkspaceDirectory=basename(resolve(cwd))==='workspace-server';
+ const root=execute('git',['rev-parse','--show-toplevel'],{cwd,timeout:10000});
  const head=execute('git',['rev-parse','--verify','HEAD'],{cwd,timeout:10000});
  const status=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
  const sha=head.stdout.trim();
  const clean=Boolean(head.ok&&/^[0-9a-f]{40}$/.test(sha)&&status.ok&&!status.stdout.trim());
  const report={schema:'duckbio.workspace.local-qa.v1',sha:head.ok?sha:null,
-  exactHead:clean,expectedHead:options.expectHead,allowDirty:options.allowDirty,stages:[],
+  exactHead:clean,expectedRoot:sourceRoot,expectedHead:options.expectHead,allowDirty:options.allowDirty,stages:[],
   outcome:'blocked',nodeVersion};
  if(!validQaNodeVersion(nodeVersion)){
   log('Workspace QA requires Node 22.16+ or Node 24.');
+  return {exitCode:2,report};
+ }
+ if(!isWorkspaceDirectory||!root.ok||resolve(root.stdout.trim())!==sourceRoot){
+  report.exactHead=false;
+  log('Not the canonical DuckBio-site/workspace-server Git checkout.');
   return {exitCode:2,report};
  }
  if(!head.ok||!status.ok||!(/^[0-9a-f]{40}$/.test(sha))){
@@ -106,8 +117,13 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  }
  // Status alone cannot bind a run to the original commit. A second
  // process could switch to a different HEAD and leave the tree clean.
+ const endRoot=execute('git',['rev-parse','--show-toplevel'],{cwd,timeout:10000});
  const endHead=execute('git',['rev-parse','--verify','HEAD'],{cwd,timeout:10000});
  const endStatus=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
+ if(!endRoot.ok||resolve(endRoot.stdout.trim())!==sourceRoot){
+  report.stages.push({name:'git-root-integrity',status:'failed',exitCode:1,durationMs:0});
+  report.exactHead=false;
+ }
  if(!endHead.ok||endHead.stdout.trim()!==sha){
   report.stages.push({name:'git-head-integrity',status:'failed',exitCode:1,durationMs:0});
   report.exactHead=false;
