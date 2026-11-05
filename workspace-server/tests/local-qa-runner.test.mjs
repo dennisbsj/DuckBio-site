@@ -382,3 +382,42 @@ test('real Git tracked symlink remains clean when external JS changes, but QA re
  assert.equal(result.report.exactHead,false);
  assert.equal(result.report.stages.length,0);
 });
+
+
+test('real modified parent policy hidden by index flags cannot escape child-folder QA enumeration',t=>{
+ const scratch=mkdtempSync(join(tmpdir(),'duckbio-qa-root-policies-'));
+ t.after(()=>rmSync(scratch,{recursive:true,force:true}));
+ const root=join(scratch,'DuckBio-site'),workspace=join(root,'workspace-server');
+ mkdirSync(root);mkdirSync(workspace);
+ const exec=(cwd,...args)=>execFileSync('git',args,{
+  cwd,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
+ exec(root,'init','-q');exec(root,'config','user.name','QA');
+ exec(root,'config','user.email','qa@example.test');
+ const policy=join(root,'suite-permissions.json');
+ writeFileSync(policy,'{"apps":{"private":true}}\n');
+ writeFileSync(join(workspace,'app.mjs'),'export default true;\n');
+ exec(root,'add','.');exec(root,'commit','-qm','Parent source with private policy');
+ const head=exec(root,'rev-parse','HEAD');
+ writeFileSync(policy,'{"apps":{"private":false}}\n');
+ for(const [on,off] of [
+  ['--assume-unchanged','--no-assume-unchanged'],
+  ['--skip-worktree','--no-skip-worktree']
+ ]){
+  exec(root,'update-index',on,'suite-permissions.json');
+  assert.equal(exec(workspace,'status','--porcelain'),'',
+   'Git status hides modified parent policy under '+on);
+  assert.equal(exec(workspace,'ls-files','-v').includes('suite-permissions.json'),false,
+   'a child-folder Git index query misses relevant parent files');
+  const flags=exec(root,'ls-files','-v');
+  assert(flags.includes('suite-permissions.json'));
+  const r=runLocalWorkspaceQa(['--expect-head='+head],{
+   cwd:workspace,nodeVersion:'22.16.0',log:()=>{}
+  });
+  assert.equal(r.exitCode,2,
+   'index scan must include tracked configuration outside workspace-server');
+  assert.equal(r.report.exactHead,false);
+  assert.equal(r.report.stages.length,0,
+   'hidden parent policy must not reach any npm execution stage');
+  exec(root,'update-index',off,'suite-permissions.json');
+ }
+});
