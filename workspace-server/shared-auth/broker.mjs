@@ -193,7 +193,7 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
     // A trusted native/policy verifier may await external services. The
     // parent and child can expire during that await despite an initial PASS.
     const finalNow = clock();
-    if (!Number.isFinite(finalNow) ||
+    if (!Number.isFinite(finalNow) || !Number.isFinite(proof.expiresAt) ||
         Math.min(proof.expiresAt, parent.expiresAt) <= finalNow) return null;
     return { proof, parent, assertion: { active: true, issuer, audience: client.id, subject: parent.subject, displayName: parent.displayName, localIdentity: granted.localIdentity, expiresAt: Math.min(proof.expiresAt, parent.expiresAt) } };
   }
@@ -296,7 +296,7 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
               // native grant is checked asynchronously. Never mint a fresh
               // child proof from an expired authorization or parent session.
               const exchangeNow = clock();
-              if (!Number.isFinite(exchangeNow) ||
+              if (!Number.isFinite(exchangeNow) || !Number.isFinite(record.expiresAt) ||
                   Math.min(record.expiresAt, parent.expiresAt) <= exchangeNow)
                 throw new BrokerError(401, 'invalid_grant');
               const sessionToken = opaque(); const expiresAt = Math.min(parent.expiresAt, exchangeNow + 8 * 60 * 60_000);

@@ -177,3 +177,19 @@ test('a still-valid PKCE code and parent can issue one native proof after awaite
  });
  assert.equal(f.proofWrites(),1);
 });
+
+
+test('malformed child expiration cannot produce an active native assertion',async t=>{
+ const f=await fixture(t,{childUntil:NaN,
+  parentUntil:START+60_000,afterAccess:START+2000});
+ assert.deepEqual(await f.introspect(),{active:false});
+ assert.equal(await f.nativeSession(),null);
+});
+
+test('malformed PKCE code expiration never mints a child proof',async t=>{
+ const f=await exchangeFixture(t,{codeUntil:NaN,
+  parentUntil:START+60_000,afterAccess:START+2000});
+ const result=await f.exchange();
+ assert.deepEqual(result,{status:401,data:{error:'invalid_grant'}});
+ assert.equal(f.proofWrites(),0);
+});
