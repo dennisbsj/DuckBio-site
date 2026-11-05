@@ -198,7 +198,13 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
       now-row.check_completed_at<=TEST_CHECK_MAX_AGE_MS&&
       Number.isSafeInteger(row.period_end)&&row.period_end>Math.floor(now/1000);
   }
-  const pendingSeats=(org,app)=>db.prepare("SELECT count(*) AS n FROM organization_invites WHERE org=? AND expires_at>? AND json_type(roles, '$.' || ?) IS NOT NULL").get(org,clock(),app).n;
+  // Inactive or demoted inviters must not reserve paid app seats.
+  const pendingSeats=(org,app)=>db.prepare(`SELECT count(*) AS n FROM organization_invites i
+    JOIN members m ON m.org=i.org AND m.account=i.issued_by AND m.admin=1 AND m.active=1
+    WHERE i.org=? AND i.expires_at>? AND json_type(i.roles, '$.' || ?) IS NOT NULL`).get(org,clock(),app).n;
+  const revokeIssuedInvitations=(org,account)=>db.prepare(
+    'DELETE FROM organization_invites WHERE org=? AND issued_by=?'
+  ).run(org,account).changes;
   const roles=(org,account)=>Object.fromEntries(db.prepare('SELECT app,role FROM assignments WHERE org=? AND account=?').all(org,account).map(x=>[x.app,x.role]));
   const view=(org,row)=>({accountId:row.account,name:row.name,nickname:row.nickname,email:row.email,admin:Boolean(row.admin),active:Boolean(row.active),roles:roles(org,row.account)});
   return Object.freeze({
@@ -584,6 +590,8 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
           const limit=db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?').get(organizationId,app)?.purchased??0;
           if(count+pendingSeats(organizationId,app)>=limit)fail('app_seats_exhausted');
         }
+        // Once an admin is demoted, their pending invites and seat holds end.
+        if(prior?.admin&&!member.admin)revokeIssuedInvitations(organizationId,member.accountId);
         db.prepare('INSERT INTO members(org,account,name,nickname,email,admin) VALUES(?,?,?,?,?,?) ON CONFLICT(org,account) DO UPDATE SET name=excluded.name,nickname=excluded.nickname,email=excluded.email,admin=excluded.admin').run(organizationId,member.accountId,member.name.trim(),member.nickname.trim(),email,member.admin?1:0);
         for(const app of APPLICATIONS){
           if(previousRoles[app.id] && requested[app.id] && previousRoles[app.id]!==requested[app.id])
@@ -976,6 +984,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         if(Boolean(row.active)===active)return {accountId,active,changed:false};
         if(!active && row.admin && db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1 AND active=1').get(organizationId).n===1)fail('last_organization_admin');
         db.prepare('UPDATE members SET active=? WHERE org=? AND account=?').run(active?1:0,organizationId,accountId);
+        if(!active)revokeIssuedInvitations(organizationId,accountId);
         audit(organizationId,actorId,active?'member.reactivated':'member.deactivated',accountId);
         // A suspended user retains the licensed seat to prevent over-allocation on reactivation.
         return {accountId,active,changed:true};
@@ -989,6 +998,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         if(!row)fail('member_not_found');
         if(row.admin && row.active && db.prepare('SELECT count(*) AS n FROM members WHERE org=? AND admin=1 AND active=1').get(organizationId).n===1)fail('last_organization_admin');
         const removedRoles=roles(organizationId,accountId);
+        revokeIssuedInvitations(organizationId,accountId);
         db.prepare('DELETE FROM members WHERE org=? AND account=?').run(organizationId,accountId);
         audit(organizationId,actorId,'member.removed',accountId,{roles:removedRoles});
         return {removed:true,accountId};
@@ -1002,6 +1012,12 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         const requested=validRoles(roles,organizationId);
         if(db.prepare('SELECT 1 FROM members WHERE org=? AND email=?').get(organizationId,normalized))fail('member_exists');
         db.prepare('DELETE FROM organization_invites WHERE expires_at<=?').run(clock());
+        // Clean legacy orphaned invites before duplicate checks; they cannot
+        // be claimed and must never block a new active admin invitation.
+        db.prepare(`DELETE FROM organization_invites WHERE org=? AND NOT EXISTS (
+          SELECT 1 FROM members m WHERE m.org=organization_invites.org
+          AND m.account=organization_invites.issued_by AND m.admin=1 AND m.active=1
+        )`).run(organizationId);
         if(db.prepare('SELECT 1 FROM organization_invites WHERE org=? AND email=?').get(organizationId,normalized))fail('invitation_exists');
         for(const app of Object.keys(requested)){
           const count=db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?').get(organizationId,app).n;
@@ -1016,7 +1032,9 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     },
     listPendingInvitations(organizationId,actorId){
       requireAdmin(organizationId,actorId);
-      return db.prepare('SELECT email,name,nickname,admin,expires_at,roles FROM organization_invites WHERE org=? AND expires_at>? ORDER BY email').all(organizationId,clock())
+      return db.prepare(`SELECT i.email,i.name,i.nickname,i.admin,i.expires_at,i.roles
+        FROM organization_invites i JOIN members m ON m.org=i.org AND m.account=i.issued_by
+        AND m.admin=1 AND m.active=1 WHERE i.org=? AND i.expires_at>? ORDER BY i.email`).all(organizationId,clock())
         .map(row=>({email:row.email,name:row.name,nickname:row.nickname,admin:Boolean(row.admin),expiresAt:row.expires_at,roles:JSON.parse(row.roles)}));
     },
     revokeInvitation({organizationId,actorId,email}){
@@ -1031,7 +1049,7 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     },
     previewInvitation(token){
       if(!safeToken(token))return null;
-      const row=db.prepare('SELECT i.*,o.name AS organization_name FROM organization_invites i JOIN organizations o ON o.id=i.org JOIN members m ON m.org=i.org AND m.account=i.issued_by AND m.admin=1 WHERE i.token_hash=? AND i.expires_at>?').get(inviteHash(token),clock());
+      const row=db.prepare('SELECT i.*,o.name AS organization_name FROM organization_invites i JOIN organizations o ON o.id=i.org JOIN members m ON m.org=i.org AND m.account=i.issued_by AND m.admin=1 AND m.active=1 WHERE i.token_hash=? AND i.expires_at>?').get(inviteHash(token),clock());
       return row?{organizationId:row.org,organizationName:row.organization_name,email:row.email,name:row.name,nickname:row.nickname,admin:Boolean(row.admin),expiresAt:row.expires_at,roles:JSON.parse(row.roles)}:null;
     },
     acceptInvitation({token,accountId,email}){
