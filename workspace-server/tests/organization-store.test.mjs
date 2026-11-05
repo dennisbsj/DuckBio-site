@@ -417,3 +417,37 @@ test('private SQLite restart preserves invitation revocation and audit after adm
  assert.throws(()=>store.acceptInvitation({token:invitation.token,
   accountId:'guest',email:'guest@example.test'}),/invalid_invitation/);
 });
+
+test('invitation acceptance fails closed if reserved app capacity disappears before redemption',t=>{
+ const {store,dbPath}=fixture(t);
+ buy(store,'seat-on-issue','Mixed',['eel','goflo'],1);
+ const invite=store.issueInvitation({organizationId:'one',actorId:'admin1',
+  name:'New Scientist',nickname:'N',email:'new-scientist@example.test',
+  roles:{eel:'scientist',goflo:'Analyst'}});
+ const db=new DatabaseSync(dbPath);
+ try{
+  // Model a seat ledger being changed independently between invite and
+  // acceptance. An actual verified billing transition normally forbids
+  // shrinking below issued reservations.
+  db.prepare('UPDATE seats SET purchased=0 WHERE org=? AND app=?')
+   .run('one','goflo');
+ }finally{db.close()}
+ assert.throws(()=>store.acceptInvitation({
+  token:invite.token,accountId:'scientist',email:'new-scientist@example.test'
+ }),/app_seats_exhausted/);
+ assert.equal(store.overview('one','admin1').users.some(u=>u.accountId==='scientist'),false);
+ assert.equal(store.accessFor({organizationId:'one',accountId:'scientist',appId:'eel'}),null);
+ assert.equal(store.previewInvitation(invite.token)?.email,'new-scientist@example.test',
+  'failed acceptance does not consume its one-time token');
+ const restorer=new DatabaseSync(dbPath);
+ try{
+  restorer.prepare('UPDATE seats SET purchased=1 WHERE org=? AND app=?')
+   .run('one','goflo');
+ }finally{restorer.close()}
+ const accepted=store.acceptInvitation({token:invite.token,
+  accountId:'scientist',email:'new-scientist@example.test'});
+ assert.deepEqual(accepted.roles,{eel:'scientist',goflo:'Analyst'});
+ assert.equal(store.previewInvitation(invite.token),null);
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').assigned,1);
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='goflo').assigned,1);
+});
