@@ -186,3 +186,24 @@ test('no missing or malformed private authority adapters can construct the grant
   }),/required/);
  }
 });
+
+
+test('a malformed positive or missing licensed-seat flag cannot activate dormant org SSO',async()=>{
+ for(const corrupted of [true,null,undefined,0,'true']){
+  const f=fixture();
+  const original=f.organizationStore.verifiedNativePermissionCandidate;
+  f.organizationStore.verifiedNativePermissionCandidate=query=>{
+   const result=original(query);
+   if(!result)return result;
+   const copy={...result};
+   if(corrupted===undefined)delete copy.licensesGranted;
+   else copy.licensesGranted=corrupted;
+   return copy;
+  };
+  assert.equal(await go(f),null,
+   'no browser-facing native handoff from untrusted paid-seat status '+String(corrupted));
+  assert.equal(f.inspections(),0,'reject malformed licensed-seat candidate BEFORE signed native lookup');
+ }
+ const valid=fixture();
+ assert(await go(valid),'the expected explicit false candidate still supports source-only inspection');
+});
