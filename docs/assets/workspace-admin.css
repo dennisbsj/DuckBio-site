@@ -120,3 +120,25 @@ html[data-theme="dark"] .role-perm-key{color:#b7d6e5}
 html[data-theme="dark"] .ua-danger{background:#482a31;color:#ffd1d1;border-color:#a75a65}
 html[data-theme="dark"] .ua-danger:hover{background:#62343c}
 @media(max-width:520px){.ua-modal-footer .ua-danger{margin-right:auto}}
+
+
+/* In-Workspace confirmation replaces browser-native confirm dialogs. */
+.duckbio-confirm-dialog{width:min(92vw,440px);padding:0;max-width:440px}
+.duckbio-confirm-dialog[open]{
+  inset:var(--launcher-visible-top,12px) 0 auto!important;
+  margin-inline:auto!important;
+  max-height:min(500px,var(--launcher-visible-height,calc(100vh - 30px)))!important;
+  overflow:auto
+}
+.duckbio-confirm-content{padding:24px}
+.duckbio-confirm-content h2{margin:0 0 11px;font-size:23px;line-height:1.22;color:#183e51}
+.duckbio-confirm-content p{margin:0 0 16px;font-size:13px;line-height:1.6;color:#507488}
+.duckbio-confirm-content .ua-modal-footer{margin-top:14px}
+html[data-theme="dark"] .duckbio-confirm-content h2{color:#ecfbff}
+html[data-theme="dark"] .duckbio-confirm-content p{color:#bfdce8}
+@media(max-width:480px){
+  .duckbio-confirm-dialog{width:calc(100% - 26px)}
+  .duckbio-confirm-content{padding:18px}
+  .duckbio-confirm-content .ua-modal-footer{justify-content:stretch}
+  .duckbio-confirm-content .ua-modal-footer button{flex:1}
+}
