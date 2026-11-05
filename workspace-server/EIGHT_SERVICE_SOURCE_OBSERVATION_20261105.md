@@ -2,11 +2,11 @@
 
 **Observed 2026-11-05 (Europe/Copenhagen). NOT a release manifest or staging approval.**
 
-This document records refs independently read through the connected GitHub repository interface. It is a transient engineering observation, **not** an immutable trusted release pin. Re-read each branch immediately before any real source audit. All private repositories and files remain in GitHub; no customer database, secrets, app service or production hostname were accessed.
+This document records refs independently read through the connected GitHub repository interface. The Workspace review commit below is the initial combined two-parent merge before later source-only invitation acceptance hardening; consult the live PR for its current head. It is a transient engineering observation, **not** an immutable trusted release pin. Re-read each branch immediately before any real source audit. All private repositories and files remain in GitHub; no customer database, secrets, app service or production hostname were accessed.
 
 | Service | Repository | Observed ref | 40-character commit | Observed source only |
 | --- | --- | --- | --- | --- |
-| Workspace reviewed candidate | `dennisbsj/DuckBio-site` | draft integration branch [#237](https://github.com/dennisbsj/DuckBio-site/pull/237) | `789b585e25176d1508bf6ce164ae769622ddb6f0` | NOT on `main` |
+| Workspace initial integration merge snapshot (historical; latest #237 head may move) | `dennisbsj/DuckBio-site` | draft integration branch [#237](https://github.com/dennisbsj/DuckBio-site/pull/237) | `789b585e25176d1508bf6ce164ae769622ddb6f0` | NOT on `main` |
 | Workspace production baseline | `dennisbsj/DuckBio-site` | `main` | `fdc312ae44d4bacbc0a5e059860939635a392b5e` | Does NOT contain the draft integration |
 | CytoDuck (goflo) | `dennisbsj/CytoDuck` | `main` | `ba22006b75b75d6b1fbe680c3d59116768806798` | Dormant native signer/lookup/HTTPS sidecar files found |
 | DuckNote (eel) | `dennisbsj/DuckNote` | `main` | `83f3892442eabb64f050934d435d39c4e72b3d8b` | Dormant native signer/lookup/HTTPS sidecar files found |
