@@ -3028,3 +3028,13 @@ html body.support-faq-page .page-hero.support-hero.duckbio-real-hero--support .d
   line-height:1.45!important;
  }
 }
+
+/* Match Support Contact button spacing to Pricing View pricing (5 Nov 2026). */
+html body.support-faq-page .page-hero.support-hero.duckbio-real-hero--support .duckbio-real-hero-cta{
+ margin-top:clamp(16px,1.6vw,25px)!important;
+}
+@media(max-width:850px){
+ html body.support-faq-page .page-hero.support-hero.duckbio-real-hero--support .duckbio-real-hero-cta{
+  margin-top:18px!important;
+ }
+}
