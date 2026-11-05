@@ -56,7 +56,8 @@ export function createNativeOrganizationBrokerAccessAdapter({
       if (!policy || policy.source !== 'verified_live_subscription_ledger' ||
           policy.organizationId !== selected.id || policy.accountId !== active.subject ||
           policy.appId !== appId || policy.permission !== PERMISSION ||
-          policy.accessGranted !== false || policy.nativeEnforcementRequired !== true ||
+          policy.accessGranted !== false || policy.licensesGranted !== false ||
+          policy.nativeEnforcementRequired !== true ||
           !roleName(policy.role) || !positive(policy.authorizationAuditRevision) ||
           !Number.isSafeInteger(policy.verifiedPaidThroughMs) ||
           policy.verifiedPaidThroughMs <= now) return null;
