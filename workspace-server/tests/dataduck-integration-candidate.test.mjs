@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DATADUCK_APP,EXISTING_DUCKBIO_APP_IDS,
- inspectDataDuckClientCandidate,inspectDataDuckNativeEntitlement}
+ inspectDataDuckClientCandidate,inspectDataDuckNativeEntitlement,
+ inspectFutureSevenAppPlanCandidate}
  from '../dataduck-integration-candidate.mjs';
 
 const origin='https://staging-workspace.duckbio.net';
@@ -57,4 +58,82 @@ test('native identity must match a separate fresh paid DataDuck entitlement',()=
   localIdentity:identity,entitlement:bad}).accessGranted,false);
  assert.equal(inspectDataDuckNativeEntitlement({
   localIdentity:null,entitlement:good}).ready,false);
+});
+
+test('future seven-app pricing grammar: Single 1, Mixed 2–6 and Bundle exactly all seven without any purchase',()=>{
+ const all=[...EXISTING_DUCKBIO_APP_IDS,'dataduck'];
+ const single=inspectFutureSevenAppPlanCandidate({
+  plan:'Single',apps:['dataduck'],seats:2
+ });
+ assert.equal(single.ok,true);
+ assert.deepEqual(single.apps,['dataduck']);
+ assert.equal(single.licensesGranted,false);
+ assert.equal(single.purchaseAuthorized,false);
+ assert.equal(single.accessGranted,false);
+ for(let count=2;count<=6;count++){
+  const mixed=inspectFutureSevenAppPlanCandidate({
+   plan:'Mixed',apps:all.slice(0,count),seats:count
+  });
+  assert.equal(mixed.ok,true,'Mixed should allow '+count+' of seven apps');
+  assert.equal(mixed.plan,'Mixed');
+  assert.equal(mixed.migrationAuthorized,false);
+  assert.equal(mixed.proposalOnly,true);
+ }
+ const bundle=inspectFutureSevenAppPlanCandidate({
+  plan:'Bundle',apps:all.slice().reverse(),seats:5
+ });
+ assert.equal(bundle.ok,true);
+ assert.deepEqual(bundle.apps,[...all].sort());
+ assert.equal(bundle.dataduckIncluded,true);
+ assert.equal(bundle.legacySixAppBundleAutomaticallyUpgraded,false);
+ assert.equal(bundle.grandfatheredSixAppSubscriptionChanges,false);
+ assert.equal(bundle.licensesGranted,false);
+ assert.equal(bundle.purchaseAuthorized,false);
+});
+
+test('historic six-app Bundle can never silently become seven-app Bundle or gain DataDuck',()=>{
+ const six=[...EXISTING_DUCKBIO_APP_IDS];
+ const old=inspectFutureSevenAppPlanCandidate({
+  plan:'Bundle',apps:six,seats:5
+ });
+ assert.equal(old.ok,false);
+ assert.equal(old.reason,'invalid_future_plan_selection');
+ assert.equal(old.accessGranted,false);
+ const mistaken=inspectFutureSevenAppPlanCandidate({
+  plan:'Mixed',apps:[...six,'dataduck'],seats:5
+ });
+ assert.equal(mistaken.ok,false,'a seven-app selection must be Bundle, not Mixed');
+ const standalone=inspectFutureSevenAppPlanCandidate({
+  plan:'Mixed',apps:[...six],seats:5
+ });
+ assert.equal(standalone.ok,true,'six selected apps are Mixed in the new catalog');
+ assert.equal(standalone.dataduckIncluded,false);
+ assert.equal(standalone.legacySixAppBundleAutomaticallyUpgraded,false);
+ assert.equal(standalone.licensesGranted,false);
+});
+
+test('unknown app, duplicate app, bad quantity and wrong future plan selections deny without side effects',()=>{
+ const all=[...EXISTING_DUCKBIO_APP_IDS,'dataduck'];
+ const bad=[
+  {plan:'Bundle',apps:[...all,all[0]],seats:1},
+  {plan:'Single',apps:[],seats:1},
+  {plan:'Single',apps:[all[0],all[1]],seats:1},
+  {plan:'Mixed',apps:[all[0]],seats:1},
+  {plan:'Mixed',apps:all,seats:1},
+  {plan:'Bundle',apps:all.slice(1),seats:1},
+  {plan:'Single',apps:['unknown'],seats:1},
+  {plan:'Mixed',apps:[all[0],all[0]],seats:1},
+  {plan:'Bundle',apps:all,seats:0},
+  {plan:'Bundle',apps:all,seats:10001},
+  {plan:'Bundle',apps:all,seats:1.5},
+  {plan:'free',apps:all,seats:1},
+  {plan:'Bundle',apps:'dataduck',seats:1}
+ ];
+ for(const query of bad){
+  const proposal=inspectFutureSevenAppPlanCandidate(query);
+  assert.equal(proposal.ok,false,JSON.stringify(query));
+  assert.equal(proposal.purchaseAuthorized,false);
+  assert.equal(proposal.licensesGranted,false);
+  assert.equal(proposal.accessGranted,false);
+ }
 });

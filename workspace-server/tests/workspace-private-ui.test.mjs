@@ -17,3 +17,22 @@ test('private Workspace page is a real same-origin client, not an embedded publi
  assert(html.includes('No live billing or licence activation is enabled.'));
  assert(html.includes('Configured Stripe TEST checkout'));
 });
+
+test('user and invitation role forms offer app dropdown filters without changing the server-side assignment model',()=>{
+ const html=readFileSync(fileURLToPath(new URL('workspace.html',base)),'utf8');
+ const js=readFileSync(fileURLToPath(new URL('workspace.js',base)),'utf8');
+ for(const id of ['account-app-picker','invite-app-picker']){
+  assert(html.includes('id="'+id+'"'));
+  assert(js.includes("'"+id+"'"));
+ }
+ assert(js.includes('function appRolePicker(pickerId,fieldsId)'));
+ assert(js.includes("for(const app of state.overview.apps)"));
+ assert(js.includes("card.dataset.appId=app.id"));
+ assert(js.includes("card.hidden=picker.value!==''&&card.dataset.appId!==picker.value"));
+ // Filtering hides cards only. Each app role <select> stays in the DOM
+ // and both existing forms still submit all selected app roles at once.
+ assert(js.includes("for(const select of $('role-fields').querySelectorAll('select'))"));
+ assert(js.includes("for(const select of $('invite-role-fields').querySelectorAll('select'))"));
+ assert(!js.includes('innerHTML'));
+ assert(!html.includes('dataduck</option>'));
+});

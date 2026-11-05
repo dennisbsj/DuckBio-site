@@ -135,7 +135,17 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
       if (typeof access.localIdentity.organizationId !== 'string' || !access.localIdentity.organizationId || access.localIdentity.organizationId.length > 128) throw new BrokerError(403, 'access_denied');
       localIdentity.organizationId = access.localIdentity.organizationId;
     }
-    return localIdentity;
+    // Only a trusted backend adapter may supply this revision. It must identify
+    // the exact authorization generation (including the selected tenant), not
+    // merely the app user's stable ID. Legacy grants omit the field entirely.
+    let bindingRevision = null;
+    if (Object.hasOwn(access, 'bindingRevision')) {
+      if (typeof access.bindingRevision !== 'string' ||
+          !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(access.bindingRevision))
+        throw new BrokerError(403, 'access_denied');
+      bindingRevision = access.bindingRevision;
+    }
+    return { localIdentity, bindingRevision };
   }
   function browserTarget(body) {
     const client = registered.get(redirects.get(body.redirectUri));
@@ -160,9 +170,9 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
     return client;
   }
   async function issueCode(parent, target) {
-    await checkAccess(parent, target.client.appId);
+    const initialAccess = await checkAccess(parent, target.client.appId);
     const code = opaque();
-    await store.putCode(digest(code), { clientId: target.client.id, appId: target.client.appId, parentSessionId: parent.id, subject: parent.subject, state: target.state, challenge: target.challenge, redirectUri: target.redirectUri, returnPath: target.returnPath, expiresAt: Math.min(clock() + 60_000, parent.expiresAt) });
+    await store.putCode(digest(code), { clientId: target.client.id, appId: target.client.appId, parentSessionId: parent.id, subject: parent.subject, state: target.state, challenge: target.challenge, redirectUri: target.redirectUri, returnPath: target.returnPath, localIdentity: initialAccess.localIdentity, bindingRevision: initialAccess.bindingRevision, expiresAt: Math.min(clock() + 60_000, parent.expiresAt) });
     const redirect = new URL(target.redirectUri);
     redirect.searchParams.set('code', code); redirect.searchParams.set('state', target.state);
     return { redirectUrl: redirect.href };
@@ -170,13 +180,17 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
   async function liveProof(client, sessionToken) {
     if (typeof sessionToken !== 'string' || !tokenPattern.test(sessionToken)) return null;
     const proof = await store.getProof(digest(sessionToken));
-    if (!proof || proof.clientId !== client.id || proof.expiresAt <= clock()) return null;
+    if (!proof || proof.clientId !== client.id || proof.appId !== client.appId || proof.expiresAt <= clock()) return null;
     const parent = await identity.getParentSession(proof.parentSessionId);
-    if (!parentValid(parent) || parent.subject !== proof.subject || parent.passwordChangeRequired) return null;
-    let localIdentity;
-    try { localIdentity = await checkAccess(parent, client.appId); } catch (error) { if (error instanceof BrokerError) return null; throw error; }
-    if (JSON.stringify(localIdentity) !== JSON.stringify(proof.localIdentity)) return null;
-    return { proof, parent, assertion: { active: true, issuer, audience: client.id, subject: parent.subject, displayName: parent.displayName, localIdentity, expiresAt: Math.min(proof.expiresAt, parent.expiresAt) } };
+    if (!parentValid(parent) || parent.id !== proof.parentSessionId || parent.subject !== proof.subject || parent.passwordChangeRequired) return null;
+    let granted;
+    try { granted = await checkAccess(parent, client.appId); } catch (error) { if (error instanceof BrokerError) return null; throw error; }
+    // Missing binding in a historical proof is the legacy unbound mode.
+    // A switch to a revision-aware adapter invalidates those old proofs.
+    const proofBinding = Object.hasOwn(proof, 'bindingRevision') ? proof.bindingRevision : null;
+    if (granted.bindingRevision !== proofBinding ||
+        JSON.stringify(granted.localIdentity) !== JSON.stringify(proof.localIdentity)) return null;
+    return { proof, parent, assertion: { active: true, issuer, audience: client.id, subject: parent.subject, displayName: parent.displayName, localIdentity: granted.localIdentity, expiresAt: Math.min(proof.expiresAt, parent.expiresAt) } };
   }
   async function checkRate(req, email) {
     const address = clientAddress(req);
@@ -260,11 +274,21 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
               const record = await store.consumeCode(digest(body.code), { clientId: client.id, state: body.state, challenge, redirectUri: body.redirectUri, now: clock() });
               if (!record) throw new BrokerError(401, 'invalid_grant');
               const parent = await identity.getParentSession(record.parentSessionId);
-              if (!parentValid(parent) || parent.subject !== record.subject || parent.passwordChangeRequired) throw new BrokerError(401, 'invalid_grant');
-              let localIdentity;
-              try { localIdentity = await checkAccess(parent, client.appId); } catch (error) { if (error instanceof BrokerError) throw new BrokerError(401, 'invalid_grant'); throw error; }
+              if (!parentValid(parent) || parent.id !== record.parentSessionId || parent.subject !== record.subject || record.appId !== client.appId || parent.passwordChangeRequired) throw new BrokerError(401, 'invalid_grant');
+              let granted;
+              try { granted = await checkAccess(parent, client.appId); } catch (error) { if (error instanceof BrokerError) throw new BrokerError(401, 'invalid_grant'); throw error; }
+              const codeBinding = Object.hasOwn(record, 'bindingRevision') ? record.bindingRevision : null;
+              // The code is valid only for the exact native account/tenant
+              // checked at issuance. Revisions alone cannot protect unbound
+              // legacy grants or mistakenly unchanged future adapter epochs.
+              // Historical codes without a snapshot expire closed.
+              if (granted.bindingRevision !== codeBinding ||
+                  !record.localIdentity ||
+                  JSON.stringify(granted.localIdentity) !== JSON.stringify(record.localIdentity))
+                throw new BrokerError(401, 'invalid_grant');
+              const localIdentity = granted.localIdentity;
               const sessionToken = opaque(); const expiresAt = Math.min(parent.expiresAt, clock() + 8 * 60 * 60_000);
-              await store.putProof(digest(sessionToken), { clientId: client.id, parentSessionId: parent.id, subject: parent.subject, localIdentity, expiresAt });
+              await store.putProof(digest(sessionToken), { clientId: client.id, appId: client.appId, parentSessionId: parent.id, subject: parent.subject, localIdentity, bindingRevision: granted.bindingRevision, expiresAt });
               json(res, 200, { issuer, audience: client.id, subject: parent.subject, displayName: parent.displayName, localIdentity, expiresAt, sessionToken, returnPath: record.returnPath });
             } else if (route === 'introspect') {
               const proof = await liveProof(client, body.sessionToken);
@@ -273,7 +297,7 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
               if (body.childOnly !== undefined && typeof body.childOnly !== 'boolean') throw new BrokerError(400, 'invalid_input');
               const token = body.sessionToken;
               const proof = typeof token === 'string' && tokenPattern.test(token) ? await store.getProof(digest(token)) : null;
-              if (proof && proof.clientId === client.id) {
+              if (proof && proof.clientId === client.id && proof.appId === client.appId) {
                 // A withdrawn app grant must still be able to log out the
                 // parent session it originally authenticated with.
                 if (!body.childOnly) await identity.logout(proof.parentSessionId);
