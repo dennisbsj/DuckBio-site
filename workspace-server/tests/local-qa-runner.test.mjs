@@ -197,3 +197,41 @@ test('a nested Git repository or noncanonical package directory cannot establish
  assert.equal(result.exitCode,2);
  assert.equal(result.report.exactHead,false);
 });
+
+test('real nested Git checkout cannot impersonate the parent Workspace repository',t=>{
+ const scratch=mkdtempSync(join(tmpdir(),'duckbio-qa-nested-root-'));
+ t.after(()=>rmSync(scratch,{recursive:true,force:true}));
+ const root=join(scratch,'DuckBio-site'),nested=join(root,'workspace-server');
+ mkdirSync(root);mkdirSync(nested);
+ const git=(cwd,...args)=>execFileSync('git',args,{
+  cwd,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
+ git(root,'init','-q');
+ writeFileSync(join(nested,'package.json'),'{"name":"workspace-root-qa","private":true}\n');
+ git(root,'add','workspace-server/package.json');
+ git(root,'-c','user.name=Private QA','-c','user.email=private@example.test',
+  'commit','-qm','Parent Workspace source');
+ const parentSha=git(root,'rev-parse','HEAD');
+ const valid=runLocalWorkspaceQa(['--expect-head='+parentSha],{
+  cwd:nested,nodeVersion:'22.16.0',log:()=>{},
+  execute:(command,args,options)=>{
+   if(command==='git'){
+    const stdout=execFileSync(command,args,{
+     cwd:options.cwd,encoding:'utf8',stdio:['ignore','pipe','ignore']});
+    return ok(stdout);
+   }
+   return ok();
+  }
+ });
+ assert.equal(valid.exitCode,0,'normal parent repository must remain acceptable');
+ git(nested,'init','-q');
+ git(nested,'add','package.json');
+ git(nested,'-c','user.name=Private QA','-c','user.email=private@example.test',
+  'commit','-qm','Nested untrusted repository');
+ const nestedSha=git(nested,'rev-parse','HEAD');
+ const blocked=runLocalWorkspaceQa(['--expect-head='+nestedSha],{
+  cwd:nested,nodeVersion:'22.16.0',log:()=>{}
+ });
+ assert.equal(blocked.exitCode,2);
+ assert.equal(blocked.report.exactHead,false);
+ assert.equal(blocked.report.outcome,'blocked');
+});
