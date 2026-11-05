@@ -756,13 +756,12 @@ html[data-theme="dark"] .duckbio-workspace-group-header p{color:#b5dee9}
 }
 
 </style>
-<link rel="stylesheet" href="assets/workspace-admin.css?v=20261101-1">
+<link rel="stylesheet" href="assets/workspace-admin.css?v=20261105-roles">
 </head>
 <body data-workspace-mode="preview">
 <div class="bar"><div class="brand"><img src="assets/duckbio-brand-nofill-dark.svg" alt=""><span>Duck<em>Bio</em> / Workspace</span></div><div class="bar-tools" role="toolbar" aria-label="Workspace communication and settings">
 <button class="bar-icon-button" type="button" data-communication="Messaging" aria-label="Messaging" title="Messaging"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.3 9.6 9.6 0 0 1-3.4-.6L3 21l1.8-5.6A8.4 8.4 0 1 1 21 11.5Z"/><path d="M8 11.5h8"/></svg></button>
 <button class="bar-icon-button" type="button" data-communication="Mail" aria-label="Mail" title="Mail"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3.5 6 8.5 7 8.5-7"/></svg></button>
-<button type="button" class="ua-launch" data-open-user-admin aria-label="User administration — demo admin">User administration</button>
 <details class="settings-menu" id="launcher-settings-menu"><summary aria-label="Open settings menu" title="Settings">⚙</summary><div class="settings-panel"><strong>Settings</strong><button type="button" data-launcher-dialog="account-dialog">Account settings</button><button type="button" data-launcher-dialog="permissions-dialog">Permissions</button><button type="button" data-open-user-admin>User administration</button></div></details></div></div>
 <div class="shell">
 <main>
@@ -814,7 +813,7 @@ html[data-theme="dark"] .duckbio-workspace-group-header p{color:#b5dee9}
  <div role="tablist" class="permission-tabs" aria-label="Permissions views">
   <button type="button" role="tab" id="perm-my-tab" aria-controls="perm-my" aria-selected="true" tabindex="0" data-perm-tab="my">My permissions</button>
   <button type="button" role="tab" id="perm-matrix-tab" aria-controls="perm-matrix" aria-selected="false" tabindex="-1" data-perm-tab="matrix">Permission matrix</button>
-  <button type="button" role="tab" id="perm-org-tab" aria-controls="perm-org" aria-selected="false" tabindex="-1" data-perm-tab="org">Organisation members</button>
+  <button type="button" role="tab" id="perm-org-tab" aria-controls="perm-org" aria-selected="false" tabindex="-1" data-perm-tab="org">Users</button>
  </div>
  <div role="tabpanel" id="perm-my" aria-labelledby="perm-my-tab" class="perm-pane">
  <h3>Example app access</h3><p class="perm-caption">The preview shows an illustrative member role, not data from a signed-in account.</p>
@@ -863,13 +862,12 @@ html[data-theme="dark"] .duckbio-workspace-group-header p{color:#b5dee9}
   <div><p class="modal-eyebrow">Organisation admin · interactive preview</p><h2 id="ua-heading">User administration</h2></div>
   <button type="button" class="modal-close" id="ua-close" aria-label="Close user administration">×</button>
  </div>
- <p class="ua-intro">Manage organisation users, app-specific roles and user licences.</p>
+ <p class="ua-intro">Assign roles and app access to organisation users, and purchase app licences. Create or delete users under Settings → Permissions → Users.</p>
  <p class="ua-preview-note">Demo only. Accounts, permissions and licence changes are temporary examples, not saved to DuckBio. Payments and real access require a secure service.</p>
  <div id="ua-main">
   <section data-ua-panel="list" aria-label="Organisation users and app licences">
    <div class="ua-toolbar"><strong>Organisation users</strong><div class="ua-actions">
-    <button type="button" class="ua-secondary" data-ua-nav="buy">+ Buy users</button>
-    <button type="button" class="ua-primary" id="ua-create" data-ua-nav="account">+ Create account</button>
+    <button type="button" class="ua-secondary" id="ua-buy-start" data-ua-nav="buy">+ Buy users</button>
    </div></div>
    <div class="ua-metric-row">
     <div class="ua-metric"><strong id="ua-organisation-count">3</strong><span>Accounts</span></div>
@@ -884,7 +882,7 @@ html[data-theme="dark"] .duckbio-workspace-group-header p{color:#b5dee9}
   </section>
   <section data-ua-panel="account" hidden aria-label="Create or edit organisation user">
    <button type="button" class="ua-secondary ua-back" data-ua-nav="list">← All users</button>
-   <h3 class="ua-section-title" id="ua-account-heading">Create account</h3>
+   <h3 class="ua-section-title" id="ua-account-heading">Edit app permissions</h3>
    <form id="ua-account-form" autocomplete="off">
     <div class="ua-grid">
      <label class="ua-field">Name <input name="name" maxlength="120" placeholder="Full name" required></label>
@@ -896,7 +894,7 @@ html[data-theme="dark"] .duckbio-workspace-group-header p{color:#b5dee9}
     <div class="ua-roles" id="ua-role-fields"></div>
     <label class="ua-checkline"><input type="checkbox" name="organisationAdmin"><span><strong>Organisation administrator</strong><br>Also a normal Workspace user, with additional permission to manage organisation accounts and purchases.</span></label>
     <p id="ua-account-message" class="ua-message" role="status" aria-live="polite"></p>
-    <div class="ua-modal-footer"><span class="ua-role-count">Changes in this preview only</span><button type="button" class="ua-secondary" data-ua-nav="list">Cancel</button><button type="submit" class="ua-primary" id="ua-account-action">Create account</button></div>
+    <div class="ua-modal-footer"><span class="ua-role-count">Changes in this preview only</span><button type="button" class="ua-secondary" data-ua-nav="list">Cancel</button><button type="submit" class="ua-primary" id="ua-account-action">Save permissions</button></div>
    </form>
   </section>
   <section data-ua-panel="buy" hidden aria-label="Purchase app user licences">
@@ -1131,5 +1129,6 @@ document.fonts?.ready?.then(scheduleSize);
 scheduleSize();
 })();
 </script>
-<script src="assets/workspace-admin.js?v=20261101-1"></script>
+<script src="assets/workspace-admin.js?v=20261105-roles"></script>
+<script src="assets/workspace-role-matrix.js?v=20261105-roles"></script>
 </body></html>
