@@ -9,6 +9,18 @@ import {fileURLToPath} from 'node:url';
 
 const projectDir=dirname(dirname(fileURLToPath(import.meta.url)));
 const TIMEOUT=20*60*1000;
+const unsafeNodeOptionKeys=new Set([
+ 'NODE_OPTIONS','NODE_PATH','NPM_CONFIG_NODE_OPTIONS'
+]);
+/** Host-provided Node test filters/preloads can suppress every test and still
+ * return exit 0. Never claim exact-head QA with these inherited settings.
+ * Also catches the npm config alias regardless of casing on Windows.
+ */
+export function unsafeQaNodeEnvironment(environment=process.env){
+ return Object.entries(environment).filter(([name,value])=>
+  unsafeNodeOptionKeys.has(name.toUpperCase())&&
+  typeof value==='string'&&value.trim().length>0).map(([name])=>name);
+}
 
 export function parseLocalQaArgs(argv){
  const allowed=new Set(['--browser','--json','--allow-dirty','--help']);
@@ -20,10 +32,14 @@ export function parseLocalQaArgs(argv){
   expectHead:pins.length?pins[0].slice('--expect-head='.length).toLowerCase():null};
 }
 function run(command,args,{cwd=projectDir,timeout=TIMEOUT}={}){
- // Do not let GIT_DIR, GIT_WORK_TREE or GIT_CONFIG_* select an unrelated
- // checkout. Preserve normal env for npm/node; strip Git overrides for Git.
- const env=Object.fromEntries(Object.entries(process.env).filter(([name])=>
-  command!=='git'||!name.startsWith('GIT_')));
+ // Node preloads/test filters can make a FAILING test exit 0.
+ // Git overrides can select unrelated trees inside npm and browser scripts.
+ // The runner rejects nonempty unsafe Node overrides before QA; independently
+ // strip them from EVERY child process, including npm and node.
+ const env=Object.fromEntries(Object.entries(process.env).filter(([name])=>{
+  const upper=name.toUpperCase();
+  return !upper.startsWith('GIT_')&&!unsafeNodeOptionKeys.has(upper);
+ }));
  env.FORCE_COLOR='0';
  const result=spawnSync(command,args,{cwd,encoding:'utf8',timeout,
   maxBuffer:16*1024*1024,shell:process.platform==='win32'&&/\.cmd$/i.test(command),
@@ -107,6 +123,13 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const report={schema:'duckbio.workspace.local-qa.v1',sha:head.ok?sha:null,
   exactHead:clean,expectedRoot:sourceRoot,expectedHead:options.expectHead,allowDirty:options.allowDirty,stages:[],
   outcome:'blocked',nodeVersion};
+ const unsafeNodeEnvironment=unsafeQaNodeEnvironment();
+ if(unsafeNodeEnvironment.length){
+  report.exactHead=false;
+  log('Unsafe inherited Node/npm test options detected: '+unsafeNodeEnvironment.join(', ')+
+   '. Clear the environment before running Workspace release QA.');
+  return {exitCode:2,report};
+ }
  if(!validQaNodeVersion(nodeVersion)){
   log('Workspace QA requires Node 22.16+ or Node 24.');
   return {exitCode:2,report};
