@@ -284,7 +284,9 @@ test('real local Git hides modifications with assume-unchanged and skip-worktree
  mkdirSync(root);mkdirSync(workspace);
  const git=(...args)=>execFileSync('git',args,{
   cwd:workspace,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
- git('init','-q');
+ execFileSync('git',['init','-q'],{
+  cwd:root,encoding:'utf8',stdio:['ignore','pipe','ignore']
+ });
  writeFileSync(join(workspace,'package.json'),'{"name":"isolated"}\n');
  writeFileSync(join(workspace,'app.mjs'),'export const secret="original";\n');
  git('add','.');
@@ -297,7 +299,7 @@ test('real local Git hides modifications with assume-unchanged and skip-worktree
   ['--assume-unchanged','--no-assume-unchanged'],
   ['--skip-worktree','--no-skip-worktree']
  ]){
-  git('update-index',enable,'workspace-server/app.mjs');
+  git('update-index',enable,'app.mjs');
   assert.equal(git('status','--porcelain'),'',
    'Git deliberately hides a modified tracked source under '+enable);
   const result=runLocalWorkspaceQa(['--expect-head='+sha],{
@@ -311,7 +313,7 @@ test('real local Git hides modifications with assume-unchanged and skip-worktree
   });
   assert.equal(result.exitCode,2,'must block hidden tracked source flag '+enable);
   assert.equal(result.report.exactHead,false);
-  git('update-index',disable,'workspace-server/app.mjs');
+  git('update-index',disable,'app.mjs');
  }
  assert.match(git('status','--porcelain'),/app\.mjs/,
   'normal Git status detects modified tracked source after removing hidden flags');
