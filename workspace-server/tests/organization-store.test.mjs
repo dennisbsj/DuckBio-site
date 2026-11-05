@@ -451,3 +451,23 @@ test('invitation acceptance fails closed if reserved app capacity disappears bef
  assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').assigned,1);
  assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='goflo').assigned,1);
 });
+
+test('atomic admin demotion can reuse seats released from that issuer’s canceled invitations',t=>{
+ const {store}=fixture(t);
+ buy(store,'one-purchased-eel','Single',['eel'],1);
+ store.saveMember({organizationId:'one',actorId:'admin1',
+  member:member('admin2',{}, {admin:true})});
+ const invite=store.issueInvitation({organizationId:'one',actorId:'admin2',
+  name:'Invitee',nickname:'I',email:'invitee@example.test',
+  roles:{eel:'scientist'}});
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,1);
+ const changed=store.saveMember({organizationId:'one',actorId:'admin1',
+  member:member('admin2',{eel:'scientist'},{admin:false})});
+ assert.equal(changed.admin,false);
+ assert.equal(changed.roles.eel,'scientist');
+ assert.equal(store.previewInvitation(invite.token),null);
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').reserved,0);
+ assert.equal(store.overview('one','admin1').apps.find(x=>x.id==='eel').assigned,1);
+ assert.equal(store.auditLog('one','admin1')
+  .find(e=>e.action==='member.updated'&&e.subject==='admin2').details.revokedInvitations,1);
+});
