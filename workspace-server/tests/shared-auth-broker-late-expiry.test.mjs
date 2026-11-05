@@ -193,3 +193,74 @@ test('malformed PKCE code expiration never mints a child proof',async t=>{
  assert.deepEqual(result,{status:401,data:{error:'invalid_grant'}});
  assert.equal(f.proofWrites(),0);
 });
+
+
+async function authorizeFixture(t,{parentUntil,afterAccess}){
+ let now=START;
+ const secret=token(),state=token(),verifier=token();
+ const redirectUri='https://goflo.example.test/auth/callback';
+ const challenge=createHash('sha256').update(verifier).digest('base64url');
+ const parent={id:'private-parent',subject:'private-subject',
+  displayName:'Private User',expiresAt:parentUntil,passwordChangeRequired:false};
+ const localIdentity={userId:'private-native-user',organizationId:'private-native-tenant'};
+ const store=createMemoryBrokerStore();
+ let codeWrites=0;
+ const originalPutCode=store.putCode.bind(store);
+ store.putCode=async(...args)=>{codeWrites++;return originalPutCode(...args)};
+ const identity={
+  getSession:async()=>parent,authenticate:async()=>parent,
+  getParentSession:async()=>parent,logout:async()=>{},
+  async getAccess(){
+   await Promise.resolve();
+   now=afterAccess;
+   return {localIdentity,bindingRevision:'generation:1'};
+  }
+ };
+ let broker;
+ const server=http.createServer(async(req,res)=>{
+  if(!await broker.handle(req,res)){res.statusCode=404;res.end()}
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const origin='http://127.0.0.1:'+server.address().port;
+ broker=createAuthBroker({
+  origin,issuer:'https://identity.example.test',
+  clients:[{id:'goflo',appId:'goflo',secret,redirectUris:[redirectUri]}],
+  identity,store,clock:()=>now
+ });
+ return {
+  codeWrites:()=>codeWrites,
+  async authorize(){
+   const preflight=await fetch(origin+'/api/suite/auth/session');
+   assert.equal(preflight.status,200);
+   const csrf=await preflight.json();
+   const cookie=preflight.headers.get('set-cookie').split(';')[0];
+   const response=await fetch(origin+'/api/suite/auth/authorize',{
+    method:'POST',headers:{
+     'Content-Type':'application/json','Origin':origin,
+     'Cookie':cookie,'X-CSRF-Token':csrf.csrfToken
+    },
+    body:JSON.stringify({appId:'goflo',returnPath:'/analysis',
+     state,codeChallenge:challenge,codeChallengeMethod:'S256',redirectUri})
+   });
+   return {status:response.status,data:await response.json()};
+  }
+ };
+}
+
+test('browser authorization denies when central session expires during awaited native access',async t=>{
+ const f=await authorizeFixture(t,{parentUntil:START+1000,
+  afterAccess:START+2000});
+ const result=await f.authorize();
+ assert.deepEqual(result,{status:401,data:{error:'invalid_credentials'}});
+ assert.equal(f.codeWrites(),0);
+});
+
+test('browser authorization still issues a valid code after a quick native access check',async t=>{
+ const f=await authorizeFixture(t,{parentUntil:START+60_000,
+  afterAccess:START+2000});
+ const result=await f.authorize();
+ assert.equal(result.status,200);
+ assert.match(result.data.redirectUrl,/^https:\/\/goflo\.example\.test\/auth\/callback\?/);
+ assert.equal(f.codeWrites(),1);
+});

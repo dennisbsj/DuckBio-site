@@ -171,8 +171,13 @@ export function createAuthBroker({ origin, issuer = origin, clients, identity, s
   }
   async function issueCode(parent, target) {
     const initialAccess = await checkAccess(parent, target.client.appId);
+    // The parent may expire while the native access check awaits its result.
+    // Never emit a browser redirect for an already-expired central session.
+    const authorizedAt = clock();
+    if (!Number.isFinite(authorizedAt) || parent.expiresAt <= authorizedAt)
+      throw new BrokerError(401, 'invalid_credentials');
     const code = opaque();
-    await store.putCode(digest(code), { clientId: target.client.id, appId: target.client.appId, parentSessionId: parent.id, subject: parent.subject, state: target.state, challenge: target.challenge, redirectUri: target.redirectUri, returnPath: target.returnPath, localIdentity: initialAccess.localIdentity, bindingRevision: initialAccess.bindingRevision, expiresAt: Math.min(clock() + 60_000, parent.expiresAt) });
+    await store.putCode(digest(code), { clientId: target.client.id, appId: target.client.appId, parentSessionId: parent.id, subject: parent.subject, state: target.state, challenge: target.challenge, redirectUri: target.redirectUri, returnPath: target.returnPath, localIdentity: initialAccess.localIdentity, bindingRevision: initialAccess.bindingRevision, expiresAt: Math.min(authorizedAt + 60_000, parent.expiresAt) });
     const redirect = new URL(target.redirectUri);
     redirect.searchParams.set('code', code); redirect.searchParams.set('state', target.state);
     return { redirectUrl: redirect.href };
