@@ -65,7 +65,9 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     return row?{accountId:id,displayName:row.displayName}: {accountId:id,displayName:'Former user'};
   }
   const url = new URL(origin);
-  const identity = createLocalIdentityAdapter({ store: identityStore, origin });
+  // Organization-scoped Workspace has no trustworthy native SSO grant yet.
+  // Legacy global grants must not bypass selected tenant, role or paid seats.
+  const identity = createLocalIdentityAdapter({ store: identityStore, origin, organizationStore });
   const broker = createAuthBroker({ origin, issuer, clients, identity, store: authStore, clock, getClientAddress });
   const registrations = new Map(clients.map(client => [client.appId, client]));
   const nativeApps = new Set(clients.filter(client => client.nativeOrigin || !STATIC_APPS.has(client.appId)).map(client => client.appId));
@@ -83,7 +85,14 @@ export function createAccountService({ origin, issuer = origin, clients, identit
     return { parent, user };
   }
   function account(user) {
-    return { user: userView(user), apps: Object.entries(APP_NAMES).map(([id, name]) => ({ id, name, nativeIdentity: nativeApps.has(id), enabled: Boolean(identityStore.getAccess(user.id, id)) })), admin: user.role === 'admin',ownerPanel:isOwner(user),communicationsEnabled };
+    return { user: userView(user), apps: Object.entries(APP_NAMES).map(([id, name]) => ({
+      id,name,nativeIdentity:nativeApps.has(id),
+      // UI availability is never an authorization token. In org mode a legacy
+      // mapping (even one with the same native IDs) cannot mark an app enabled.
+      // Verified native permissions and current paid seats require the separate
+      // reviewed, dormant native broker contract.
+      enabled:organizationStore===null&&Boolean(identityStore.getAccess(user.id,id))
+    })), admin: user.role === 'admin',ownerPanel:isOwner(user),communicationsEnabled };
   }
   async function roster(appId) {
     const client = registrations.get(appId);
@@ -171,7 +180,8 @@ export function createAccountService({ origin, issuer = origin, clients, identit
               'Referrer-Policy':'no-referrer'});res.end();return true;
           }
           const destination=await authorizedContentDestination({
-            contentId,viewerId:user.id,resolveResource:resolveContentResource,
+            contentId,viewerId:user.id,sessionId:parent.id,
+            identityStore,resolveResource:resolveContentResource,
             clients,organizationStore});
           if(!destination)throw new ServiceError(404,'not_found');
           res.writeHead(303,{'Location':destination,'Cache-Control':'private, no-store',

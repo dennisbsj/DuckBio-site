@@ -5,6 +5,24 @@ const errorMessage=(status)=>status===401?'Sign in again.':status===403?'Your ro
 function status(message){$('status').textContent=message;}
 function el(tag,text,cls){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
 function button(text,fn){const b=el('button',text);b.type='button';b.addEventListener('click',fn);return b;}
+// User/invite application dropdown is presentation-only: keep all role selects
+// mounted so switching a filter never discards unsaved role assignments.
+// Unreleased DataDuck is intentionally absent from overview.apps.
+function appRolePicker(pickerId,fieldsId){
+ const picker=$(pickerId),fields=$(fieldsId);
+ picker.replaceChildren();
+ const all=el('option','All current applications');all.value='';
+ picker.append(all);
+ for(const app of state.overview.apps){
+  const option=el('option',app.name);option.value=app.id;picker.append(option);
+ }
+ picker.value='';
+ picker.onchange=()=>{
+  for(const card of fields.children)
+   card.hidden=picker.value!==''&&card.dataset.appId!==picker.value;
+ };
+ picker.onchange();
+}
 async function request(route,data){
  const res=await fetch(route,{method:data===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers:data===undefined?{}:{'Content-Type':'application/json','X-CSRF-Token':state.csrf},body:data===undefined?undefined:JSON.stringify(data)});
  let body={};try{body=await res.json();}catch{}
@@ -85,6 +103,7 @@ function renderInviteRoleFields(){
  const root=$('invite-role-fields');root.replaceChildren();
  for(const app of state.overview.apps){
   const card=el('div',undefined,'role-card'),label=el('label',app.name),select=el('select');
+  card.dataset.appId=app.id;
   select.name=app.id;select.setAttribute('aria-label',app.name+' invitation role');
   const none=el('option','No access');none.value='';select.append(none);
   for(const role of app.roles){const option=el('option',role);option.value=role;select.append(option);}
@@ -92,6 +111,7 @@ function renderInviteRoleFields(){
   card.append(label,el('small',app.assigned+' assigned · '+(app.reserved||0)+' reserved · '+app.purchased+' purchased'));
   root.append(card);
  }
+ appRolePicker('invite-app-picker','invite-role-fields');
 }
 function renderAudit(events){
  const root=$('audit-events');root.replaceChildren();
@@ -139,12 +159,14 @@ function roleFields(user){
  const root=$('role-fields');root.replaceChildren();
  for(const app of state.overview.apps){
   const card=el('div',undefined,'role-card'),label=el('label',app.name),select=el('select');
+  card.dataset.appId=app.id;
   select.name=app.id;select.setAttribute('aria-label',app.name+' role');
   const none=el('option','No access');none.value='';select.append(none);
   for(const role of app.roles){const option=el('option',role);option.value=role;select.append(option);}
   select.value=user?.roles?.[app.id]||'';label.append(select);
   card.append(label,el('small',app.assigned+' assigned / '+app.purchased+' purchased'));root.append(card);
  }
+ appRolePicker('account-app-picker','role-fields');
 }
 function edit(user){
  $('buy-panel').hidden=true;$('invite-panel').hidden=true;$('edit-panel').hidden=false;

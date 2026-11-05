@@ -86,6 +86,8 @@
           <label class="inline"><input id="org-admin" name="admin" type="checkbox"> Organization administrator</label>
         </div>
         <h3>Individual application permissions</h3>
+        <label>Choose application to edit<select id="account-app-picker" aria-label="Choose application for user permissions"></select></label>
+        <p>Switch between applications without losing unsaved role selections. Only apps with approved Workspace access can be selected.</p>
         <div id="role-fields" class="roles"></div>
         <div class="actions"><button type="submit" class="primary">Save permissions</button><button type="button" id="cancel-edit">Cancel</button></div>
       </form>
@@ -98,7 +100,7 @@
         <label>Nickname<input id="invite-nickname" maxlength="120" required></label>
         <label>Email<input id="invite-email" type="email" maxlength="254" required></label>
         <label class="inline"><input id="invite-admin" type="checkbox"> Organization administrator</label>
-        <div class="wide-field"><h3>App access and roles</h3><div id="invite-role-fields" class="roles"></div></div>
+        <div class="wide-field"><h3>App access and roles</h3><label>Choose application<select id="invite-app-picker" aria-label="Choose application for invitation"></select></label><p>App roles are saved together; changing this filter does not remove other selections.</p><div id="invite-role-fields" class="roles"></div></div>
         <div class="actions"><button type="submit" class="primary">Create invitation</button><button type="button" id="close-invite">Cancel</button></div>
       </form>
       <div id="invite-result" hidden>

@@ -1,4 +1,5 @@
 import {DatabaseSync} from 'node:sqlite';
+import {assertOrganizationAuditSchema} from './organization-audit-schema-guard.mjs';
 import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import {existsSync,mkdirSync,realpathSync,chmodSync,readFileSync} from 'node:fs';
 import path from 'node:path';
@@ -36,6 +37,14 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
   mkdirSync(path.dirname(databasePath),{recursive:true,mode:0o700});
   const db=new DatabaseSync(databasePath);
   db.exec('PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON');
+  // One IMMEDIATE lock covers audit existence, base schema and the session epoch seed.
+  db.exec('BEGIN IMMEDIATE');
+  try{
+    assertOrganizationAuditSchema(db);
+  // The base schema and session-epoch migration are now one SQLite
+  // write transaction. An audit table lost between two ordinary DDL
+  // statements must not be silently recreated or re-seeded at revision 1.
+  // Both policy and session epochs are checked after acquiring the lock.
   db.exec([
     'CREATE TABLE IF NOT EXISTS organizations(id TEXT PRIMARY KEY,name TEXT NOT NULL)',
     'CREATE TABLE IF NOT EXISTS members(org TEXT NOT NULL REFERENCES organizations(id),account TEXT NOT NULL,name TEXT NOT NULL,nickname TEXT NOT NULL,email TEXT NOT NULL,admin INTEGER NOT NULL CHECK(admin IN (0,1)),PRIMARY KEY(org,account),UNIQUE(org,email))',
@@ -60,6 +69,39 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
     "CREATE TABLE IF NOT EXISTS owner_alert_outbox(id INTEGER PRIMARY KEY AUTOINCREMENT,audit_id INTEGER NOT NULL UNIQUE REFERENCES organization_audit(id),category TEXT NOT NULL CHECK(category IN ('organization','subscription','user','permission')),state TEXT NOT NULL CHECK(state IN ('pending','sending','sent','failed')),attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),lease_token TEXT,locked_until INTEGER,next_attempt_at INTEGER NOT NULL,sent_at INTEGER)",
     "CREATE TABLE IF NOT EXISTS stripe_live_event_log(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,object_id TEXT NOT NULL,event_created INTEGER NOT NULL,raw_digest TEXT NOT NULL,received_at INTEGER NOT NULL)"
   ].join(';')+';');
+    const epochTableExists=Boolean(db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_organization_versions'"
+    ).get());
+    // A persistent SQLite schema marker distinguishes a true pre-epoch
+    // database from a damaged/restored database whose version tombstones
+    // have been deleted. The header marker and the first epoch seed must
+    // commit under the SAME write lock. Never accept a fresh revision 1
+    // after a previously migrated session selection was revoked/rebound.
+    const schemaRevision=db.prepare('PRAGMA user_version').get()?.user_version;
+    if(!Number.isSafeInteger(schemaRevision)||schemaRevision<0)
+      fail('session_revision_unavailable');
+    if(!epochTableExists && schemaRevision!==0)
+      fail('session_revision_unavailable');
+    if(!epochTableExists){
+      // Tombstones persist after clear: deleting + reselecting the same org
+      // must never restore an in-flight preflight's prior selection revision.
+      // DDL and legacy seed commit together. A crash never leaves an empty
+      // but 'established' table that permanently disables legacy sessions.
+      db.exec('CREATE TABLE session_organization_versions(session_id TEXT PRIMARY KEY,revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991))');
+      db.prepare('INSERT INTO session_organization_versions(session_id,revision) SELECT session_id,1 FROM session_organizations').run();
+    }
+    // Old organization schemas did not use the SQLite user_version header.
+    // Make the independent existence proof durable for all existing and
+    // freshly migrated databases, but never roll it backward on reopen.
+    if(schemaRevision===0)db.exec('PRAGMA user_version=1');
+    // When the table already exists, do NOT backfill missing records;
+    // those represent corruption or attempted tampering, not a migration.
+    db.exec('COMMIT');
+  }catch(error){
+    db.exec('ROLLBACK');
+    db.close();
+    throw error;
+  }
   if(!db.prepare('PRAGMA table_info(members)').all().some(row=>row.name==='active')) db.exec('ALTER TABLE members ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))');
   if(!db.prepare('PRAGMA table_info(organization_invites)').all().some(row=>row.name==='roles')) db.exec("ALTER TABLE organization_invites ADD COLUMN roles TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(roles))");
   // Older private SQLite databases created before lifecycle diagnostics have no column.
@@ -68,6 +110,19 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
 
   for(const suffix of ['','-wal','-shm'])if(existsSync(databasePath+suffix))chmodSync(databasePath+suffix,0o600);
   const tx=work=>{db.exec('BEGIN IMMEDIATE');try{const result=work();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
+  const sessionSelectionRevision=sessionId=>{
+    const revision=db.prepare('SELECT revision FROM session_organization_versions WHERE session_id=?').get(sessionId)?.revision;
+    return Number.isSafeInteger(revision)&&revision>0?revision:null;
+  };
+  const advanceSessionSelectionRevision=sessionId=>{
+    // The independent tombstone is updated in the SAME IMMEDIATE transaction
+    // as the selection mutation. Overflow fails closed and rolls back both.
+    const revision=db.prepare(`INSERT INTO session_organization_versions(session_id,revision)
+      VALUES(?,1) ON CONFLICT(session_id) DO UPDATE SET revision=revision+1
+      RETURNING revision`).get(sessionId)?.revision;
+    if(!Number.isSafeInteger(revision)||revision<=0)fail('session_revision_unavailable');
+    return revision;
+  };
   const liveEventLedger=createStripeLiveEventLedger({db,clock});
 
   // Organization-scoped app role policies. Built-in role edits are stored as
@@ -370,19 +425,34 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         const selected=db.prepare('SELECT account,org FROM session_organizations WHERE session_id=?').get(sessionId);
         if(selected){
           if(selected.account!==accountId||selected.org!==organizationId)fail('organization_locked');
+          if(!sessionSelectionRevision(sessionId))fail('session_revision_unavailable');
           return {organizationId,alreadySelected:true};
         }
+        advanceSessionSelectionRevision(sessionId);
         db.prepare('INSERT INTO session_organizations(session_id,account,org,selected_at) VALUES(?,?,?,?)').run(sessionId,accountId,organizationId,clock());
         return {organizationId,alreadySelected:false};
       });
     },
     currentSessionOrganization({sessionId,accountId}){
       if(!safeId(sessionId)||!safeId(accountId))return null;
-      const row=db.prepare('SELECT o.id,o.name,m.admin FROM session_organizations s JOIN organizations o ON o.id=s.org JOIN members m ON m.org=s.org AND m.account=s.account AND m.active=1 WHERE s.session_id=? AND s.account=?').get(sessionId,accountId);
-      return row?{id:row.id,name:row.name,admin:Boolean(row.admin)}:null;
+      const row=db.prepare(`SELECT o.id,o.name,m.admin,v.revision AS sessionSelectionRevision
+        FROM session_organizations s
+        JOIN session_organization_versions v ON v.session_id=s.session_id
+        JOIN organizations o ON o.id=s.org
+        JOIN members m ON m.org=s.org AND m.account=s.account AND m.active=1
+        WHERE s.session_id=? AND s.account=?`).get(sessionId,accountId);
+      return row&&Number.isSafeInteger(row.sessionSelectionRevision)&&row.sessionSelectionRevision>0?
+        {id:row.id,name:row.name,admin:Boolean(row.admin),sessionSelectionRevision:row.sessionSelectionRevision}:null;
     },
     clearSessionOrganization(sessionId){
-      if(safeId(sessionId))db.prepare('DELETE FROM session_organizations WHERE session_id=?').run(sessionId);
+      if(!safeId(sessionId))return;
+      return tx(()=>{
+        const selected=db.prepare('SELECT 1 FROM session_organizations WHERE session_id=?').get(sessionId);
+        if(!selected)return; // idempotent cleanup does not invent revisions.
+        if(!sessionSelectionRevision(sessionId))fail('session_revision_unavailable');
+        advanceSessionSelectionRevision(sessionId);
+        db.prepare('DELETE FROM session_organizations WHERE session_id=?').run(sessionId);
+      });
     },
     overview(org,actor){
       requireAdmin(org,actor);
@@ -1077,6 +1147,68 @@ export function createOrganizationStore({databasePath,clock=Date.now,verifyLiveS
         if(row.enabled)allowed.add(row.permission);else allowed.delete(row.permission);
       }
       return [...allowed].sort();
+    },
+    // READ-ONLY, private, fail-closed native permission candidate. This is
+    // deliberately NOT an app grant or native authorization. The active SSO
+    // broker still requires separate explicit native account linking, and all
+    // downstream apps must recheck their own permissions per operation.
+    //
+    // The six-app verified LIVE ledger is the only eligible paid evidence.
+    // Stripe TEST observations, unpaid drafts, legacy purchase receipts,
+    // pending invitations and the upcoming DataDuck catalog grant nothing.
+    verifiedNativePermissionCandidate({organizationId,accountId,appId,permission}={}){
+      if(!safeId(organizationId)||!safeId(accountId)||!byId.has(appId)||
+         typeof permission!=='string'||!byId.get(appId).permissions.includes(permission))
+        return null;
+      // A native candidate reads membership, seat capacity, paid period and
+      // effective permissions across multiple SQLite SELECT statements. A
+      // second Workspace connection can commit a revoke/regrant in between.
+      // Record a monotonic audit barrier before the first policy read and
+      // refuse any mixed-epoch result even when the final values match.
+      const startingAuditRevision=db.prepare(
+        'SELECT MAX(id) AS revision FROM organization_audit WHERE org=?'
+      ).get(organizationId)?.revision;
+      if(!Number.isSafeInteger(startingAuditRevision)||
+         startingAuditRevision<1)return null;
+      const member=db.prepare('SELECT a.role FROM assignments a JOIN members m ON m.org=a.org AND m.account=a.account WHERE a.org=? AND a.account=? AND a.app=? AND m.active=1')
+        .get(organizationId,accountId,appId);
+      if(!member)return null;
+      const purchased=db.prepare('SELECT purchased FROM seats WHERE org=? AND app=?')
+        .get(organizationId,appId)?.purchased??0;
+      const assigned=db.prepare('SELECT count(*) AS n FROM assignments WHERE org=? AND app=?')
+        .get(organizationId,appId).n;
+      const reserved=pendingSeats(organizationId,appId);
+      if(purchased<=0||assigned<1||!Number.isSafeInteger(assigned+reserved)||
+         assigned+reserved>purchased)return null;
+      const rows=db.prepare("SELECT sub.seats,sub.paid_through FROM verified_subscription_allocations sub WHERE sub.org=? AND sub.source='stripe_live' AND sub.state='active' AND sub.paid_through>? AND EXISTS (SELECT 1 FROM json_each(sub.apps) app WHERE app.value=?)")
+        .all(organizationId,Math.floor(clock()/1000),appId);
+      let coveredSeats=0,earliestPaidThrough=Infinity;
+      for(const row of rows){
+        coveredSeats+=row.seats;
+        if(!Number.isSafeInteger(coveredSeats))return null;
+        earliestPaidThrough=Math.min(earliestPaidThrough,row.paid_through);
+      }
+      // For this strict candidate, even reservations must be backed by a
+      // currently paid, independently verified live subscription. Mixing in
+      // unverified or test seat sources cannot elevate native privileges.
+      if(coveredSeats<assigned+reserved)return null;
+      if(!this.effectivePermissions({organizationId,accountId,appId}).includes(permission))
+        return null;
+      // AUTOINCREMENT-backed per-organization audit cursor: role edits,
+      // per-user overrides, membership changes and verified LIVE billing
+      // transitions advance this even if they later restore identical values.
+      // It is private preflight freshness evidence, never an app grant.
+      const authorizationAuditRevision=db.prepare(
+        'SELECT MAX(id) AS revision FROM organization_audit WHERE org=?'
+      ).get(organizationId)?.revision;
+      if(!Number.isSafeInteger(authorizationAuditRevision)||
+         authorizationAuditRevision<1||
+         authorizationAuditRevision!==startingAuditRevision)return null;
+      return Object.freeze({organizationId,accountId,appId,
+        role:member.role,permission,verifiedPaidThroughMs:earliestPaidThrough*1000,
+        authorizationAuditRevision,
+        source:'verified_live_subscription_ledger',nativeEnforcementRequired:true,
+        accessGranted:false,licensesGranted:false});
     },
     accessFor({organizationId,accountId,appId}){
       if(!safeId(organizationId)||!safeId(accountId)||!byId.has(appId))return null;

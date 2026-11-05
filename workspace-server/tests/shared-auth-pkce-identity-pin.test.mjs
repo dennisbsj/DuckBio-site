@@ -1,0 +1,369 @@
+/**
+ * The real Workspace PKCE broker + durable SQLite code/proof store.
+ * All six app clients are synthetic; there is no native service or billing
+ * adapter and no grant is installed in the live Workspace runtime.
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import { randomBytes, createHash } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createAuthBroker } from '../shared-auth/broker.mjs';
+import { createSqliteAuthStores } from '../shared-auth/sqlite-store.mjs';
+
+const APP_IDS = Object.freeze(['limsman', 'eel', 'methpipe', 'mantrain', 'duckman', 'goflo']);
+const opaque = () => randomBytes(32).toString('base64url');
+const NOW = 1_800_000_000_000;
+
+async function fixture(t) {
+  const root = mkdtempSync(join(tmpdir(), 'duckbio-pkce-pin-'));
+  const databasePath = join(root, 'private', 'auth.sqlite');
+  const stores = createSqliteAuthStores({ databasePath, clock: () => NOW });
+  let proofWrites = 0;
+  const authStore = {
+    ...stores.brokerStore,
+    async putProof(key, value) {
+      proofWrites += 1;
+      return stores.brokerStore.putProof(key, value);
+    },
+  };
+  const clients = APP_IDS.map(id => ({
+    id, appId: id,
+    secret: opaque(),
+    redirectUris: ['https://' + id + '.example.test/auth/callback'],
+  }));
+  const parent = {
+    id: 'existing-parent-session', subject: 'workspace-account',
+    displayName: 'Offline Workspace User', expiresAt: NOW + 3_600_000,
+  };
+  const grants = new Map(APP_IDS.map(id => [id, {
+    localIdentity: { userId: 'native-' + id + '-user', organizationId: 'native-org-a' },
+  }]));
+  let parentLookupOverride = null;
+  let logoutCalls = 0;
+  const identity = {
+    async getSession() { return parent; },
+    async authenticate() { return parent; },
+    async getParentSession(id) { return id === parent.id ? (parentLookupOverride ?? parent) : null; },
+    async getAccess(_parent, appId) { return grants.get(appId) ?? null; },
+    async logout() { logoutCalls += 1; },
+  };
+  let broker;
+  const server = http.createServer(async (req, res) => {
+    if (!await broker.handle(req, res)) {
+      res.statusCode = 404;
+      res.end();
+    }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const origin = 'http://127.0.0.1:' + server.address().port;
+  broker = createAuthBroker({
+    origin, issuer: 'https://identity.example.test',
+    clients, identity, store: authStore, clock: () => NOW,
+  });
+  t.after(async () => {
+    server.closeAllConnections?.();
+    await new Promise(resolve => server.close(resolve));
+    stores.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+  const start = await fetch(origin + '/api/suite/auth/session');
+  assert.equal(start.status, 200);
+  const cookie = start.headers.get('set-cookie').split(';')[0];
+  const { csrfToken } = await start.json();
+  const browserHeaders = {
+    'Content-Type': 'application/json', Origin: origin,
+    Cookie: cookie, 'X-CSRF-Token': csrfToken,
+  };
+  const clientFor = id => {
+    const client = clients.find(c => c.id === id);
+    assert(client);
+    return client;
+  };
+  async function post(route, body, appId = null) {
+    const headers = appId
+      ? {
+        'Content-Type': 'application/json',
+        Authorization: 'Basic ' + Buffer.from(
+          appId + ':' + clientFor(appId).secret,
+        ).toString('base64'),
+      }
+      : browserHeaders;
+    const response = await fetch(origin + '/api/suite/auth/' + route, {
+      method: 'POST', headers, body: JSON.stringify(body),
+    });
+    return {
+      status: response.status,
+      data: response.status === 204 ? null : await response.json(),
+    };
+  }
+  async function authorize(appId) {
+    const client = clientFor(appId);
+    const state = opaque(), verifier = opaque();
+    const codeChallenge = createHash('sha256')
+      .update(verifier).digest('base64url');
+    const result = await post('authorize', {
+      appId, returnPath: '/analysis', state,
+      codeChallenge, codeChallengeMethod: 'S256',
+      redirectUri: client.redirectUris[0],
+    });
+    assert.equal(result.status, 200);
+    return {
+      code: new URL(result.data.redirectUrl).searchParams.get('code'),
+      state, verifier, redirectUri: client.redirectUris[0],
+    };
+  }
+  const exchange = (appId, ticket) => post('exchange', {
+    clientId: appId, code: ticket.code, state: ticket.state,
+    codeVerifier: ticket.verifier, redirectUri: ticket.redirectUri,
+  }, appId);
+  const introspect = (appId, sessionToken) => post('introspect',
+    { clientId: appId, sessionToken }, appId);
+  const revoke = (appId, sessionToken, childOnly = false) => post('revoke',
+    { clientId: appId, sessionToken, childOnly }, appId);
+  return {
+    authorize, exchange, introspect, revoke, authStore,
+    codeWrites: () => proofWrites, logoutCalls: () => logoutCalls, parent, clients,
+    // Simulate trusted client registration changing during redeploy while
+    // preserving the exact same durable SQLite authentication database.
+    setClientApp(clientId, appId) {
+      const registry = clients.map(c => c.id === clientId ? { ...c, appId } : c);
+      broker = createAuthBroker({
+        origin, issuer: 'https://identity.example.test',
+        clients: registry, identity, store: authStore, clock: () => NOW,
+      });
+    },
+    setParentLookup(parentSession) { parentLookupOverride = parentSession; },
+    async authenticateNative(appId, sessionToken) {
+      const auth = 'Basic ' + Buffer.from(
+        appId + ':' + clientFor(appId).secret,
+      ).toString('base64');
+      return broker.authenticateNativeSession({
+        headers: { authorization: auth },
+      }, { sessionToken });
+    },
+    setGrant: (appId, localIdentity, revision = undefined) => grants.set(appId,
+      localIdentity === null ? null : {
+        localIdentity,
+        ...(revision === undefined ? {} : { bindingRevision: revision }),
+      }),
+    getGrant: appId => grants.get(appId),
+  };
+}
+
+test('all six registered apps deny changed native user at code exchange even with legacy unbound revisions', async t => {
+  const f = await fixture(t);
+  for (const appId of APP_IDS) {
+    const original = f.getGrant(appId).localIdentity;
+    const ticket = await f.authorize(appId);
+    f.setGrant(appId, {
+      userId: original.userId + '-rebound',
+      organizationId: original.organizationId,
+    });
+    const denied = await f.exchange(appId, ticket);
+    assert.deepEqual(denied, { status: 401, data: { error: 'invalid_grant' } }, appId);
+    assert.equal((await f.exchange(appId, ticket)).status, 401, 'code must be consumed');
+    assert.equal(f.codeWrites(), APP_IDS.indexOf(appId), 'denial cannot mint proof');
+    // A new code issued for the new identity remains valid.
+    const fresh = await f.authorize(appId);
+    const valid = await f.exchange(appId, fresh);
+    assert.equal(valid.status, 200);
+    assert.deepEqual(valid.data.localIdentity, {
+      userId: original.userId + '-rebound',
+      organizationId: original.organizationId,
+    });
+    assert.equal((await f.introspect(appId, valid.data.sessionToken)).data.active, true);
+  }
+});
+
+test('all six registered apps deny changed native tenant even with same user ID and unchanged revision', async t => {
+  const f = await fixture(t);
+  for (const appId of APP_IDS) {
+    const original = f.getGrant(appId).localIdentity;
+    f.setGrant(appId, original, 'tenant:1');
+    const ticket = await f.authorize(appId);
+    f.setGrant(appId, {
+      userId: original.userId,
+      organizationId: 'native-org-b',
+    }, 'tenant:1');
+    const denied = await f.exchange(appId, ticket);
+    assert.deepEqual(denied, { status: 401, data: { error: 'invalid_grant' } }, appId);
+  }
+  assert.equal(f.codeWrites(), 0);
+});
+
+test('six-app broker accepts unchanged native identities and strict revision at issuance/exchange', async t => {
+  const f = await fixture(t);
+  for (const appId of APP_IDS) {
+    const original = f.getGrant(appId).localIdentity;
+    f.setGrant(appId, original, 'strict:123');
+    const ticket = await f.authorize(appId);
+    const issued = await f.exchange(appId, ticket);
+    assert.equal(issued.status, 200);
+    assert.equal(issued.data.audience, appId);
+    assert.deepEqual(issued.data.localIdentity, original);
+    assert.equal(Object.hasOwn(issued.data, 'bindingRevision'), false);
+    assert.equal((await f.introspect(appId, issued.data.sessionToken)).data.active, true);
+  }
+  assert.equal(f.codeWrites(), APP_IDS.length);
+});
+
+test('legacy SQLite PKCE code without identity snapshot expires closed and creates no proof', async t => {
+  const f = await fixture(t);
+  const appId = 'goflo';
+  const verifier = opaque(), state = opaque(), code = opaque();
+  const redirectUri = f.clients.find(c => c.id === appId).redirectUris[0];
+  await f.authStore.putCode(createHash('sha256').update(code).digest('hex'), {
+    appId, clientId: appId, parentSessionId: f.parent.id,
+    subject: f.parent.subject, state,
+    challenge: createHash('sha256').update(verifier).digest('base64url'),
+    redirectUri, returnPath: '/analysis', expiresAt: NOW + 60_000,
+  });
+  const result = await f.exchange(appId, { code, state, verifier, redirectUri });
+  assert.deepEqual(result, { status: 401, data: { error: 'invalid_grant' } });
+  assert.equal(f.codeWrites(), 0);
+});
+
+test('suspension between code issuance and exchange denies even when identity remains unchanged', async t => {
+  const f = await fixture(t);
+  const ticket = await f.authorize('goflo');
+  f.setGrant('goflo', null);
+  const result = await f.exchange('goflo', ticket);
+  assert.deepEqual(result, { status: 401, data: { error: 'invalid_grant' } });
+  assert.equal(f.codeWrites(), 0);
+});
+
+test('legacy single-tenant local identity stays compatible until its native tenant changes', async t => {
+  const f = await fixture(t);
+  for (const appId of APP_IDS) {
+    const userId = 'legacy-' + appId + '-user';
+    f.setGrant(appId, { userId });
+    const ticket = await f.authorize(appId);
+    const successful = await f.exchange(appId, ticket);
+    assert.equal(successful.status, 200, appId);
+    assert.deepEqual(successful.data.localIdentity, { userId });
+    assert.equal((await f.introspect(appId, successful.data.sessionToken)).data.active, true);
+    const beforeTenantBinding = await f.authorize(appId);
+    f.setGrant(appId, { userId, organizationId: 'new-native-tenant' });
+    assert.deepEqual(await f.exchange(appId, beforeTenantBinding), {
+      status: 401, data: { error: 'invalid_grant' },
+    }, appId + ' newly introduced native tenant invalidates outstanding code');
+    assert.deepEqual((await f.introspect(appId, successful.data.sessionToken)).data, {
+      active: false,
+    }, appId + ' outstanding proof cannot survive a changed local identity');
+  }
+});
+
+test('all six clients pin PKCE code and active native proof to the exact registered app ID', async t => {
+  const f = await fixture(t);
+  for (const [index, clientId] of APP_IDS.entries()) {
+    const otherApp = APP_IDS[(index + 1) % APP_IDS.length];
+    const sharedIdentity = { userId: 'shared-native-user', organizationId: 'shared-native-org' };
+    f.setGrant(clientId, sharedIdentity, 'stable:1');
+    f.setGrant(otherApp, sharedIdentity, 'stable:1');
+    const ticket = await f.authorize(clientId);
+    f.setClientApp(clientId, otherApp);
+    assert.deepEqual(await f.exchange(clientId, ticket), {
+      status: 401, data: { error: 'invalid_grant' },
+    }, clientId + ' stale code was issued for another registered app');
+    f.setClientApp(clientId, clientId);
+    const fresh = await f.authorize(clientId);
+    const issued = await f.exchange(clientId, fresh);
+    assert.equal(issued.status, 200);
+    assert.equal((await f.introspect(clientId, issued.data.sessionToken)).data.active, true);
+    f.setClientApp(clientId, otherApp);
+    assert.deepEqual((await f.introspect(clientId, issued.data.sessionToken)).data, {
+      active: false,
+    }, clientId + ' stale proof cannot switch audience on reconfiguration');
+    assert.equal(await f.authenticateNative(clientId, issued.data.sessionToken), null);
+    f.setClientApp(clientId, clientId);
+  }
+});
+
+test('pre-change durable SQLite proof without app ID cannot authenticate to any client', async t => {
+  const f = await fixture(t);
+  const clientId = 'goflo';
+  const sessionToken = opaque();
+  const oldIdentity = f.getGrant(clientId).localIdentity;
+  await f.authStore.putProof(createHash('sha256').update(sessionToken).digest('hex'), {
+    clientId, parentSessionId: f.parent.id, subject: f.parent.subject,
+    localIdentity: oldIdentity, bindingRevision: null,
+    expiresAt: NOW + 30_000,
+  });
+  assert.deepEqual((await f.introspect(clientId, sessionToken)).data, { active: false });
+  assert.equal(await f.authenticateNative(clientId, sessionToken), null);
+});
+
+test('a sibling parent session with identical subject cannot replace the original native proof parent', async t => {
+  const f = await fixture(t);
+  const code = await f.authorize('goflo');
+  const issued = await f.exchange('goflo', code);
+  assert.equal(issued.status, 200);
+  f.setParentLookup({ ...f.parent, id: 'different-sibling-session' });
+  assert.deepEqual((await f.introspect('goflo', issued.data.sessionToken)).data, {
+    active: false,
+  });
+  assert.equal(await f.authenticateNative('goflo', issued.data.sessionToken), null);
+  const pending = await f.authorize('goflo');
+  assert.deepEqual(await f.exchange('goflo', pending), {
+    status: 401, data: { error: 'invalid_grant' },
+  });
+});
+
+test('reusing a client ID for another app cannot revoke the original parent session', async t => {
+  const f = await fixture(t);
+  const sharedIdentity = { userId: 'same-native-person', organizationId: 'same-native-tenant' };
+  f.setGrant('goflo', sharedIdentity, 'strict:stable');
+  f.setGrant('eel', sharedIdentity, 'strict:stable');
+  const issued = await f.exchange('goflo', await f.authorize('goflo'));
+  assert.equal(issued.status, 200);
+  f.setClientApp('goflo', 'eel');
+  assert.equal((await f.revoke('goflo', issued.data.sessionToken)).status, 204);
+  assert.equal(f.logoutCalls(), 0, 'wrong-app token must not log out the original parent');
+  f.setClientApp('goflo', 'goflo');
+  assert.equal((await f.introspect('goflo', issued.data.sessionToken)).data.active, true);
+  assert.equal((await f.revoke('goflo', issued.data.sessionToken)).status, 204);
+  assert.equal(f.logoutCalls(), 1, 'properly registered app can still log out parent');
+  assert.deepEqual((await f.introspect('goflo', issued.data.sessionToken)).data, {
+    active: false,
+  });
+});
+
+test('consumed PKCE codes cannot be replayed after successful exchange for any of the six apps', async t => {
+  const f = await fixture(t);
+  for (const appId of APP_IDS) {
+    const ticket = await f.authorize(appId);
+    const first = await f.exchange(appId, ticket);
+    assert.equal(first.status, 200, appId + ' first exchange');
+    assert.equal(first.data.audience, appId);
+    assert.deepEqual(await f.exchange(appId, ticket), {
+      status: 401, data: { error: 'invalid_grant' },
+    }, appId + ' already-consumed code');
+    assert.equal((await f.introspect(appId, first.data.sessionToken)).data.active, true);
+  }
+  assert.equal(f.codeWrites(), APP_IDS.length, 'one and only one proof per successful code');
+});
+
+test('revoked child proof cannot be reused and child-only revoke cannot log out parent', async t => {
+  const f = await fixture(t);
+  for (const appId of APP_IDS) {
+    const initial = await f.exchange(appId, await f.authorize(appId));
+    assert.equal(initial.status, 200);
+    const token = initial.data.sessionToken;
+    assert.equal((await f.introspect(appId, token)).data.active, true);
+    assert.equal((await f.revoke(appId, token, true)).status, 204);
+    assert.deepEqual((await f.introspect(appId, token)).data, { active: false });
+    assert.equal(await f.authenticateNative(appId, token), null);
+    assert.equal((await f.revoke(appId, token, true)).status, 204);
+    assert.equal(f.logoutCalls(), 0, 'child-only revoke must not destroy original parent');
+    const fresh = await f.exchange(appId, await f.authorize(appId));
+    assert.equal(fresh.status, 200, 'parent may issue fresh approved grant');
+    assert.equal((await f.introspect(appId, fresh.data.sessionToken)).data.active, true);
+    f.setGrant(appId, null);
+    assert.deepEqual((await f.introspect(appId, fresh.data.sessionToken)).data, {
+      active: false,
+    }, 'revoked native app grant must also invalidate an outstanding child proof');
+  }
+});
