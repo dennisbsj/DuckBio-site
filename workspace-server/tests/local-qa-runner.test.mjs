@@ -523,7 +523,10 @@ test('release QA pins a trusted npm command shell rather than the user npmrc def
  const npmCalls=f.calls.filter(call=>call[0]==='npm'||call[0]==='npm.cmd');
  assert.equal(npmCalls.length,2,'both source syntax and core tests must use the pinned shell');
  const expected=process.platform==='win32'?'cmd.exe':'/bin/sh';
- for(const call of npmCalls)
+ for(const call of npmCalls){
   assert(call.some(arg=>arg.startsWith('--script-shell=')&&arg.endsWith(expected)),
    'npm user/global script-shell must not replace test execution');
+  assert(call.includes('--node-options='),
+   'npmrc must not inject a Node test-name filter or preload into the test child');
+ }
 });
