@@ -47,6 +47,16 @@ export function ordinaryTrackedGitIndex(output){
  const entries=output.slice(0,-1).split('\0');
  return entries.length>0&&entries.every(entry=>/^H [^\r\n]+$/u.test(entry));
 }
+/** Reject tracked symlinks/submodules and partial merge stages.
+ * A symlink can execute externally mutable code while git status stays clean.
+ * All reviewed Workspace files are regular 100644/100755 Git blobs.
+ */
+export function regularTrackedGitModes(output){
+ if(typeof output!=='string'||!output.endsWith('\0'))return false;
+ const entries=output.slice(0,-1).split('\0');
+ return entries.length>0&&entries.every(entry=>
+  /^(?:100644|100755) [0-9a-f]{40} 0\t[^\r\n]+$/u.test(entry));
+}
 export function validQaNodeVersion(version){
  const parsed=/^(\d+)\.(\d+)\.\d+$/.exec(version);
  if(!parsed)return false;
@@ -73,10 +83,13 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const head=execute('git',['rev-parse','--verify','HEAD'],{cwd,timeout:10000});
  const status=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
  const sourceIndex=execute('git',['ls-files','-v','-z'],{cwd,timeout:10000});
+ const sourceModes=execute('git',['ls-files','--stage','-z'],{cwd,timeout:10000});
  const sha=head.stdout.trim();
  const trustworthyIndex=Boolean(sourceIndex.ok&&ordinaryTrackedGitIndex(sourceIndex.stdout));
+ const trustworthyModes=Boolean(sourceModes.ok&&regularTrackedGitModes(sourceModes.stdout)&&
+  sourceModes.stdout.split('\0').length===sourceIndex.stdout.split('\0').length);
  const clean=Boolean(head.ok&&/^[0-9a-f]{40}$/.test(sha)&&status.ok&&
-  !status.stdout.trim()&&trustworthyIndex);
+  !status.stdout.trim()&&trustworthyIndex&&trustworthyModes);
  const report={schema:'duckbio.workspace.local-qa.v1',sha:head.ok?sha:null,
   exactHead:clean,expectedRoot:sourceRoot,expectedHead:options.expectHead,allowDirty:options.allowDirty,stages:[],
   outcome:'blocked',nodeVersion};
@@ -95,9 +108,9 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  }
  // This is never overridable by --allow-dirty. A masked index can cause
  // status to falsely report a clean checkout and hide malicious source.
- if(!trustworthyIndex){
+ if(!trustworthyIndex||!trustworthyModes){
   report.exactHead=false;
-  log('Tracked Git index contains hidden source flags or is unreadable.');
+  log('Tracked Git index contains hidden source flags, symlinks, submodules or unreadable entries.');
   return {exitCode:2,report};
  }
  if(options.expectHead&&sha!==options.expectHead){
@@ -142,6 +155,12 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
  const endHead=execute('git',['rev-parse','--verify','HEAD'],{cwd,timeout:10000});
  const endStatus=execute('git',['status','--porcelain','--untracked-files=normal'],{cwd,timeout:10000});
  const endIndex=execute('git',['ls-files','-v','-z'],{cwd,timeout:10000});
+ const endModes=execute('git',['ls-files','--stage','-z'],{cwd,timeout:10000});
+ if(!endModes.ok||!regularTrackedGitModes(endModes.stdout)||
+    endModes.stdout!==sourceModes.stdout){
+  report.stages.push({name:'git-source-mode-integrity',status:'failed',exitCode:1,durationMs:0});
+  report.exactHead=false;
+ }
  if(!endIndex.ok||!ordinaryTrackedGitIndex(endIndex.stdout)||
     endIndex.stdout!==sourceIndex.stdout){
   report.stages.push({name:'git-index-integrity',status:'failed',exitCode:1,durationMs:0});
