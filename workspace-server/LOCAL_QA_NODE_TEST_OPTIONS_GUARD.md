@@ -55,3 +55,14 @@ The directly invoked QA runner still uses npm for the checked-in `check` and `te
 An isolated Unix npm fixture verified that an explicit shell option restores the nonzero exit code of a deliberately failing script even when an inherited npm shell override was configured. This is a focused primitive test, **not** the full Workspace CI test. A compromised shell executable or manipulated host system is outside the local QA runner's security boundary.
 
 The release operator still needs to invoke `node scripts/local-qa.mjs` directly and inspect the actual JSON report. The `npm run qa:local` wrapper must not be treated as release proof on an uncontrolled machine.
+
+## npmrc node-options outside the checked-out Git source
+
+A user-global npmrc or checked-in npm configuration can specify `node-options` with an inherited test-name pattern even when no relevant process environment variable is set. An isolated real npm/Node 22 regression with a failing security test showed:
+
+- `npm test` with project `.npmrc` node-options applying a nonmatching test filter exited **0** and ran no actual named test.
+- `npm --node-options= test` on the same fixture exited **1**, correctly surfacing the failing assertion.
+
+The local QA runner now passes the explicit empty npm CLI option `--node-options=` to **both** syntax and core stages, in addition to the pinned platform `--script-shell`. CLI values supersede untrusted local/user-global npmrc settings. These isolated results do **not** imply that the entire DuckBio test suite has been executed on the latest source branch.
+
+For acceptance use **direct trusted Node invocation**, review the JSON report, and separately attest the operator's installed npm, Node, shell, resolved dependencies and private source checkout. An arbitrary malicious host cannot be proven trustworthy by this application-level guard.
