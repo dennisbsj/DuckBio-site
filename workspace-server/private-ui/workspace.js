@@ -1,7 +1,9 @@
 // Private same-origin Workspace UI. Server owns roles, license counts and identity.
 const $=id=>document.getElementById(id);
 const state={csrf:'',orgs:[],selected:null,overview:null,matrix:null,rolePolicies:null,busy:false,inviteToken:null,inviteDetails:null};
-const errorMessage=(status)=>status===401?'Sign in again.':status===403?'Your role does not allow this action.':status===409?'There are not enough app licences, or the data changed. Reload the organization.':status===400?'Check the account, email and app roles.':'The private Workspace service is unavailable.';
+const errorMessage=(status,code)=>code==='invitation_revoked'
+ ?'The invitation was canceled while email was being sent. Ask an active organization administrator to create a new invitation.'
+ :status===401?'Sign in again.':status===403?'Your role does not allow this action.':status===409?'There are not enough app licences, or the data changed. Reload the organization.':status===400?'Check the account, email and app roles.':'The private Workspace service is unavailable.';
 function status(message){$('status').textContent=message;}
 function el(tag,text,cls){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
 function button(text,fn){const b=el('button',text);b.type='button';b.addEventListener('click',fn);return b;}
@@ -26,7 +28,7 @@ function appRolePicker(pickerId,fieldsId){
 async function request(route,data){
  const res=await fetch(route,{method:data===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers:data===undefined?{}:{'Content-Type':'application/json','X-CSRF-Token':state.csrf},body:data===undefined?undefined:JSON.stringify(data)});
  let body={};try{body=await res.json();}catch{}
- if(!res.ok)throw Object.assign(new Error(errorMessage(res.status)),{status:res.status});
+ if(!res.ok)throw Object.assign(new Error(errorMessage(res.status,body.error)),{status:res.status});
  return body;
 }
 function showPortal(visible){$('portal').hidden=!visible;$('sign-in').hidden=visible;$('organization-choice').hidden=true;$('invite-accept-panel').hidden=true;$('logout').hidden=!visible;}

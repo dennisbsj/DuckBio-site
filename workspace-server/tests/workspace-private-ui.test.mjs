@@ -76,3 +76,12 @@ test('seats are shown per app after subtracting assignments and pending invites'
  assert(js.includes('Over capacity by '));
  assert(!js.includes('organization-wide available users'));
 });
+
+
+test('invitation revoked during asynchronous delivery has an explicit private Workspace error',()=>{
+ const js=readFileSync(fileURLToPath(new URL('workspace.js',base)),'utf8');
+ assert(js.includes("code==='invitation_revoked'"));
+ assert(js.includes('The invitation was canceled while email was being sent.'));
+ assert(js.includes('errorMessage(res.status,body.error)'));
+ assert(!js.includes('innerHTML'));
+});

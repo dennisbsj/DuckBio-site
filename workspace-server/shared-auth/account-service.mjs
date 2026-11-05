@@ -506,16 +506,23 @@ export function createAccountService({ origin, issuer = origin, clients, identit
             const issued=organizationStore.issueInvitation({organizationId:body.organizationId,actorId:user.id,email:body.email,name:body.name,nickname:body.nickname,admin:body.admin===true,roles:body.roles??{}});
             const inviteUrl=new URL('/workspace',origin);inviteUrl.searchParams.set('invite',issued.token);
             if(invitationMailer){
+              // An inviter may lose organization authority while the email
+              // provider is processing the request. Never confirm an unusable
+              // invitation, even if the provider reports delivery success.
+              const invite=organizationStore.previewInvitation(issued.token);
+              if(!invite)throw new ServiceError(409,'invitation_revoked');
               try{
-                const invite=organizationStore.previewInvitation(issued.token);
                 await invitationMailer.sendInvitation({email:invite.email,name:invite.name,organizationName:invite.organizationName,invitationUrl:inviteUrl.href,expiresAt:issued.expiresAt});
               }catch{
-                // If provider confirmation fails, revoke the pending secret and release seats.
-                // On an ambiguous timeout a delivered email may have an unusable link;
-                // a fresh invitation must then be issued by the administrator.
-                organizationStore.revokeInvitation({organizationId:body.organizationId,actorId:user.id,email:body.email});
+                // A remote failure may be ambiguous. Revoke only when the
+                // invitation still exists; a suspended issuer's invites were
+                // already revoked by the organization-store transaction.
+                if(organizationStore.previewInvitation(issued.token))
+                  organizationStore.revokeInvitation({organizationId:body.organizationId,actorId:user.id,email:body.email});
                 throw new ServiceError(503,'email_unavailable');
               }
+              if(!organizationStore.previewInvitation(issued.token))
+                throw new ServiceError(409,'invitation_revoked');
               send(res,201,{delivery:'email',expiresAt:issued.expiresAt});
             }else send(res,201,{delivery:'manual',invitationUrl:inviteUrl.href,expiresAt:issued.expiresAt});
           }
