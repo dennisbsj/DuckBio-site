@@ -565,3 +565,12 @@ test('modified tracked parent policy blocks QA before npm from a workspace child
  assert.equal(result.report.outcome,'blocked');
  assert.equal(nonGitCalls,0,'dirty parent source must block before executing QA');
 });
+
+
+test('inherited npm workspace selectors cannot redirect Workspace QA to another package',()=>{
+ for(const key of ['NPM_CONFIG_WORKSPACE','npm_config_workspace',
+  'NPM_CONFIG_WORKSPACES','npm_config_workspaces']){
+  assert.deepEqual(unsafeQaNodeEnvironment({[key]:'other-package'}),[key]);
+ }
+ assert.deepEqual(unsafeQaNodeEnvironment({NPM_CONFIG_WORKSPACE:'   '}),[]);
+});

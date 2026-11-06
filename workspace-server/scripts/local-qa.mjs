@@ -11,7 +11,8 @@ const projectDir=dirname(dirname(fileURLToPath(import.meta.url)));
 const TIMEOUT=20*60*1000;
 const unsafeQaOverrideKeys=new Set([
  'NODE_OPTIONS','NODE_PATH','NPM_CONFIG_NODE_OPTIONS',
- 'NPM_CONFIG_SCRIPT_SHELL'
+ 'NPM_CONFIG_SCRIPT_SHELL',
+ 'NPM_CONFIG_WORKSPACE','NPM_CONFIG_WORKSPACES'
 ]);
 /** Host-provided Node test filters/preloads can suppress every test and still
  * return exit 0. Never claim exact-head QA with these inherited settings.
