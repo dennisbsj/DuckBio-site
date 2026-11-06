@@ -191,10 +191,10 @@ jobs:
             trap '"$pg_bin/pg_ctl" -D "$QA_ROOT/pg" -m immediate -w stop' EXIT
             "$pg_bin/createdb" -h 127.0.0.1 -p 55432 -U qa native_test
             export EEL_TEST_DATABASE_URL=postgresql://qa@127.0.0.1:55432/native_test
-            VITE_STORAGE_MODE=server npm run build
+            VITE_STORAGE_MODE=server npm --script-shell=/bin/bash --node-options= --workspaces=false run build
             timeout --signal=TERM --kill-after=5s 240s node "$NATIVE_TEST"
           else
-            if [[ "$NATIVE_APP" == CytoDuck ]]; then npm run build; fi
+            if [[ "$NATIVE_APP" == CytoDuck ]]; then npm --script-shell=/bin/bash --node-options= --workspaces=false run build; fi
             timeout --signal=TERM --kill-after=5s 240s node --test "$NATIVE_TEST"
           fi
           TESTS
