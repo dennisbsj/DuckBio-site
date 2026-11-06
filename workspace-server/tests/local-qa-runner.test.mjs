@@ -103,6 +103,9 @@ test('pinned exact SHA mismatches block before executing any code checks',()=>{
  assert.throws(()=>parseLocalQaArgs(['--expect-head='+SHA,'--expect-head='+SHA]),/unknown_argument/);
  const r=runLocalWorkspaceQa(['--expect-head='+other],{execute:f.execute,log:()=>{}});
  assert.equal(r.exitCode,2);assert.equal(r.report.expectedHead,other);
+ assert.equal(r.report.exactHead,false,
+  'a clean but wrong HEAD must never be marked exact in JSON evidence');
+ assert.equal(r.report.outcome,'blocked');
  assert.equal(f.calls.filter(x=>x[0]!=='git').length,0);
 });
 
