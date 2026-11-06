@@ -1,0 +1,221 @@
+name: DuckBio daily isolated QA
+
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+    inputs:
+      native_integrations:
+        description: 'Run all six private native app integrations (requires DUCKBIO_QA_READ_TOKEN)'
+        type: boolean
+        default: false
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/daily-isolated-qa.yml'
+      - 'workspace-server/DAILY_QA.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-isolated-qa-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  workspace:
+    name: Workspace checks and synthetic six-app contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare local-only test execution
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/daily-qa/tmp"
+          cat > "$RUNNER_TEMP/daily-qa/isolate.sh" <<'ISOLATE'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          # A fresh Linux network namespace has no external interfaces or routes.
+          # Bring up loopback for the disposable HTTP/HTTPS/database fixtures only.
+          exec sudo unshare --net -- bash -euo pipefail -c '
+            ip link set lo up
+            qa_user=$1; qa_home=$2; qa_path=$3; qa_tmp=$4
+            shift 4
+            exec runuser -u "$qa_user" -- env -i HOME="$qa_home" PATH="$qa_path" TMPDIR="$qa_tmp" CI=true "$@"
+          ' -- "$(id -un)" "$HOME" "$PATH" "$RUNNER_TEMP/daily-qa/tmp" "$@"
+          ISOLATE
+          chmod +x "$RUNNER_TEMP/daily-qa/isolate.sh"
+      - name: Record tested revision and toolchain
+        run: |
+          set -euo pipefail
+          { git rev-parse HEAD; node --version; npm --version; } | tee "$RUNNER_TEMP/daily-qa/revision.log"
+      # workspace-server currently has no external npm dependencies or lockfile.
+      - name: Check Workspace source
+        working-directory: workspace-server
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/daily-qa/isolate.sh" npm run check 2>&1 | tee "$RUNNER_TEMP/daily-qa/check.log"
+      - name: Run existing isolated Workspace suite
+        working-directory: workspace-server
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/daily-qa/isolate.sh" npm test 2>&1 | tee "$RUNNER_TEMP/daily-qa/tests.log"
+      - name: Preserve logs on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: duckbio-workspace-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/daily-qa/*.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  native-integrations:
+    name: Workspace with ${{ matrix.app }}
+    # Prepared opt-in: private source access is separate from production access.
+    # Set the repository variable to true to include this matrix in daily runs.
+    if: >-
+      (github.event_name == 'schedule' && vars.DUCKBIO_NATIVE_QA_ENABLED == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.native_integrations)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - app: CytoDuck
+            test: tests/e2e/cytoduck-real-workspace-https.test.cjs
+          - app: DuckNote
+            test: scripts/workspace-native-postgres-real-browser.mjs
+          - app: DuckTrain
+            test: tests/browser-ducktrain-real-workspace-https.test.cjs
+          - app: DuckMan
+            test: tests/browser-duckman-real-workspace-https.test.cjs
+          - app: DuckPipe
+            test: tests/browser-duckpipe-real-workspace-https.test.cjs
+          - app: LabDuck
+            test: tests/browser-labduck-real-workspace-https.test.cjs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: workspace
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare local-only test execution
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/daily-qa/tmp"
+          cat > "$RUNNER_TEMP/daily-qa/isolate.sh" <<'ISOLATE'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          # A fresh Linux network namespace has no external interfaces or routes.
+          # Bring up loopback for the disposable HTTP/HTTPS/database fixtures only.
+          exec sudo unshare --net -- bash -euo pipefail -c '
+            ip link set lo up
+            qa_user=$1; qa_home=$2; qa_path=$3; qa_tmp=$4
+            shift 4
+            exec runuser -u "$qa_user" -- env -i HOME="$qa_home" PATH="$qa_path" TMPDIR="$qa_tmp" CI=true "$@"
+          ' -- "$(id -un)" "$HOME" "$PATH" "$RUNNER_TEMP/daily-qa/tmp" "$@"
+          ISOLATE
+          chmod +x "$RUNNER_TEMP/daily-qa/isolate.sh"
+      - name: Require explicitly configured read-only source access
+        env:
+          SOURCE_TOKEN: ${{ secrets.DUCKBIO_QA_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$SOURCE_TOKEN" ]]; then
+            echo '::error::Set DUCKBIO_QA_READ_TOKEN with contents:read on the six private app repositories; no production credentials are used.'
+            exit 1
+          fi
+      - name: Checkout current native app main (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: dennisbsj/${{ matrix.app }}
+          ref: main
+          path: native
+          token: ${{ secrets.DUCKBIO_QA_READ_TOKEN }}
+          persist-credentials: false
+      - name: Record exact Workspace and native revisions
+        run: |
+          set -euo pipefail
+          { git -C workspace rev-parse HEAD; git -C native rev-parse HEAD; node --version; } | tee "$RUNNER_TEMP/daily-qa/revision.log"
+      - name: Install locked application dependencies where declared
+        working-directory: native
+        run: |
+          set -euo pipefail
+          if [[ -f package-lock.json ]]; then
+            npm ci --no-audit --no-fund 2>&1 | tee "$RUNNER_TEMP/daily-qa/install.log"
+          else
+            node -e 'const p=require("./package.json"); if(Object.keys({...p.dependencies,...p.devDependencies}).length) throw Error("Dependencies require a reviewed lockfile")'
+          fi
+      - name: Install pinned test-only browser harness
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/daily-qa/browser" --no-audit --no-fund --ignore-scripts playwright@1.56.1 2>&1 | tee "$RUNNER_TEMP/daily-qa/browser-install.log"
+          PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/daily-qa/browsers" node "$RUNNER_TEMP/daily-qa/browser/node_modules/playwright/cli.js" install --with-deps chromium 2>&1 | tee -a "$RUNNER_TEMP/daily-qa/browser-install.log"
+      - name: Prepare PostgreSQL binaries for disposable DuckNote database
+        if: matrix.app == 'DuckNote'
+        run: |
+          set -euo pipefail
+          sudo apt-get update 2>&1 | tee "$RUNNER_TEMP/daily-qa/postgres-install.log"
+          sudo apt-get install -y postgresql libpq-dev 2>&1 | tee -a "$RUNNER_TEMP/daily-qa/postgres-install.log"
+      - name: Prepare required native integration command
+        env:
+          NATIVE_APP: ${{ matrix.app }}
+          NATIVE_TEST: ${{ matrix.test }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/daily-qa/native-tests.sh" <<'TESTS'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          cd "$NATIVE_ROOT"
+          if [[ "$NATIVE_APP" == DuckNote ]]; then
+            pg_bin="$(pg_config --bindir)"
+            "$pg_bin/initdb" -D "$QA_ROOT/pg" --encoding=UTF8 -A trust -U qa
+            "$pg_bin/pg_ctl" -D "$QA_ROOT/pg" -l "$QA_ROOT/postgres.log" -o "-h 127.0.0.1 -p 55432 -k $QA_ROOT/tmp" -w start
+            trap '"$pg_bin/pg_ctl" -D "$QA_ROOT/pg" -m immediate -w stop' EXIT
+            "$pg_bin/createdb" -h 127.0.0.1 -p 55432 -U qa native_test
+            export EEL_TEST_DATABASE_URL=postgresql://qa@127.0.0.1:55432/native_test
+            VITE_STORAGE_MODE=server npm run build
+            timeout --signal=TERM --kill-after=5s 240s node "$NATIVE_TEST"
+          else
+            if [[ "$NATIVE_APP" == CytoDuck ]]; then npm run build; fi
+            timeout --signal=TERM --kill-after=5s 240s node --test "$NATIVE_TEST"
+          fi
+          TESTS
+      - name: Test real native app and current Workspace with synthetic HTTPS fixtures
+        env:
+          NATIVE_APP: ${{ matrix.app }}
+          NATIVE_TEST: ${{ matrix.test }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/daily-qa/isolate.sh" env \
+            NATIVE_APP="$NATIVE_APP" NATIVE_TEST="$NATIVE_TEST" \
+            NATIVE_ROOT="$GITHUB_WORKSPACE/native" QA_ROOT="$RUNNER_TEMP/daily-qa" \
+            DUCKBIO_SITE_CHECKOUT="$GITHUB_WORKSPACE/workspace" \
+            DUCKBIO_WORKSPACE_TEST_ROOT="$GITHUB_WORKSPACE/workspace/workspace-server" \
+            NODE_OPTIONS="--require=$GITHUB_WORKSPACE/native/tests/helpers/local-network-only.cjs" \
+            NODE_PATH="$RUNNER_TEMP/daily-qa/browser/node_modules" \
+            PLAYWRIGHT_MODULE="$RUNNER_TEMP/daily-qa/browser/node_modules/playwright" \
+            PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/daily-qa/browsers" \
+            bash "$RUNNER_TEMP/daily-qa/native-tests.sh" 2>&1 | tee "$RUNNER_TEMP/daily-qa/integration.log"
+      - name: Preserve integration logs on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: duckbio-native-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/daily-qa/*.log
+          if-no-files-found: warn
+          retention-days: 14
