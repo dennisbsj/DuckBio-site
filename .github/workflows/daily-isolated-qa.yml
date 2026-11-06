@@ -65,12 +65,12 @@ jobs:
         working-directory: workspace-server
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/daily-qa/isolate.sh" npm run check 2>&1 | tee "$RUNNER_TEMP/daily-qa/check.log"
+          "$RUNNER_TEMP/daily-qa/isolate.sh" npm --script-shell=/bin/bash --node-options= --workspaces=false run check 2>&1 | tee "$RUNNER_TEMP/daily-qa/check.log"
       - name: Run existing isolated Workspace suite
         working-directory: workspace-server
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/daily-qa/isolate.sh" npm test 2>&1 | tee "$RUNNER_TEMP/daily-qa/tests.log"
+          "$RUNNER_TEMP/daily-qa/isolate.sh" npm --script-shell=/bin/bash --node-options= --workspaces=false test 2>&1 | tee "$RUNNER_TEMP/daily-qa/tests.log"
       - name: Preserve logs on success or failure
         if: always()
         uses: actions/upload-artifact@v4
