@@ -14,6 +14,7 @@ on:
     paths:
       - '.github/workflows/daily-isolated-qa.yml'
       - 'workspace-server/DAILY_QA.md'
+      - 'workspace-server/**'
 
 permissions:
   contents: read
