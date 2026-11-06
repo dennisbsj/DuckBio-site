@@ -154,6 +154,7 @@ export function runLocalWorkspaceQa(argv=process.argv.slice(2),{
   return {exitCode:2,report};
  }
  if(options.expectHead&&sha!==options.expectHead){
+  report.exactHead=false;
   log('Checked-out Git HEAD does not match the pinned expected SHA.');
   return {exitCode:2,report};
  }
