@@ -574,3 +574,35 @@ test('inherited npm workspace selectors cannot redirect Workspace QA to another 
  }
  assert.deepEqual(unsafeQaNodeEnvironment({NPM_CONFIG_WORKSPACE:'   '}),[]);
 });
+
+
+test('npm user .npmrc workspace selector cannot redirect protected QA child scripts',t=>{
+ if(process.platform==='win32'){t.skip('POSIX shell fixture');return;}
+ const scratch=mkdtempSync(join(tmpdir(),'duckbio-npmrc-workspace-'));
+ t.after(()=>rmSync(scratch,{recursive:true,force:true}));
+ mkdirSync(join(scratch,'b'));mkdirSync(join(scratch,'home'));
+ writeFileSync(join(scratch,'package.json'),JSON.stringify({
+  name:'qa-root',private:true,workspaces:['b'],
+  scripts:{check:'node -e "process.exit(7)"'}
+ })+'\n');
+ writeFileSync(join(scratch,'b','package.json'),JSON.stringify({
+  name:'qa-child',version:'1.0.0',scripts:{check:'node -e "process.exit(0)"'}
+ })+'\n');
+ const userconfig=join(scratch,'home','.npmrc');
+ writeFileSync(userconfig,'workspace=b\n');
+ const env={...process.env,NPM_CONFIG_USERCONFIG:userconfig};
+ const run=args=>spawnSync('npm',args,{cwd:scratch,env,encoding:'utf8',timeout:15000});
+ const redirected=run(['--script-shell=/bin/sh','--node-options=','run','check']);
+ assert.equal(redirected.status,0,redirected.stderr);
+ const protectedRun=run(['--script-shell=/bin/sh','--node-options=',
+  '--workspaces=false','run','check']);
+ assert.notEqual(protectedRun.status,0,
+  'must fail closed instead of accepting a child workspace green');
+ const f=fake();
+ const result=runLocalWorkspaceQa([],{execute:f.execute,log:()=>{}});
+ assert.equal(result.exitCode,0);
+ for(const call of f.calls.filter(x=>x[0]==='npm')){
+  assert.ok(call.includes('--workspaces=false'),
+   'each npm QA child must explicitly disable workspace selection');
+ }
+});
