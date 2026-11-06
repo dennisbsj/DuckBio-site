@@ -84,9 +84,11 @@ jobs:
     name: Workspace with ${{ matrix.app }}
     # Prepared opt-in: private source access is separate from production access.
     # Set the repository variable to true to include this matrix in daily runs.
+    # Private source token must not be used by a manually dispatched feature-branch workflow.
     if: >-
-      (github.event_name == 'schedule' && vars.DUCKBIO_NATIVE_QA_ENABLED == 'true') ||
-      (github.event_name == 'workflow_dispatch' && inputs.native_integrations)
+      github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'schedule' && vars.DUCKBIO_NATIVE_QA_ENABLED == 'true') ||
+       (github.event_name == 'workflow_dispatch' && inputs.native_integrations))
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
