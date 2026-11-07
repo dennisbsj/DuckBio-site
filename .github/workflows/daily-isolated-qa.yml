@@ -189,7 +189,17 @@ jobs:
       - name: Install pinned test-only browser harness
         run: |
           set -euo pipefail
-          npm install --prefix "$RUNNER_TEMP/daily-qa/browser" --no-audit --no-fund --ignore-scripts playwright@1.56.1 2>&1 | tee "$RUNNER_TEMP/daily-qa/browser-install.log"
+          # Browser harness installation is also network-enabled: do not inherit Node/npm
+          # preload hooks or user/global/project npm configuration from the runner.
+          browser_root="$RUNNER_TEMP/daily-qa/browser"
+          mkdir -p "$browser_root" "$RUNNER_TEMP/daily-qa/browser-home"
+          : > "$RUNNER_TEMP/daily-qa/browser-global.npmrc"
+          (
+            cd "$browser_root"
+            env -i HOME="$RUNNER_TEMP/daily-qa/browser-home" PATH="$PATH" CI=true \\
+              npm --userconfig=/dev/null --globalconfig="$RUNNER_TEMP/daily-qa/browser-global.npmrc" \\
+              install --no-audit --no-fund --ignore-scripts --save-exact playwright@1.56.1
+          ) 2>&1 | tee "$RUNNER_TEMP/daily-qa/browser-install.log"
       - name: Record resolved browser harness and Chromium executable provenance
         run: |
           set -euo pipefail
