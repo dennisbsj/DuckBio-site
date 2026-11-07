@@ -160,6 +160,13 @@ jobs:
         working-directory: native
         run: |
           set -euo pipefail
+          # Deny inherited preloads and module search paths before online npm preparation.
+          for inherited in NODE_OPTIONS NODE_PATH npm_config_node_options NPM_CONFIG_NODE_OPTIONS; do
+            if [[ -n "${!inherited:-}" ]]; then
+              echo "::error::Unexpected inherited Node execution setting: $inherited"
+              exit 1
+            fi
+          done
           if [[ -f package-lock.json ]]; then
             npm ci --ignore-scripts --no-audit --no-fund 2>&1 | tee "$RUNNER_TEMP/daily-qa/install.log"
           else
