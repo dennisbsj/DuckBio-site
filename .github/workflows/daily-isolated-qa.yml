@@ -168,6 +168,17 @@ jobs:
           set -euo pipefail
           npm install --prefix "$RUNNER_TEMP/daily-qa/browser" --no-audit --no-fund --ignore-scripts playwright@1.56.1 2>&1 | tee "$RUNNER_TEMP/daily-qa/browser-install.log"
           PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/daily-qa/browsers" node "$RUNNER_TEMP/daily-qa/browser/node_modules/playwright/cli.js" install --with-deps chromium 2>&1 | tee -a "$RUNNER_TEMP/daily-qa/browser-install.log"
+      - name: Record resolved browser harness and Chromium executable provenance
+        run: |
+          set -euo pipefail
+          browser_root="$RUNNER_TEMP/daily-qa/browser"
+          lockfile="$browser_root/package-lock.json"
+          test -s "$lockfile"
+          node -e 'const p=require(process.argv[1]);if(p.packages?.["node_modules/playwright"]?.version!=="1.56.1")process.exit(1)' "$lockfile"
+          sha256sum "$lockfile" | tee "$RUNNER_TEMP/daily-qa/browser-provenance.log"
+          chromium_bin="$(PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/daily-qa/browsers" node -e 'const p=require(process.argv[1]);process.stdout.write(p.chromium.executablePath())' "$browser_root/node_modules/playwright")"
+          test -f "$chromium_bin"
+          sha256sum "$chromium_bin" | tee -a "$RUNNER_TEMP/daily-qa/browser-provenance.log"
       - name: Prepare PostgreSQL binaries for disposable DuckNote database
         if: matrix.app == 'DuckNote'
         run: |
