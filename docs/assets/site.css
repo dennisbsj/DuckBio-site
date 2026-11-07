@@ -3038,3 +3038,19 @@ html body.support-faq-page .page-hero.support-hero.duckbio-real-hero--support .d
   margin-top:18px!important;
  }
 }
+
+
+/* Keep the cleaned DuckBook hero legible and show the complete image on phones.
+   The marketing copy is live HTML, not baked into the illustration. */
+@media (min-width:851px) {
+  body.homepage-exact main>.home-mockup-exact.duckbio-real-hero>.duckbio-real-hero-image {
+    object-position:center 15%!important;
+  }
+}
+@media (max-width:850px) {
+  body.homepage-exact main>.home-mockup-exact.duckbio-real-hero>.duckbio-real-hero-image {
+    aspect-ratio:2/1!important;
+    object-fit:contain!important;
+    object-position:center center!important;
+  }
+}
