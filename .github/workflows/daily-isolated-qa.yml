@@ -168,7 +168,8 @@ jobs:
             fi
           done
           if [[ -f package-lock.json ]]; then
-            npm ci --ignore-scripts --no-audit --no-fund 2>&1 | tee "$RUNNER_TEMP/daily-qa/install.log"
+            : > "$RUNNER_TEMP/daily-qa/empty-global.npmrc"
+            npm ci --ignore-scripts --userconfig=/dev/null --globalconfig="$RUNNER_TEMP/daily-qa/empty-global.npmrc" --no-audit --no-fund 2>&1 | tee "$RUNNER_TEMP/daily-qa/install.log"
           else
             node -e 'const p=require("./package.json"); if(Object.keys({...p.dependencies,...p.devDependencies}).length) throw Error("Dependencies require a reviewed lockfile")'
           fi
