@@ -167,6 +167,19 @@ jobs:
               exit 1
             fi
           done
+          # Deny arbitrary npm_config_* environment overrides and unreviewed project npmrc.
+          # CLI user/global npmrc flags alone cannot override project-local configuration.
+          for inherited in $(compgen -e); do
+            case "$inherited" in
+              npm_config_*|NPM_CONFIG_*)
+                echo "::error::Unexpected inherited npm configuration: $inherited"
+                exit 1;;
+            esac
+          done
+          if [[ -e .npmrc || -L .npmrc ]]; then
+            echo '::error::Native repository .npmrc requires explicit source review before online npm install'
+            exit 1
+          fi
           if [[ -f package-lock.json ]]; then
             : > "$RUNNER_TEMP/daily-qa/empty-global.npmrc"
             npm ci --ignore-scripts --userconfig=/dev/null --globalconfig="$RUNNER_TEMP/daily-qa/empty-global.npmrc" --no-audit --no-fund 2>&1 | tee "$RUNNER_TEMP/daily-qa/install.log"
