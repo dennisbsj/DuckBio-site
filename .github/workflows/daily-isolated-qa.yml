@@ -154,12 +154,14 @@ jobs:
         run: |
           set -euo pipefail
           { git -C workspace rev-parse HEAD; git -C native rev-parse HEAD; node --version; } | tee "$RUNNER_TEMP/daily-qa/revision.log"
+      # Fail closed: native npm dependency lifecycle hooks must not execute with network access.
+      # Native build/runtime compatibility (esbuild, @node-rs/argon2) still requires exact-SHA QA.
       - name: Install locked application dependencies where declared
         working-directory: native
         run: |
           set -euo pipefail
           if [[ -f package-lock.json ]]; then
-            npm ci --no-audit --no-fund 2>&1 | tee "$RUNNER_TEMP/daily-qa/install.log"
+            npm ci --ignore-scripts --no-audit --no-fund 2>&1 | tee "$RUNNER_TEMP/daily-qa/install.log"
           else
             node -e 'const p=require("./package.json"); if(Object.keys({...p.dependencies,...p.devDependencies}).length) throw Error("Dependencies require a reviewed lockfile")'
           fi
