@@ -196,8 +196,8 @@ jobs:
           : > "$RUNNER_TEMP/daily-qa/browser-global.npmrc"
           (
             cd "$browser_root"
-            env -i HOME="$RUNNER_TEMP/daily-qa/browser-home" PATH="$PATH" CI=true \\
-              npm --userconfig=/dev/null --globalconfig="$RUNNER_TEMP/daily-qa/browser-global.npmrc" \\
+            env -i HOME="$RUNNER_TEMP/daily-qa/browser-home" PATH="$PATH" CI=true \
+              npm --userconfig=/dev/null --globalconfig="$RUNNER_TEMP/daily-qa/browser-global.npmrc" \
               install --no-audit --no-fund --ignore-scripts --save-exact playwright@1.56.1
           ) 2>&1 | tee "$RUNNER_TEMP/daily-qa/browser-install.log"
       - name: Record resolved browser harness and Chromium executable provenance
