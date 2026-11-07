@@ -174,7 +174,7 @@ jobs:
           browser_root="$RUNNER_TEMP/daily-qa/browser"
           lockfile="$browser_root/package-lock.json"
           test -s "$lockfile"
-          node -e 'const p=require(process.argv[1]);if(p.packages?.["node_modules/playwright"]?.version!=="1.56.1")process.exit(1)' "$lockfile"
+          node -e 'const p=require(process.argv[1]);for(const name of ["playwright","playwright-core"]){const x=p.packages?.["node_modules/"+name];if(x?.version!=="1.56.1"||!/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(x.integrity||"")||!/^https:\/\/registry\.npmjs\.org\//.test(x.resolved||"")){console.error("Unverified browser dependency: "+name);process.exit(1)}}' "$lockfile"
           sha256sum "$lockfile" | tee "$RUNNER_TEMP/daily-qa/browser-provenance.log"
           chromium_bin="$(PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/daily-qa/browsers" node -e 'const p=require(process.argv[1]);process.stdout.write(p.chromium.executablePath())' "$browser_root/node_modules/playwright")"
           test -f "$chromium_bin"
